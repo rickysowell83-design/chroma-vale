@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chroma Vale — Admin</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 2rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .sub { color: #666; font-size: 0.85rem; margin-bottom: 2rem; }
+
+    .login { max-width: 360px; }
+    .login input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+    }
+    .login input:focus { border-color: #a855f7; }
+    .login button {
+      width: 100%;
+      padding: 0.75rem;
+      background: #a855f7;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .login button:hover { background: #c084fc; }
+
+    .stats { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .stat { background: #1a1a1a; padding: 1rem 1.25rem; border-radius: 8px; border: 1px solid #2a2a2a; }
+    .stat .num { font-size: 2rem; font-weight: 700; color: #a855f7; }
+    .stat .label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 0.6rem 0.75rem; font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #222; }
+    td { padding: 0.6rem 0.75rem; font-size: 0.9rem; border-bottom: 1px solid #1a1a1a; }
+    td.email { color: #e0e0e0; }
+    td.date { color: #666; font-size: 0.8rem; }
+
+    .error { color: #f87171; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+    .error.show { display: block; }
+
+    .hidden { display: none; }
+    .logout-btn {
+      position: absolute; top: 2rem; right: 2rem;
+      background: none; border: 1px solid #333; color: #666;
+      padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+    }
+    .logout-btn:hover { color: #e0e0e0; border-color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Chroma Vale</h1>
+    <p class="sub">Email signups</p>
+
+    <!-- Login -->
+    <div id="login-screen" class="login">
+      <input type="password" id="key-input" placeholder="Admin key" autofocus>
+      <button onclick="loadList()">View Signups</button>
+      <p id="login-error" class="error">Wrong key.</p>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden">
+      <button class="logout-btn" onclick="logout()">Logout</button>
+      <div class="stats">
+        <div class="stat"><div class="num" id="count">-</div><div class="label">Total</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Email</th><th>Signed Up</th></tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://chroma-vale-signup.ricky-sowell83.workers.dev';
+
+    // Auto-login if key is saved
+    const savedKey = sessionStorage.getItem('cv_admin_key');
+    if (savedKey) {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      fetchList(savedKey);
+    }
+
+    // Enter key to submit
+    document.getElementById('key-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') loadList();
+    });
+
+    async function loadList() {
+      const key = document.getElementById('key-input').value.trim();
+      if (!key) return;
+
+      try {
+        const res = await fetch(`${WORKER_URL}/list?key=${encodeURIComponent(key)}`);
+        if (res.status === 401) {
+          document.getElementById('login-error').classList.add('show');
+          return;
+        }
+        const data = await res.json();
+
+        // Save key for session
+        sessionStorage.setItem('cv_admin_key', key);
+
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('login-error').classList.remove('show');
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('key-input').value = '';
+
+        renderList(data);
+      } catch (err) {
+        document.getElementById('login-error').classList.add('show');
+      }
+    }
+
+    function renderList(data) {
+      document.getElementById('count').textContent = data.count;
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = data.emails.map(e =>
+        `<tr><td class="email">${escapeHtml(e.email)}</td><td class="date">${fmtDate(e.signed_up)}</td></tr>`
+      ).join('');
+    }
+
+    function logout() {
+      sessionStorage.removeItem('cv_admin_key');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('key-input').focus();
+    }
+
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function fetchList(key) {
+      const res = await fetch(`${WORKER_URL}/list?key=${encodeURIComponent(key)}`);
+      if (res.status !== 200) { logout(); return; }
+      renderList(await res.json());
+    }
+  </script>
+</body>
+</html>
