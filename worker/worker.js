@@ -12,10 +12,10 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // GET /list?key=SECRET — admin: list all signups
+    // GET /list?key=SECRET — admin: list all signups (v2)
     if (request.method === 'GET' && url.pathname === '/list') {
       const key = url.searchParams.get('key');
-      const adminKey = env.ADMIN_KEY || 'chroma-vale-admin-2026';
+      const adminKey = env.ADMIN_KEY || 'rmsP@yMe_sunstickets_6017';
 
       if (key !== adminKey) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
