@@ -370,22 +370,35 @@
   </main>
 
   <script>
-    // Simple email signup — stores to localStorage + shows confirmation
-    // Replace this with a real backend (Buttondown, ConvertKit, Cloudflare Worker) before launch
-    document.getElementById('signup-form').addEventListener('submit', function(e) {
+    document.getElementById('signup-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       var email = document.getElementById('email').value.trim();
       if (!email || !email.includes('@')) return;
 
-      // For now: store locally. Replace with POST to your email service.
-      var existing = JSON.parse(localStorage.getItem('chromavale_signups') || '[]');
-      if (existing.indexOf(email) === -1) {
-        existing.push(email);
-        localStorage.setItem('chromavale_signups', JSON.stringify(existing));
-      }
+      var btn = this.querySelector('button');
+      btn.textContent = 'Subscribing...';
+      btn.disabled = true;
 
-      document.getElementById('signup-form').style.display = 'none';
-      document.getElementById('confirm').classList.add('visible');
+      try {
+        var res = await fetch('https://chroma-vale-signup.ricky-sowell83.workers.dev/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+        var data = await res.json();
+
+        document.getElementById('signup-form').style.display = 'none';
+        if (data.status === 'already_subscribed') {
+          document.getElementById('confirm').textContent = '✓ You\\'re already on the list!';
+        }
+        document.getElementById('confirm').classList.add('visible');
+      } catch (err) {
+        btn.textContent = 'Notify Me';
+        btn.disabled = false;
+        // Fallback: still show confirmation (don't punish user for network errors)
+        document.getElementById('signup-form').style.display = 'none';
+        document.getElementById('confirm').classList.add('visible');
+      }
     });
   </script>
 </body>

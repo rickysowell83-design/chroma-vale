@@ -1,0 +1,7 @@
+name = "chroma-vale-signup"
+main = "worker.js"
+compatibility_date = "2026-07-21"
+
+[[kv_namespaces]]
+binding = "EMAILS"
+id = "ba7e3ace631443c6866deef9ac8f4919"
