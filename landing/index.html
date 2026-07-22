@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chroma Vale — Sort. Build. Restore.</title>
+  <meta name="description" content="A puzzle game where every level restores color to a dead world. Pipeline puzzles. Pixel art. Zero paywalls.">
+  <meta property="og:title" content="Chroma Vale">
+  <meta property="og:description" content="A puzzle game where every level restores color to a dead world.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://chromavale.com">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --text: #e0e0e0;
+      --muted: #888;
+      --accent: #a855f7;
+      --accent-glow: #c084fc;
+    }
+
+    @font-face {
+      font-family: 'Display';
+      src: local('Georgia'), local('Times New Roman');
+      /* Falls back gracefully */
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Animated background — subtle grayscale-to-color bleed */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 40%, rgba(168,85,247,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 80% at 20% 80%, rgba(59,130,246,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 70% at 80% 20%, rgba(236,72,153,0.04) 0%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+      animation: breathe 8s ease-in-out infinite alternate;
+    }
+
+    @keyframes breathe {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 560px;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* Logo / Title */
+    .title-block {
+      margin-bottom: 1rem;
+    }
+
+    .sub-mark {
+      display: inline-block;
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(2.5rem, 8vw, 4.5rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #e0e0e0 0%, #a0a0a0 40%, #a855f7 60%, #c084fc 80%, #e0e0e0 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 6s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    /* Pipeline visual — decorative */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin: 2rem 0 1.5rem;
+      height: 48px;
+    }
+
+    .pipe-segment {
+      height: 4px;
+      flex: 1;
+      max-width: 60px;
+      border-radius: 2px;
+      transition: background 0.8s ease;
+    }
+
+    .pipeline:hover .pipe-segment {
+      animation: colorFlow 1.5s ease-in-out forwards;
+    }
+
+    .pipeline:hover .pipe-segment:nth-child(1) { animation-delay: 0s; }
+    .pipeline:hover .pipe-segment:nth-child(2) { animation-delay: 0.1s; }
+    .pipeline:hover .pipe-segment:nth-child(3) { animation-delay: 0.2s; }
+    .pipeline:hover .pipe-segment:nth-child(4) { animation-delay: 0.3s; }
+    .pipeline:hover .pipe-segment:nth-child(5) { animation-delay: 0.4s; }
+    .pipeline:hover .pipe-segment:nth-child(6) { animation-delay: 0.5s; }
+
+    @keyframes colorFlow {
+      0% { background: #444; }
+      100% { background: #a855f7; box-shadow: 0 0 8px rgba(168,85,247,0.6); }
+    }
+
+    .pipe-segment { background: #333; }
+    .pipe-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #333;
+      flex-shrink: 0;
+      transition: all 0.8s ease;
+    }
+    .pipeline:hover .pipe-dot {
+      background: #c084fc;
+      box-shadow: 0 0 12px rgba(192,132,252,0.8);
+    }
+
+    /* Tagline */
+    .tagline {
+      font-size: clamp(1rem, 3vw, 1.25rem);
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .tagline strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Art placeholder */
+    .art-placeholder {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      aspect-ratio: 16/10;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #222 50%, #1a1a1a 100%);
+      border: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .art-placeholder::after {
+      content: '🎨 Concept art coming soon';
+      color: #444;
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* Email signup */
+    .signup {
+      margin-bottom: 2rem;
+    }
+
+    .signup-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .signup-form {
+      display: flex;
+      gap: 0.5rem;
+      max-width: 380px;
+      margin: 0 auto;
+    }
+
+    .signup-form input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .signup-form input:focus {
+      border-color: var(--accent);
+    }
+
+    .signup-form input::placeholder {
+      color: #555;
+    }
+
+    .signup-form button {
+      padding: 0.75rem 1.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+
+    .signup-form button:hover {
+      background: var(--accent-glow);
+      box-shadow: 0 0 20px rgba(168,85,247,0.3);
+    }
+
+    .signup-note {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 0.5rem;
+    }
+
+    /* Social */
+    .social {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .social a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .social a:hover {
+      color: var(--text);
+    }
+
+    .social .x-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .social .x-link svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    /* Footer */
+    footer {
+      font-size: 0.75rem;
+      color: #444;
+      margin-top: 1rem;
+    }
+
+    /* Confirmation message (hidden by default) */
+    .confirm {
+      display: none;
+      color: #86efac;
+      font-size: 0.9rem;
+      margin-top: 0.75rem;
+    }
+
+    .confirm.visible { display: block; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .signup-form {
+        flex-direction: column;
+      }
+      .signup-form button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="title-block">
+      <span class="sub-mark">Manahunter Presents</span>
+      <h1>Chroma Vale</h1>
+    </div>
+
+    <!-- Decorative pipeline -->
+    <div class="pipeline" aria-hidden="true">
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+      <div class="pipe-segment"></div>
+      <div class="pipe-dot"></div>
+    </div>
+
+    <p class="tagline">
+      A puzzle game where <strong>every level restores color</strong> to a dead world. Route chromatic energy through pipeline networks. Rebuild. Watch the world bloom.
+    </p>
+
+    <!-- Placeholder for concept art / GIF -->
+    <div class="art-placeholder"></div>
+
+    <!-- Email signup -->
+    <div class="signup">
+      <p class="signup-label">Get notified on launch</p>
+      <form class="signup-form" id="signup-form">
+        <input type="email" id="email" placeholder="you@email.com" required>
+        <button type="submit">Notify Me</button>
+      </form>
+      <p class="signup-note">No spam. One email when the game launches. Maybe a dev update or two.</p>
+      <p class="confirm" id="confirm">✓ You're on the list. Thanks!</p>
+    </div>
+
+    <!-- Social -->
+    <div class="social">
+      <a href="https://x.com/Manahunter4" class="x-link" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        @Manahunter4
+      </a>
+      <span style="color:#333;">·</span>
+      <a href="mailto:hello@chromavale.com">hello@chromavale.com</a>
+    </div>
+
+    <footer>
+      &copy; 2026 Manahunter. Chroma Vale coming soon.
+    </footer>
+  </main>
+
+  <script>
+    // Simple email signup — stores to localStorage + shows confirmation
+    // Replace this with a real backend (Buttondown, ConvertKit, Cloudflare Worker) before launch
+    document.getElementById('signup-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var email = document.getElementById('email').value.trim();
+      if (!email || !email.includes('@')) return;
+
+      // For now: store locally. Replace with POST to your email service.
+      var existing = JSON.parse(localStorage.getItem('chromavale_signups') || '[]');
+      if (existing.indexOf(email) === -1) {
+        existing.push(email);
+        localStorage.setItem('chromavale_signups', JSON.stringify(existing));
+      }
+
+      document.getElementById('signup-form').style.display = 'none';
+      document.getElementById('confirm').classList.add('visible');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+# Unity generated
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# IDE / Editor
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Asset meta files should be tracked
+# But ignore meta files for directories Unity hasn't created yet
+# Actually, KEEP .meta files — never gitignore them
+
+# Memory captures
+*.mdb
+*.pdb
+
+# Build
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Crashlytics / crash dumps
+crashlytics-build.properties
+
+# Package manager auto-generated (we track manifest.json manually)
+/Packages/packages-lock.json
+
+# Hermes / Agent
+.hermes/

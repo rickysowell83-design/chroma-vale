@@ -1,0 +1,16 @@
+{
+  "name": "ChromaVale.Domain",
+  "rootNamespace": "ChromaVale.Domain",
+  "references": [
+    "ChromaVale.Core"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
