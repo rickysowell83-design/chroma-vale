@@ -3,7 +3,8 @@
   "rootNamespace": "ChromaVale.Presentation",
   "references": [
     "ChromaVale.Core",
-    "ChromaVale.Domain"
+    "ChromaVale.Domain",
+    "ChromaVale.Infrastructure"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

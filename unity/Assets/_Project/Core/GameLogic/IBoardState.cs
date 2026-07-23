@@ -23,7 +23,7 @@ namespace ChromaVale.Core.GameLogic
         int Width { get; }
         int Height { get; }
         GridCell GetCell(int x, int y);
-        void PlacePipe(int x, int y, int colorIndex);
+        void PlacePipe(int x, int y);
         bool IsValidPosition(int x, int y);
         bool IsComplete { get; }
     }

@@ -2,7 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using ChromaVale.Core.GameLogic;
+using ChromaVale.Domain.Progression;
 using ChromaVale.Domain.PuzzleBoard;
+using ChromaVale.Infrastructure.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -39,6 +41,10 @@ namespace ChromaVale.Presentation.Views
         private int _starsEarned;
         private readonly Stack<(int x, int y, int pieceIdx)> _undoStack = new();
 
+        // Audio
+        private IAudioService _audioService;
+        private float _lastFlowTickSoundTime;
+
         // Colors
         private static readonly Color NeonCyan = new(0.2f, 0.9f, 0.95f);
         private static readonly Color NeonMagenta = new(0.95f, 0.2f, 0.7f);
@@ -61,12 +67,26 @@ namespace ChromaVale.Presentation.Views
         private void Start()
         {
             _maxLevel = _levelRepo.LevelCount;
+
+            // Resolve audio service from the persistent installer
+            _audioService = AudioServiceInstaller.Instance;
+
+            // Load saved progress — start from the highest unlocked level
+            if (SaveGameManager.Instance != null)
+            {
+                int savedLevel = SaveGameManager.Instance.CurrentLevel;
+                if (savedLevel >= 1 && savedLevel <= _maxLevel)
+                    _levelNumber = savedLevel;
+            }
+
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
             _inventory = new PipeInventory(_level.Inventory);
             BuildGrid();
             CreateUI();
+
+            if (_audioService != null) _audioService.PlaySound("level_start");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -183,12 +203,11 @@ namespace ChromaVale.Presentation.Views
 
             var cell = _board.GetCell(x, y);
 
-            // If there's a placed pipe here, rotate or remove it
+            // If there's a placed pipe here, ROTATE it (tap)
             int existingIdx = _inventory.GetPieceIndexAt(x, y);
             if (existingIdx >= 0 && cell.Type == CellType.Pipe)
             {
-                // Undo this placement on tap
-                UndoPlacement(x, y, existingIdx);
+                RotatePlacement(x, y, existingIdx);
                 return;
             }
 
@@ -200,31 +219,72 @@ namespace ChromaVale.Presentation.Views
             }
         }
 
+        /// <summary>
+        /// Called by right-click on any tile. Undoes the most recently placed piece.
+        /// Right-click on a placed piece = undo/remove (chosen for prototype simplicity).
+        /// </summary>
+        public void OnRightClick()
+        {
+            if (_solved) return;
+            if (_flowSim.IsRunning) return;
+            UndoPlacement();
+        }
+
+        private void RotatePlacement(int x, int y, int pieceIdx)
+        {
+            var piece = _inventory.GetPieceAt(x, y);
+            if (piece == null) return;
+
+            piece.Rotate();
+
+            // Redraw the pipe shape with new rotation
+            DrawPipeShape(_renderers[x, y].gameObject, piece.Shape, piece.Rotation);
+
+            // Reset tile color to neutral if flow isn't running
+            if (!_flowSim.IsRunning)
+            {
+                _renderers[x, y].color = GetPipeColor(0);
+            }
+
+            // Notify flow simulator of shape/rotation change
+            if (_flowSim != null)
+            {
+                _flowSim.SetPipeShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
+            }
+
+            StartCoroutine(PopAnim(_renderers[x, y].transform));
+        }
+
         private void PlaceSelectedPiece(int x, int y)
         {
             if (_selectedPieceIndex < 0) return;
 
-            bool placed = _inventory.TryPlace(_selectedPieceIndex, _board, x, y, _flowSim);
+            bool placed = _inventory.TryPlace(_selectedPieceIndex, _board, x, y, _flowSim, rotation: 0);
             if (placed)
             {
                 _undoStack.Push((x, y, _selectedPieceIndex));
                 _moveCount++;
                 UpdateMoveCounter();
                 _renderers[x, y].color = GetPipeColor(0);
-                // Draw the visual pipe shape on the tile
+                // Draw the visual pipe shape on the tile (initial rotation = 0)
                 var piece = _inventory.GetPieceAt(x, y);
-                if (piece != null) DrawPipeShape(_renderers[x, y].gameObject, piece.Shape);
+                if (piece != null) DrawPipeShape(_renderers[x, y].gameObject, piece.Shape, piece.Rotation);
                 StartCoroutine(PopAnim(_renderers[x, y].transform));
                 UpdateInventoryUI();
                 _selectedPieceIndex = -1;
                 HighlightSelected(null);
                 if (_tutorialHint != null && _tutorialHint.activeSelf)
                     _tutorialHint.SetActive(false);
+                if (_audioService != null) _audioService.PlaySound("pipe_place");
             }
         }
 
-        private void UndoPlacement(int x, int y, int pieceIdx)
+        private void UndoPlacement()
         {
+            if (_undoStack.Count == 0) return;
+            var top = _undoStack.Peek();
+            int x = top.x, y = top.y;
+
             bool undone = _inventory.TryUndo(_board);
             if (undone)
             {
@@ -233,13 +293,8 @@ namespace ChromaVale.Presentation.Views
                 _moveCount = Mathf.Max(0, _moveCount - 1);
                 UpdateMoveCounter();
                 UpdateInventoryUI();
-                // Pop the undo stack if this was the last placed piece
-                if (_undoStack.Count > 0)
-                {
-                    var top = _undoStack.Peek();
-                    if (top.x == x && top.y == y)
-                        _undoStack.Pop();
-                }
+                _undoStack.Pop();
+                if (_audioService != null) _audioService.PlaySound("undo");
             }
         }
 
@@ -313,6 +368,12 @@ namespace ChromaVale.Presentation.Views
                 _renderers[x, y].color = GetPipeColor(colorIndex);
                 StartCoroutine(FlowPulseAnim(_renderers[x, y].transform));
             }
+            // Throttle flow_tick to max 1 per 0.1s to avoid audible spam
+            if (_audioService != null && Time.realtimeSinceStartup - _lastFlowTickSoundTime >= 0.1f)
+            {
+                _audioService.PlaySound("flow_tick");
+                _lastFlowTickSoundTime = Time.realtimeSinceStartup;
+            }
         }
 
         private void HandlePipeBurst(int x, int y)
@@ -323,6 +384,7 @@ namespace ChromaVale.Presentation.Views
                 StartCoroutine(BurstAnim(_renderers[x, y].transform));
             }
             _inventory.MarkBurst(x, y);
+            if (_audioService != null) _audioService.PlaySound("pipe_burst");
         }
 
         private void HandleColorMix(int x, int y, int colorA, int colorB)
@@ -332,6 +394,7 @@ namespace ChromaVale.Presentation.Views
             {
                 StartCoroutine(MixFlashAnim(_renderers[x, y]));
             }
+            if (_audioService != null) _audioService.PlaySound("color_mix");
         }
 
         private void HandleTargetReached(int x, int y, int colorIndex)
@@ -340,6 +403,7 @@ namespace ChromaVale.Presentation.Views
             {
                 StartCoroutine(TargetBloomAnim(_renderers[x, y], colorIndex));
             }
+            if (_audioService != null) _audioService.PlaySound("target_reached");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -738,6 +802,9 @@ namespace ChromaVale.Presentation.Views
 
         private void ShowWinPopup()
         {
+            // Persist level completion — saves stars and unlocks next level
+            SaveGameManager.Instance?.RecordLevelComplete(_levelNumber, _starsEarned);
+
             var ts = _winPopup.GetComponentsInChildren<Text>();
             foreach (var t in ts)
             {
@@ -762,6 +829,7 @@ namespace ChromaVale.Presentation.Views
             _winPopup.SetActive(true);
             var bg = _winPopup.GetComponentInChildren<Image>();
             if (bg != null) StartCoroutine(FadeBg(bg));
+            if (_audioService != null) _audioService.PlaySound("win_fanfare");
         }
 
         private System.Collections.IEnumerator FadeBg(Image bg)
@@ -826,9 +894,15 @@ namespace ChromaVale.Presentation.Views
 
         private void AdvanceLevel()
         {
-            if (_levelNumber >= _maxLevel) _levelNumber = 1;
-            else _levelNumber++;
-            LoadLevel(_levelNumber);
+            // Use the level unlocked by RecordLevelComplete, or fallback to simple increment
+            int nextLevel;
+            if (SaveGameManager.Instance != null)
+                nextLevel = SaveGameManager.Instance.CurrentLevel;
+            else
+                nextLevel = _levelNumber + 1;
+
+            if (nextLevel > _maxLevel) nextLevel = 1;
+            LoadLevel(nextLevel);
         }
 
         private void LoadLevel(int levelNum)
@@ -847,6 +921,12 @@ namespace ChromaVale.Presentation.Views
 
             _levelNumber = levelNum;
             _level = _levelRepo.GetLevel(_levelNumber);
+
+            // Persist the current level so progress survives app close
+            if (SaveGameManager.Instance != null)
+            {
+                SaveGameManager.Instance.SaveProgress();
+            }
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
             _inventory = new PipeInventory(_level.Inventory);
@@ -1006,54 +1086,70 @@ namespace ChromaVale.Presentation.Views
         // PIPE SHAPE DRAWING (procedural — no external sprites needed)
         // ═══════════════════════════════════════════════════════════════
 
-        private void DrawPipeShape(GameObject tile, PieceShape shape)
+        private void DrawPipeShape(GameObject tile, PieceShape shape, int rotation = 0)
         {
             ClearPipeShape(tile);
             var parentSr = tile.GetComponent<SpriteRenderer>();
             if (parentSr == null) return;
 
+            // Create a rotation root so bars can be rotated without affecting child indicators
+            var root = new GameObject("Shape_Root");
+            root.transform.SetParent(tile.transform, false);
+
+            // Determine effective rotation based on shape rules:
+            // Straight: 0/180 = horizontal, 90/270 = vertical → use rotation mod 180
+            // Elbow/TJunction/Valve: rotate through all 4 orientations
+            // Cross/Amplifier/Mixer/Blocker: no visual rotation effect
+            int effectiveRotation = shape switch
+            {
+                PieceShape.Straight => rotation % 180,
+                PieceShape.Elbow => rotation,
+                PieceShape.TJunction => rotation,
+                PieceShape.Valve => rotation,
+                _ => 0
+            };
+            root.transform.localRotation = Quaternion.Euler(0, 0, effectiveRotation);
+
             switch (shape)
             {
                 case PieceShape.Straight:
-                    AddBar(tile, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
                     break;
                 case PieceShape.Elbow:
-                    AddBar(tile, "h", new Vector3(0.45f, 0.2f, 1f), new Vector3(0.15f, -0.18f, 0), parentSr);
-                    AddBar(tile, "v", new Vector3(0.2f, 0.45f, 1f), new Vector3(-0.18f, 0.15f, 0), parentSr);
+                    AddBar(root, "h", new Vector3(0.45f, 0.2f, 1f), new Vector3(0.15f, -0.18f, 0), parentSr);
+                    AddBar(root, "v", new Vector3(0.2f, 0.45f, 1f), new Vector3(-0.18f, 0.15f, 0), parentSr);
                     break;
                 case PieceShape.TJunction:
-                    AddBar(tile, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(tile, "v", new Vector3(0.2f, 0.35f, 1f), new Vector3(0f, 0.18f, 0), parentSr);
+                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "v", new Vector3(0.2f, 0.35f, 1f), new Vector3(0f, 0.18f, 0), parentSr);
                     break;
                 case PieceShape.Cross:
-                    AddBar(tile, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(tile, "v", new Vector3(0.2f, 0.65f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "v", new Vector3(0.2f, 0.65f, 1f), Vector3.zero, parentSr);
                     break;
                 case PieceShape.Valve:
-                    // Diamond indicator with arrow
-                    AddBar(tile, "h", new Vector3(0.45f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(tile, "arr", new Vector3(0.2f, 0.2f, 1f), new Vector3(0.25f, 0f, 0), parentSr);
+                    AddBar(root, "h", new Vector3(0.45f, 0.2f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "arr", new Vector3(0.2f, 0.2f, 1f), new Vector3(0.25f, 0f, 0), parentSr);
                     break;
                 case PieceShape.Amplifier:
-                    // Triangle-ish indicator
-                    AddBar(tile, "h", new Vector3(0.4f, 0.3f, 1f), Vector3.zero, parentSr);
-                    AddBar(tile, "plus", new Vector3(0.2f, 0.2f, 1f), new Vector3(0f, 0.2f, 0), parentSr);
+                    AddBar(root, "h", new Vector3(0.4f, 0.3f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "plus", new Vector3(0.2f, 0.2f, 1f), new Vector3(0f, 0.2f, 0), parentSr);
                     break;
                 case PieceShape.Mixer:
-                    // X shape — two diagonal bars
-                    AddBar(tile, "x1", new Vector3(0.55f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(tile, "x2", new Vector3(0.2f, 0.55f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "x1", new Vector3(0.55f, 0.2f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "x2", new Vector3(0.2f, 0.55f, 1f), Vector3.zero, parentSr);
                     break;
                 case PieceShape.Blocker:
-                    // Solid fill
-                    AddBar(tile, "blk", new Vector3(0.7f, 0.7f, 1f), Vector3.zero, parentSr);
+                    AddBar(root, "blk", new Vector3(0.7f, 0.7f, 1f), Vector3.zero, parentSr);
                     break;
             }
         }
 
+        private static int _shapeCounter;
+
         private void AddBar(GameObject parent, string id, Vector3 scale, Vector3 offset, SpriteRenderer parentSr)
         {
-            var go = new GameObject($"Shape_{id}_{Time.frameCount}_{Random.Range(0,9999)}");
+            var go = new GameObject($"Shape_{id}_{_shapeCounter++}");
             go.transform.SetParent(parent.transform, false);
             go.transform.localPosition = offset;
             go.transform.localScale = scale;
@@ -1065,10 +1161,12 @@ namespace ChromaVale.Presentation.Views
 
         private void ClearPipeShape(GameObject tile)
         {
+            // Destroy the Shape_Root container (which holds all shape bars)
+            // so rotation state is cleanly reset before redraw.
             for (int i = tile.transform.childCount - 1; i >= 0; i--)
             {
                 var child = tile.transform.GetChild(i);
-                if (child.name.StartsWith("Shape_"))
+                if (child.name == "Shape_Root")
                     Destroy(child.gameObject);
             }
         }
@@ -1076,12 +1174,27 @@ namespace ChromaVale.Presentation.Views
 
     /// <summary>
     /// Attached to each grid tile for click handling.
+    /// Left-click = rotate (or place piece on empty cell).
+    /// Right-click = undo/remove most recently placed piece.
     /// </summary>
     public class TileClickHandler : MonoBehaviour
     {
         private int _x, _y;
         private PuzzleBoardView _board;
+        private bool _isMouseOver;
+
         public void Init(int x, int y, PuzzleBoardView b) { _x = x; _y = y; _board = b; }
         private void OnMouseDown() { _board.OnPointerDown(_x, _y); }
+        private void OnMouseEnter() { _isMouseOver = true; }
+        private void OnMouseExit() { _isMouseOver = false; }
+
+        private void Update()
+        {
+            // Detect right-click while hovering over this tile
+            if (_isMouseOver && Input.GetMouseButtonDown(1))
+            {
+                _board.OnRightClick();
+            }
+        }
     }
 }

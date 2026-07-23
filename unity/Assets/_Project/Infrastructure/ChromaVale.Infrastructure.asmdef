@@ -2,7 +2,8 @@
   "name": "ChromaVale.Infrastructure",
   "rootNamespace": "ChromaVale.Infrastructure",
   "references": [
-    "ChromaVale.Core"
+    "ChromaVale.Core",
+    "VContainer"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

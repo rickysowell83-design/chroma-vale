@@ -10,6 +10,10 @@ namespace ChromaVale.Domain.PuzzleBoard
     /// placed pipes. Handles capacity, overflow/burst, color mixing,
     /// flow gates, and win/lose detection.
     ///
+    /// SHAPE-AWARE FLOW: Each pipe piece shape + rotation defines which
+    /// directions accept INPUT and which produce OUTPUT. Flow only
+    /// propagates when both cells agree on the connection.
+    ///
     /// Usage (from MonoBehaviour):
     ///   _sim.StartSimulation(board, level);
     ///   while (_sim.GetResult() == SimulationResult.InProgress)
@@ -42,6 +46,13 @@ namespace ChromaVale.Domain.PuzzleBoard
         private HashSet<(int x, int y)> _reachedTargets;
         private Dictionary<(int, int), int> _pipeCapacityMap = new(); // (x, y) → capacity (from placed piece)
 
+        // Shape info per cell: (shape, valveDirection, rotationDegrees)
+        // rotationDegrees is 0, 90, 180, or 270 (clockwise)
+        private Dictionary<(int, int), (PieceShape shape, PipeDirection direction, int rotation)> _pipeShapeMap = new();
+
+        // Cells flagged as Mixers — allow color mixing at this cell
+        private HashSet<(int, int)> _mixerCells;
+
         // Active wave fronts: each is (x, y, colorIndex)
         private List<Wave> _activeWaves;
         // Visited: (x, y, colorIndex) — prevents re-entering same cell with same color
@@ -56,6 +67,13 @@ namespace ChromaVale.Domain.PuzzleBoard
             public int SourceIndex; // Which source emitted this wave
         }
 
+        // ── Direction bit-flag constants ──
+        private const uint UpFlag    = 1; // 1 << 0
+        private const uint DownFlag  = 2; // 1 << 1
+        private const uint LeftFlag  = 4; // 1 << 2
+        private const uint RightFlag = 8; // 1 << 3
+        private const uint AllFlags  = UpFlag | DownFlag | LeftFlag | RightFlag;
+
         public void StartSimulation(IBoardState board, LevelData level)
         {
             StartSimulation(board, level, null);
@@ -67,6 +85,8 @@ namespace ChromaVale.Domain.PuzzleBoard
             _level = level;
             _cellStates = new PipeCellState[board.Width, board.Height];
             _pipeCapacityMap = new Dictionary<(int, int), int>();
+            _pipeShapeMap = new Dictionary<(int, int), (PieceShape, PipeDirection, int)>();
+            _mixerCells = new HashSet<(int, int)>();
             _reachedTargets = new HashSet<(int x, int y)>();
             _activeWaves = new List<Wave>();
             _visited = new HashSet<(int x, int y, int colorIndex)>();
@@ -75,14 +95,12 @@ namespace ChromaVale.Domain.PuzzleBoard
             CurrentTick = 0;
 
             // Initialize per-cell capacities from board state
-            // Default: each pipe cell has capacity 2 until overridden
             for (int x = 0; x < board.Width; x++)
                 for (int y = 0; y < board.Height; y++)
                 {
                     var cell = board.GetCell(x, y);
                     if (cell.Type == CellType.Pipe)
                     {
-                        // Look up actual capacity from placed piece, default to 2
                         int cap = 2;
                         if (inventory != null)
                         {
@@ -96,6 +114,36 @@ namespace ChromaVale.Domain.PuzzleBoard
                     else
                     {
                         _cellStates[x, y] = new PipeCellState();
+                    }
+                }
+
+            // Initialize piece shapes from inventory (restore shapes for restart/load)
+            if (inventory != null)
+            {
+                for (int x = 0; x < board.Width; x++)
+                    for (int y = 0; y < board.Height; y++)
+                    {
+                        if (_board.GetCell(x, y).Type == CellType.Pipe)
+                        {
+                            var piece = inventory.GetPieceAt(x, y);
+                            if (piece != null)
+                            {
+                                _pipeShapeMap[(x, y)] = (piece.Shape, piece.Direction, piece.Rotation);
+                            }
+                        }
+                    }
+            }
+
+            // Apply Amplifier adjacency boosts and flag Mixer cells
+            for (int x = 0; x < board.Width; x++)
+                for (int y = 0; y < board.Height; y++)
+                {
+                    if (_pipeShapeMap.TryGetValue((x, y), out var shapeData))
+                    {
+                        if (shapeData.shape == PieceShape.Amplifier)
+                            ApplyAmplifierBoost(x, y);
+                        else if (shapeData.shape == PieceShape.Mixer)
+                            _mixerCells.Add((x, y));
                     }
                 }
 
@@ -116,12 +164,10 @@ namespace ChromaVale.Domain.PuzzleBoard
 
         /// <summary>
         /// Emit waves from a source cell into adjacent pipe/target/flowgate cells.
+        /// Respects neighbor cell shape connections.
         /// </summary>
         private void EmitFromSource(int sourceIndex, int sx, int sy, int color, int pressure)
         {
-            // For level simplicity, each source emits one wave per tick.
-            // Pressure > 1 means it emits that many waves in the first tick
-            // (increasing flow through downstream pipes).
             for (int p = 0; p < pressure; p++)
             {
                 foreach (var (dx, dy) in Directions)
@@ -138,6 +184,13 @@ namespace ChromaVale.Domain.PuzzleBoard
 
                     if (cell.Type == CellType.Pipe || cell.Type == CellType.FlowGate)
                     {
+                        // ── Shape-aware entry check for Pipe cells ──
+                        if (cell.Type == CellType.Pipe)
+                        {
+                            PipeDirection neighborEntryDir = OppositeDirection(DirectionFromDelta(dx, dy));
+                            if (!CanEnterCell(nx, ny, neighborEntryDir)) continue;
+                        }
+
                         _visited.Add(visitKey);
                         _cellStates[nx, ny].Capacity = GetCapacity(nx, ny);
 
@@ -162,7 +215,6 @@ namespace ChromaVale.Domain.PuzzleBoard
             CurrentTick++;
 
             var nextWaves = new List<Wave>();
-            var wavesToAdd = new List<Wave>(); // For bursts, we may add contaminant waves
 
             foreach (var wave in _activeWaves)
             {
@@ -170,6 +222,11 @@ namespace ChromaVale.Domain.PuzzleBoard
 
                 foreach (var (dx, dy) in Directions)
                 {
+                    PipeDirection exitDir = DirectionFromDelta(dx, dy);
+
+                    // ── CHECK 1: Can flow EXIT the current cell in this direction? ──
+                    if (!CanExitCell(cx, cy, exitDir)) continue;
+
                     int nx = cx + dx, ny = cy + dy;
                     if (!_board.IsValidPosition(nx, ny)) continue;
 
@@ -180,17 +237,15 @@ namespace ChromaVale.Domain.PuzzleBoard
                     if (cell.Type == CellType.Obstacle) continue;
                     if (_cellStates[nx, ny].State == OverloadState.Burst) continue;
 
-                    // ── Flow Gate: only allow if direction matches ──
+                    // ── CHECK 2: Can flow ENTER the neighbor from the opposite direction? ──
+                    PipeDirection neighborEntryDir = OppositeDirection(exitDir);
+
+                    // ── Flow Gate: uses built-in direction check ──
                     if (cell.Type == CellType.FlowGate)
                     {
-                        // Flow must enter FROM the correct direction
                         PipeDirection requiredEntry = cell.FlowDirection;
-                        PipeDirection actualEntry = DirectionFromDelta(dx, dy);
-
-                        // Reverse: if gate points Right, flow must enter from Left (dx=-1)
                         if (!IsValidGateEntry(requiredEntry, dx, dy)) continue;
 
-                        // Pass through gate
                         _visited.Add(visitKey);
                         OnFlowAdvance?.Invoke(nx, ny, color);
                         nextWaves.Add(new Wave { X = nx, Y = ny, ColorIndex = color, SourceIndex = wave.SourceIndex });
@@ -200,6 +255,8 @@ namespace ChromaVale.Domain.PuzzleBoard
                     // ── Pipe cell: add flow ──
                     if (cell.Type == CellType.Pipe)
                     {
+                        if (!CanEnterCell(nx, ny, neighborEntryDir)) continue;
+
                         _visited.Add(visitKey);
 
                         // Get or init cell state
@@ -268,6 +325,124 @@ namespace ChromaVale.Domain.PuzzleBoard
             }
         }
 
+        // ────────────────────────────────────────────────────────────────
+        // SHAPE-AWARE CONNECTION MAP SYSTEM
+        // ────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Map a PipeDirection to a bit flag for fast set operations.
+        /// </summary>
+        private static uint DirectionToFlag(PipeDirection dir)
+        {
+            switch (dir)
+            {
+                case PipeDirection.Up:    return UpFlag;
+                case PipeDirection.Down:  return DownFlag;
+                case PipeDirection.Left:  return LeftFlag;
+                case PipeDirection.Right: return RightFlag;
+                default:                  return 0;
+            }
+        }
+
+        /// <summary>
+        /// Return the direction opposite to the given one.
+        /// </summary>
+        private static PipeDirection OppositeDirection(PipeDirection dir)
+        {
+            switch (dir)
+            {
+                case PipeDirection.Up:    return PipeDirection.Down;
+                case PipeDirection.Down:  return PipeDirection.Up;
+                case PipeDirection.Left:  return PipeDirection.Right;
+                case PipeDirection.Right: return PipeDirection.Left;
+                default:                  return PipeDirection.None;
+            }
+        }
+
+        /// <summary>
+        /// Rotate a bit-flag direction set N steps clockwise (each step = 90°).
+        /// </summary>
+        private static uint RotateBitsCW(uint bits, int steps)
+        {
+            steps = steps % 4;
+            if (steps == 0) return bits;
+            for (int i = 0; i < steps; i++)
+                bits = ((bits & 1) << 3) | ((bits & 8) >> 2) | ((bits & 2) << 1) | ((bits & 4) >> 2);
+            return bits;
+        }
+
+        /// <summary>
+        /// Get the bit-flag set of directions a shape+rotation accepts as INPUT.
+        /// </summary>
+        private static uint GetInputFlags(PieceShape shape, PipeDirection valveDir, int rotationDegrees)
+        {
+            uint baseFlags;
+            switch (shape)
+            {
+                case PieceShape.Straight:    baseFlags = LeftFlag | RightFlag; break;  // ← →
+                case PieceShape.Elbow:       baseFlags = UpFlag | LeftFlag;    break;  // ↑ ←
+                case PieceShape.TJunction:   baseFlags = LeftFlag | RightFlag | UpFlag; break; // ← → ↑
+                case PieceShape.Cross:       baseFlags = AllFlags;             break;
+                case PieceShape.Valve:       baseFlags = DirectionToFlag(OppositeDirection(valveDir)); break;
+                case PieceShape.Amplifier:   baseFlags = AllFlags;             break;
+                case PieceShape.Mixer:       baseFlags = AllFlags;             break;
+                case PieceShape.Blocker:     baseFlags = 0;                    break;
+                default:                     baseFlags = AllFlags;             break; // backward compat
+            }
+            // Valve direction is absolute — rotation does not change it
+            if (shape == PieceShape.Valve) return baseFlags;
+            // Cross, Amplifier, Mixer, Blocker all yield AllFlags or 0 regardless of rotation
+            return RotateBitsCW(baseFlags, rotationDegrees / 90);
+        }
+
+        /// <summary>
+        /// Get the bit-flag set of directions a shape+rotation produces as OUTPUT.
+        /// </summary>
+        private static uint GetOutputFlags(PieceShape shape, PipeDirection valveDir, int rotationDegrees)
+        {
+            uint baseFlags;
+            switch (shape)
+            {
+                case PieceShape.Straight:    baseFlags = LeftFlag | RightFlag; break;  // ← →
+                case PieceShape.Elbow:       baseFlags = DownFlag | RightFlag; break;  // ↓ →
+                case PieceShape.TJunction:   baseFlags = LeftFlag | RightFlag | DownFlag; break; // ← → ↓
+                case PieceShape.Cross:       baseFlags = AllFlags;             break;
+                case PieceShape.Valve:       baseFlags = DirectionToFlag(valveDir); break;
+                case PieceShape.Amplifier:   baseFlags = AllFlags;             break;
+                case PieceShape.Mixer:       baseFlags = AllFlags;             break;
+                case PieceShape.Blocker:     baseFlags = 0;                    break;
+                default:                     baseFlags = AllFlags;             break; // backward compat
+            }
+            if (shape == PieceShape.Valve) return baseFlags;
+            return RotateBitsCW(baseFlags, rotationDegrees / 90);
+        }
+
+        /// <summary>
+        /// Can flow exit cell (x,y) in the given direction?
+        /// Cells with no shape info default to omnidirectional (backward compat).
+        /// </summary>
+        private bool CanExitCell(int x, int y, PipeDirection dir)
+        {
+            if (!_pipeShapeMap.TryGetValue((x, y), out var info))
+                return true;
+            uint flags = GetOutputFlags(info.shape, info.direction, info.rotation);
+            return (flags & DirectionToFlag(dir)) != 0;
+        }
+
+        /// <summary>
+        /// Can flow enter cell (x,y) from the given direction?
+        /// Cells with no shape info default to omnidirectional (backward compat).
+        /// </summary>
+        private bool CanEnterCell(int x, int y, PipeDirection dir)
+        {
+            if (!_pipeShapeMap.TryGetValue((x, y), out var info))
+                return true;
+            uint flags = GetInputFlags(info.shape, info.direction, info.rotation);
+            return (flags & DirectionToFlag(dir)) != 0;
+        }
+
+        // ────────────────────────────────────────────────────────────────
+
         private void ReachTarget(int x, int y, int color)
         {
             if (!_reachedTargets.Contains((x, y)))
@@ -295,12 +470,57 @@ namespace ChromaVale.Domain.PuzzleBoard
         }
 
         /// <summary>
-        /// Set the piece shape for a specific pipe cell (affects flow propagation).
-        /// Not used in v1 but reserves the slot for directed flow.
+        /// Set the piece shape, direction, and rotation for a specific pipe cell.
+        /// Controls how flow propagates through the cell.
+        /// Also applies Amplifier adjacency boost and flags Mixer cells on placement.
         /// </summary>
-        public void SetPipeShape(int x, int y, PieceShape shape)
+        public void SetPipeShape(int x, int y, PieceShape shape, PipeDirection direction, int rotation)
         {
-            // Reserved for v2: T-junctions split flow, valves block backflow, etc.
+            _pipeShapeMap[(x, y)] = (shape, direction, rotation);
+
+            // ── Amplifier: boost adjacent pipe cells on placement ──
+            if (shape == PieceShape.Amplifier)
+            {
+                ApplyAmplifierBoost(x, y);
+            }
+            // ── Mixer: flag this cell as a mixing zone ──
+            else if (shape == PieceShape.Mixer)
+            {
+                if (_mixerCells != null)
+                    _mixerCells.Add((x, y));
+            }
+        }
+
+        /// <summary>
+        /// Increment capacity of all 4 adjacent pipe cells by 1.
+        /// Called when an Amplifier is placed (or on simulation restart).
+        /// </summary>
+        private void ApplyAmplifierBoost(int x, int y)
+        {
+            foreach (var (dx, dy) in Directions)
+            {
+                int nx = x + dx, ny = y + dy;
+                if (_board != null && !_board.IsValidPosition(nx, ny)) continue;
+                if (_pipeCapacityMap.ContainsKey((nx, ny)))
+                {
+                    _pipeCapacityMap[(nx, ny)] += 1;
+                    // Also update live cell state capacity if simulation is running
+                    if (_cellStates != null && _board != null && _board.IsValidPosition(nx, ny))
+                    {
+                        if (_cellStates[nx, ny].Capacity > 0)
+                            _cellStates[nx, ny].Capacity += 1;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check whether a cell is flagged as a Mixer zone.
+        /// Mixer cells allow color mixing even if it would otherwise not be possible.
+        /// </summary>
+        public bool IsMixerCell(int x, int y)
+        {
+            return _mixerCells != null && _mixerCells.Contains((x, y));
         }
 
         // ── Flow Gate helpers ──

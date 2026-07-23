@@ -82,8 +82,9 @@ namespace ChromaVale.Domain.PuzzleBoard
         /// <param name="x">Grid X coordinate.</param>
         /// <param name="y">Grid Y coordinate.</param>
         /// <param name="flowSimulator">For registering capacity.</param>
+        /// <param name="rotation">Initial rotation in degrees (0, 90, 180, 270). Default 0.</param>
         /// <returns>True if placement succeeded.</returns>
-        public bool TryPlace(int pieceIndex, GridBoard board, int x, int y, FlowSimulator flowSimulator = null)
+        public bool TryPlace(int pieceIndex, GridBoard board, int x, int y, FlowSimulator flowSimulator = null, int rotation = 0)
         {
             if (pieceIndex < 0 || pieceIndex >= _pieces.Count) return false;
             var piece = _pieces[pieceIndex];
@@ -95,8 +96,9 @@ namespace ChromaVale.Domain.PuzzleBoard
             if (cell.IsOccupied) return false;
 
             // Place on board (uncolored pipe — color is assigned by flow)
-            board.PlacePipe(x, y, -1);
+            board.PlacePipe(x, y);
             _pieces[pieceIndex].State = PieceState.Placed;
+            _pieces[pieceIndex].Rotation = rotation % 360; // Store initial rotation
             _placementMap[(x, y)] = pieceIndex;
 
             // Register capacity with flow simulator
@@ -104,10 +106,8 @@ namespace ChromaVale.Domain.PuzzleBoard
             {
                 flowSimulator?.SetPipeCapacity(x, y, piece.Capacity);
             }
-            if (piece.Shape != PieceShape.Straight)
-            {
-                flowSimulator?.SetPipeShape(x, y, piece.Shape);
-            }
+            // Register shape info (all shapes — Straight rotation matters for connection maps)
+            flowSimulator?.SetPipeShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
 
             return true;
         }
@@ -131,6 +131,7 @@ namespace ChromaVale.Domain.PuzzleBoard
 
             // Return piece to hand
             _pieces[pieceIndex].State = PieceState.InHand;
+            _pieces[pieceIndex].Rotation = 0; // Reset rotation when returning to hand
             _placementMap.Remove((x, y));
 
             // Clear board cell

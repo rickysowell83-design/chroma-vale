@@ -37,11 +37,10 @@ namespace ChromaVale.Domain.PuzzleBoard
 
         public GridCell GetCell(int x, int y) => _cells[x, y];
 
-        public void PlacePipe(int x, int y, int colorIndex)
+        public void PlacePipe(int x, int y)
         {
             if (!IsValidPosition(x, y)) return;
             var cell = _cells[x, y];
-            // Allow placement on Empty cells only. colorIndex of -1 means "uncolored pipe."
             if (cell.Type != CellType.Empty) return;
             if (cell.IsOccupied) return;
 
@@ -49,7 +48,7 @@ namespace ChromaVale.Domain.PuzzleBoard
             _cells[x, y] = new GridCell
             {
                 Type = CellType.Pipe,
-                ColorIndex = colorIndex, // -1 = uncolored (color assigned by flow)
+                ColorIndex = -1, // -1 = uncolored (color assigned by flow)
                 IsOccupied = true,
                 FlowDirection = PipeDirection.None
             };
