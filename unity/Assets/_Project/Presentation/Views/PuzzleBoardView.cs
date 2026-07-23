@@ -517,18 +517,20 @@ namespace ChromaVale.Presentation.Views
         private int CalculateStars()
         {
             int stars = 1; // Base: completed the level
-            float efficiency = _inventory.GetEfficiency();
-            bool noBursts = _inventory.BurstCount == 0;
+            int unused = _inventory.AvailableCount;
+            int total = _inventory.Pieces.Count;
+            float efficiency = total > 0 ? (float)unused / total : 0f;
+            bool underPar = _flowSim.CurrentTick <= _level.ParTicks;
 
-            // ★★: No bursts + used ≤ 80% of available pieces
-            if (noBursts && efficiency >= 0.2f)
+            // 2 stars: completed with leftover pieces (used less than provided)
+            if (unused > 0)
                 stars = 2;
 
-            // ★★★: No bursts + used ≤ 60% + on par (ticks ≤ 2× par)
-            bool onPar = _flowSim.CurrentTick <= _level.ParTicks * 2;
-            if (noBursts && efficiency >= 0.4f && onPar)
+            // 3 stars: completed with leftover pieces AND under par time
+            if (unused > 0 && underPar)
                 stars = 3;
 
+            Debug.Log($"[Stars] unused={unused}/{total} efficiency={efficiency:F2} ticks={_flowSim.CurrentTick}/{_level.ParTicks} par={underPar} → {stars}★");
             return stars;
         }
 
