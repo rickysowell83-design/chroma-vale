@@ -947,50 +947,7 @@ namespace ChromaVale.Presentation.Views
 
         public void ResetPuzzle()
         {
-            _solved = false;
-            _moveCount = 0;
-            _starsEarned = 0;
-            _selectedPieceIndex = -1;
-            _undoStack.Clear();
-
-            if (_winPopup != null) _winPopup.SetActive(false);
-
-            _level = _levelRepo.GetLevel(_levelNumber);
-            _board = new GridBoard(_level);
-            _flowSim = new FlowSimulator();
-            _inventory = new PipeInventory(_level.Inventory);
-
-            for (int x = 0; x < _board.Width; x++)
-                for (int y = 0; y < _board.Height; y++)
-                {
-                    var sr = _renderers[x, y];
-                    if (sr == null) continue;
-                    var cell = _board.GetCell(x, y);
-                    sr.color = cell.Type switch
-                    {
-                        CellType.Source when cell.ColorIndex == 0 => CyanHint,
-                        CellType.Source when cell.ColorIndex == 1 => MagentaHint,
-                        CellType.Source when cell.ColorIndex == 2 => YellowHint,
-                        CellType.Target when cell.ColorIndex == 0 => CyanHint,
-                        CellType.Target when cell.ColorIndex == 1 => MagentaHint,
-                        CellType.Target when cell.ColorIndex == 2 => YellowHint,
-                        CellType.Target when cell.ColorIndex == 6 => PurpleHint,
-                        CellType.Obstacle => ObstacleCol,
-                        CellType.FlowGate when cell.FlowDirection == PipeDirection.Up => FlowGateUp,
-                        CellType.FlowGate when cell.FlowDirection == PipeDirection.Down => FlowGateDown,
-                        CellType.FlowGate when cell.FlowDirection == PipeDirection.Right => FlowGateRight,
-                        CellType.FlowGate when cell.FlowDirection == PipeDirection.Left => FlowGateLeft,
-                        _ => DarkTile
-                    };
-                }
-
-            UpdateMoveCounter();
-            UpdateInventoryUI();
-            if (_flowButton != null) _flowButton.GetComponent<Button>().interactable = true;
-            EnableInventoryInteraction();
-
-            if (_levelNumber == 1 && _tutorialHint != null)
-                _tutorialHint.SetActive(true);
+            LoadLevel(_levelNumber);
         }
 
         private void AdvanceLevel()
