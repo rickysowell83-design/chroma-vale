@@ -87,11 +87,73 @@ namespace ChromaVale.Presentation.Views
             _inventory = new PipeInventory(_level.Inventory);
             BuildGrid();
             CreateUI();
+            DrawConnectionHint();
+            PlayBeep(440f, 0.15f); // Welcome beep!
 
             if (_audioService != null) _audioService.PlaySound("level_start");
 
             // Start pulsing source tiles to show the player where to connect from
             StartCoroutine(PulseSources());
+        }
+
+        /// <summary>
+        /// Draws a dotted-arrow line from each source to its matching-color target
+        /// so the player immediately sees the goal.
+        /// </summary>
+        private void DrawConnectionHint()
+        {
+            foreach (var src in _level.Sources)
+            {
+                foreach (var tgt in _level.Targets)
+                {
+                    if (tgt.ColorIndex != src.ColorIndex) continue;
+
+                    var line = new GameObject($"Hint_{src.ColorIndex}");
+                    line.transform.SetParent(transform);
+                    var lr = line.AddComponent<LineRenderer>();
+                    lr.positionCount = 2;
+                    var off = new Vector3(-_board.Width * _tileSize / 2f, -_board.Height * _tileSize / 2f, 0);
+                    lr.SetPosition(0, new Vector3(src.X * _tileSize + off.x, src.Y * _tileSize + off.y, -0.5f));
+                    lr.SetPosition(1, new Vector3(tgt.X * _tileSize + off.x, tgt.Y * _tileSize + off.y, -0.5f));
+                    lr.startWidth = 0.08f; lr.endWidth = 0.08f;
+                    var col = GetPipeColor(src.ColorIndex);
+                    col.a = 0.35f;
+                    lr.material = new Material(Shader.Find("Sprites/Default"));
+                    lr.startColor = col; lr.endColor = col;
+                    lr.textureMode = LineTextureMode.Tile;
+                    lr.sortingOrder = -5;
+                    // Destroy on solve
+                    StartCoroutine(DestroyOnSolve(line));
+                }
+            }
+        }
+
+        private IEnumerator DestroyOnSolve(GameObject go)
+        {
+            while (!_solved) yield return null;
+            if (go != null) Destroy(go);
+        }
+
+        /// <summary>
+        /// Quick synthesized beep — no audio files needed.
+        /// </summary>
+        private void PlayBeep(float freq = 440f, float duration = 0.1f)
+        {
+            int sampleRate = 44100;
+            int samples = Mathf.CeilToInt(sampleRate * duration);
+            var clip = AudioClip.Create("beep", samples, 1, sampleRate, false);
+            var data = new float[samples];
+            for (int i = 0; i < samples; i++)
+                data[i] = Mathf.Sin(2f * Mathf.PI * freq * i / sampleRate) * 0.3f;
+            clip.SetData(data, 0);
+            // Play on the main camera's AudioListener
+            var cam = Camera.main;
+            if (cam != null)
+            {
+                var src = cam.gameObject.GetComponent<AudioSource>();
+                if (src == null) src = cam.gameObject.AddComponent<AudioSource>();
+                src.PlayOneShot(clip);
+            }
         }
 
         private IEnumerator PulseSources()
@@ -306,6 +368,7 @@ namespace ChromaVale.Presentation.Views
                 if (_tutorialHint != null && _tutorialHint.activeSelf)
                     _tutorialHint.SetActive(false);
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
+                PlayBeep(660f, 0.08f); // placement pop
 
                 // Auto-trigger flow when a path is completed
                 if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
@@ -400,6 +463,7 @@ namespace ChromaVale.Presentation.Views
             if (result == SimulationResult.AllTargetsReached)
             {
                 _solved = true;
+                PlayBeep(880f, 0.3f); // victory beep!
                 _starsEarned = CalculateStars();
                 yield return new WaitForSeconds(0.5f);
                 ShowWinPopup();
