@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using TMPro;
 
 namespace ChromaVale.Presentation.Views
 {
@@ -65,15 +66,7 @@ namespace ChromaVale.Presentation.Views
         private static readonly Color FlowGateRight = new(0.10f, 0.15f, 0.25f);
         private static readonly Color FlowGateLeft = new(0.20f, 0.10f, 0.15f);
 
-        private static Font _cachedFont;
-        private static Font GetUIFont()
-        {
-            if (_cachedFont == null)
-                _cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
-            return _cachedFont;
-        }
 
-        private void Start()
         {
             _maxLevel = _levelRepo.LevelCount;
 
@@ -531,9 +524,9 @@ namespace ChromaVale.Presentation.Views
             // Move counter
             var ct = new GameObject("CounterText");
             ct.transform.SetParent(mc.transform, false);
-            var tx = ct.AddComponent<Text>();
-            tx.font = GetUIFont();
-            tx.fontSize = 16; tx.alignment = TextAnchor.UpperLeft; tx.color = NeonCyan;
+            var tx = ct.AddComponent<TextMeshProUGUI>();
+            tx
+            tx.fontSize = 16; tx.alignment = TextAlignmentOptions.TopLeft; tx.color = NeonCyan;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = new Vector2(0.02f, 0.94f); tr.anchorMax = new Vector2(0.3f, 0.99f);
             tr.offsetMin = Vector2.zero; tr.offsetMax = Vector2.zero;
@@ -542,9 +535,9 @@ namespace ChromaVale.Presentation.Views
             // Level label
             var ll = new GameObject("LevelLabel");
             ll.transform.SetParent(mc.transform, false);
-            var ltx = ll.AddComponent<Text>();
-            ltx.font = GetUIFont();
-            ltx.fontSize = 16; ltx.alignment = TextAnchor.UpperCenter; ltx.color = new Color(0.4f, 0.4f, 0.5f);
+            var ltx = ll.AddComponent<TextMeshProUGUI>();
+            ltx
+            ltx.fontSize = 16; ltx.alignment = TextAlignmentOptions.Top; ltx.color = new Color(0.4f, 0.4f, 0.5f);
             var llr = ltx.GetComponent<RectTransform>();
             llr.anchorMin = new Vector2(0.35f, 0.94f); llr.anchorMax = new Vector2(0.65f, 0.99f);
             llr.offsetMin = Vector2.zero; llr.offsetMax = Vector2.zero;
@@ -560,9 +553,9 @@ namespace ChromaVale.Presentation.Views
             rr.offsetMin = Vector2.zero; rr.offsetMax = Vector2.zero;
             var rt = new GameObject("ResetText");
             rt.transform.SetParent(rb.transform, false);
-            var rtx = rt.AddComponent<Text>();
-            rtx.text = "RESET"; rtx.font = GetUIFont();
-            rtx.fontSize = 14; rtx.alignment = TextAnchor.MiddleCenter; rtx.color = Color.white;
+            var rtx = rt.AddComponent<TextMeshProUGUI>();
+            rtx.text = "RESET"; rtx
+            rtx.fontSize = 14; rtx.alignment = TextAlignmentOptions.Center; rtx.color = Color.white;
             var rtr = rtx.GetComponent<RectTransform>();
             rtr.anchorMin = Vector2.zero; rtr.anchorMax = Vector2.one; rtr.sizeDelta = Vector2.zero;
         }
@@ -587,10 +580,10 @@ namespace ChromaVale.Presentation.Views
 
             var txt = new GameObject("FlowText");
             txt.transform.SetParent(btnGo.transform, false);
-            var ftx = txt.AddComponent<Text>();
+            var ftx = txt.AddComponent<TextMeshProUGUI>();
             ftx.text = "▶ FLOW ON";
-            ftx.font = GetUIFont();
-            ftx.fontSize = 20; ftx.alignment = TextAnchor.MiddleCenter; ftx.color = Color.white;
+            ftx
+            ftx.fontSize = 20; ftx.alignment = TextAlignmentOptions.Center; ftx.color = Color.white;
             var ftr = ftx.GetComponent<RectTransform>();
             ftr.anchorMin = Vector2.zero; ftr.anchorMax = Vector2.one; ftr.sizeDelta = Vector2.zero;
 
@@ -658,10 +651,10 @@ namespace ChromaVale.Presentation.Views
                 // Label
                 var labelGo = new GameObject("Label");
                 labelGo.transform.SetParent(slot.transform, false);
-                var labelTx = labelGo.AddComponent<Text>();
+                var labelTx = labelGo.AddComponent<TextMeshProUGUI>();
                 labelTx.text = $"{ShapeSymbol(shape)} ×{count}";
-                labelTx.font = GetUIFont();
-                labelTx.fontSize = 11; labelTx.alignment = TextAnchor.MiddleCenter; labelTx.color = Color.white;
+                labelTx
+                labelTx.fontSize = 11; labelTx.alignment = TextAlignmentOptions.Center; labelTx.color = Color.white;
                 var lr = labelTx.GetComponent<RectTransform>();
                 lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.sizeDelta = Vector2.zero;
 
@@ -757,9 +750,9 @@ namespace ChromaVale.Presentation.Views
 
             var textGo = new GameObject("HintText");
             textGo.transform.SetParent(th.transform, false);
-            var thtx = textGo.AddComponent<Text>();
-            thtx.font = GetUIFont();
-            thtx.fontSize = 18; thtx.alignment = TextAnchor.MiddleCenter; thtx.color = Color.white;
+            var thtx = textGo.AddComponent<TextMeshProUGUI>();
+            thtx
+            thtx.fontSize = 18; thtx.alignment = TextAlignmentOptions.Center; thtx.color = Color.white;
             var thr = thtx.GetComponent<RectTransform>();
             thr.anchorMin = new Vector2(0.05f, 0.12f); thr.anchorMax = new Vector2(0.95f, 0.26f);
             thr.offsetMin = Vector2.zero; thr.offsetMax = Vector2.zero;
@@ -794,10 +787,10 @@ namespace ChromaVale.Presentation.Views
             // Title
             var t1 = new GameObject("WinMain");
             t1.transform.SetParent(bg.transform, false);
-            var wtx = t1.AddComponent<Text>();
+            var wtx = t1.AddComponent<TextMeshProUGUI>();
             wtx.text = "PIPELINE ONLINE";
-            wtx.font = GetUIFont();
-            wtx.fontSize = 32; wtx.alignment = TextAnchor.MiddleCenter; wtx.color = NeonCyan;
+            wtx
+            wtx.fontSize = 32; wtx.alignment = TextAlignmentOptions.Center; wtx.color = NeonCyan;
             var wr = wtx.GetComponent<RectTransform>();
             wr.anchorMin = new Vector2(0.5f, 0.7f); wr.anchorMax = new Vector2(0.5f, 0.7f);
             wr.sizeDelta = new Vector2(500, 70);
@@ -805,10 +798,10 @@ namespace ChromaVale.Presentation.Views
             // Subtitle
             var t2 = new GameObject("WinSub");
             t2.transform.SetParent(bg.transform, false);
-            var wsx = t2.AddComponent<Text>();
+            var wsx = t2.AddComponent<TextMeshProUGUI>();
             wsx.text = "Flow delivered successfully.";
-            wsx.font = GetUIFont();
-            wsx.fontSize = 15; wsx.alignment = TextAnchor.MiddleCenter; wsx.color = new Color(0.5f, 0.5f, 0.6f);
+            wsx
+            wsx.fontSize = 15; wsx.alignment = TextAlignmentOptions.Center; wsx.color = new Color(0.5f, 0.5f, 0.6f);
             var wr2 = wsx.GetComponent<RectTransform>();
             wr2.anchorMin = new Vector2(0.5f, 0.6f); wr2.anchorMax = new Vector2(0.5f, 0.6f);
             wr2.sizeDelta = new Vector2(400, 35);
@@ -816,10 +809,10 @@ namespace ChromaVale.Presentation.Views
             // Stars
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
-            var scx = t3.AddComponent<Text>();
+            var scx = t3.AddComponent<TextMeshProUGUI>();
             scx.text = "★☆☆";
-            scx.font = GetUIFont();
-            scx.fontSize = 30; scx.alignment = TextAnchor.MiddleCenter; scx.color = NeonYellow;
+            scx
+            scx.fontSize = 30; scx.alignment = TextAlignmentOptions.Center; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
             wr3.sizeDelta = new Vector2(400, 40);
@@ -827,10 +820,10 @@ namespace ChromaVale.Presentation.Views
             // Score
             var t4 = new GameObject("WinScore");
             t4.transform.SetParent(bg.transform, false);
-            var scx2 = t4.AddComponent<Text>();
+            var scx2 = t4.AddComponent<TextMeshProUGUI>();
             scx2.text = "Completed in 12 moves";
-            scx2.font = GetUIFont();
-            scx2.fontSize = 13; scx2.alignment = TextAnchor.MiddleCenter; scx2.color = new Color(0.3f, 0.3f, 0.4f);
+            scx2
+            scx2.fontSize = 13; scx2.alignment = TextAlignmentOptions.Center; scx2.color = new Color(0.3f, 0.3f, 0.4f);
             var wr4 = scx2.GetComponent<RectTransform>();
             wr4.anchorMin = new Vector2(0.5f, 0.43f); wr4.anchorMax = new Vector2(0.5f, 0.43f);
             wr4.sizeDelta = new Vector2(400, 25);
@@ -860,9 +853,9 @@ namespace ChromaVale.Presentation.Views
 
             var txt = new GameObject(label + "Text");
             txt.transform.SetParent(go.transform, false);
-            var tx = txt.AddComponent<Text>();
-            tx.text = label; tx.font = GetUIFont();
-            tx.fontSize = 14; tx.alignment = TextAnchor.MiddleCenter; tx.color = Color.white;
+            var tx = txt.AddComponent<TextMeshProUGUI>();
+            tx.text = label; tx
+            tx.fontSize = 14; tx.alignment = TextAlignmentOptions.Center; tx.color = Color.white;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
 
@@ -878,7 +871,7 @@ namespace ChromaVale.Presentation.Views
             // Persist level completion — saves stars and unlocks next level
             SaveGameManager.Instance?.RecordLevelComplete(_levelNumber, _starsEarned);
 
-            var ts = _winPopup.GetComponentsInChildren<Text>();
+            var ts = _winPopup.GetComponentsInChildren<TextMeshProUGUI>();
             foreach (var t in ts)
             {
                 if (t.name == "WinMain")
@@ -1026,7 +1019,7 @@ namespace ChromaVale.Presentation.Views
         private void UpdateLevelLabel()
         {
             if (_levelLabel == null) return;
-            var tx = _levelLabel.GetComponent<Text>();
+            var tx = _levelLabel.GetComponent<TextMeshProUGUI>();
             if (tx != null) tx.text = $"LEVEL {_levelNumber}/{_maxLevel}";
         }
 
