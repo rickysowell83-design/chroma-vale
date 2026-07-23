@@ -1,4 +1,13 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "jp.hadashikick.vcontainer"
+      ]
+    }
+  ],
   "dependencies": {
     "com.unity.collab-proxy": "2.0.0",
     "com.unity.feature.2d": "2.0.0",
