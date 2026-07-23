@@ -845,12 +845,13 @@ namespace ChromaVale.Presentation.Views
             wr2.anchorMin = new Vector2(0.5f, 0.6f); wr2.anchorMax = new Vector2(0.5f, 0.6f);
             wr2.sizeDelta = new Vector2(400, 35);
 
-            // Stars
+            // Stars — use legacy Text with Arial font (has ★ character)
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
-            var scx = t3.AddComponent<TextMeshProUGUI>();
-            scx.text = $"STARS: {_starsEarned} / 3";
-            scx.fontSize = 30; scx.alignment = TextAlignmentOptions.Center; scx.color = NeonYellow;
+            var scx = t3.AddComponent<Text>();
+            scx.text = _starsEarned switch { 3 => "★★★", 2 => "★★☆", _ => "★☆☆" };
+            scx.font = Font.CreateDynamicFontFromOSFont("Arial", 30);
+            scx.fontSize = 30; scx.alignment = TextAnchor.MiddleCenter; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
             wr3.sizeDelta = new Vector2(400, 40);
@@ -914,14 +915,15 @@ namespace ChromaVale.Presentation.Views
                     t.text = "PIPELINE ONLINE";
                 if (t.name == "WinSub")
                     t.text = "Flow delivered successfully.";
-                if (t.name == "WinStars")
-                {
-                    string starStr = $"{_starsEarned} / 3 STARS";
-                    t.text = starStr;
-                    t.color = _starsEarned switch { 3 => NeonYellow, 2 => new Color(0.9f, 0.9f, 0.2f), _ => new Color(0.5f, 0.5f, 0.5f) };
-                }
                 if (t.name == "WinScore")
-                    t.text = $"Completed in {_moveCount} placements · {_flowSim.CurrentTick} ticks";
+                    t.text = $"Completed in {_moveCount} moves";
+            }
+            // Stars use legacy Text (Arial has ★)
+            var starText = _winPopup.GetComponentInChildren<Text>();
+            if (starText != null && starText.name == "WinStars")
+            {
+                starText.text = _starsEarned switch { 3 => "★★★", 2 => "★★☆", _ => "★☆☆" };
+                starText.color = _starsEarned switch { 3 => NeonYellow, 2 => new Color(0.9f, 0.9f, 0.2f), _ => new Color(0.5f, 0.5f, 0.5f) };
             }
             _winPopup.SetActive(true);
             var bg = _winPopup.GetComponentInChildren<Image>();
