@@ -30,6 +30,9 @@ namespace ChromaVale.Domain.PuzzleBoard
 
             foreach (var o in level.Obstacles)
                 _cells[o.X, o.Y] = GridCell.Obstacle;
+
+            foreach (var fg in level.FlowGates)
+                _cells[fg.X, fg.Y] = GridCell.FlowGate(fg.Direction);
         }
 
         public GridCell GetCell(int x, int y) => _cells[x, y];
@@ -38,14 +41,16 @@ namespace ChromaVale.Domain.PuzzleBoard
         {
             if (!IsValidPosition(x, y)) return;
             var cell = _cells[x, y];
-            if (cell.Type is CellType.Source or CellType.Target or CellType.Obstacle) return;
+            if (cell.Type is CellType.Source or CellType.Target or CellType.Obstacle or CellType.FlowGate)
+                return;
 
             _history.Push((x, y, cell));
             _cells[x, y] = new GridCell
             {
                 Type = CellType.Pipe,
                 ColorIndex = colorIndex,
-                IsOccupied = true
+                IsOccupied = true,
+                FlowDirection = PipeDirection.None
             };
         }
 
