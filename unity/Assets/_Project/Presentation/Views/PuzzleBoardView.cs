@@ -66,7 +66,7 @@ namespace ChromaVale.Presentation.Views
         private static readonly Color FlowGateRight = new(0.10f, 0.15f, 0.25f);
         private static readonly Color FlowGateLeft = new(0.20f, 0.10f, 0.15f);
 
-
+        private void Start()
         {
             _maxLevel = _levelRepo.LevelCount;
 
@@ -88,7 +88,7 @@ namespace ChromaVale.Presentation.Views
             BuildGrid();
             CreateUI();
             DrawConnectionHint();
-            PlayBeep(440f, 0.15f); // Welcome beep!
+            PlayBeep(440f, 0.15f);
 
             if (_audioService != null) _audioService.PlaySound("level_start");
 
@@ -96,10 +96,6 @@ namespace ChromaVale.Presentation.Views
             StartCoroutine(PulseSources());
         }
 
-        /// <summary>
-        /// Draws a dotted-arrow line from each source to its matching-color target
-        /// so the player immediately sees the goal.
-        /// </summary>
         private void DrawConnectionHint()
         {
             foreach (var src in _level.Sources)
@@ -107,7 +103,6 @@ namespace ChromaVale.Presentation.Views
                 foreach (var tgt in _level.Targets)
                 {
                     if (tgt.ColorIndex != src.ColorIndex) continue;
-
                     var line = new GameObject($"Hint_{src.ColorIndex}");
                     line.transform.SetParent(transform);
                     var lr = line.AddComponent<LineRenderer>();
@@ -116,13 +111,10 @@ namespace ChromaVale.Presentation.Views
                     lr.SetPosition(0, new Vector3(src.X * _tileSize + off.x, src.Y * _tileSize + off.y, -0.5f));
                     lr.SetPosition(1, new Vector3(tgt.X * _tileSize + off.x, tgt.Y * _tileSize + off.y, -0.5f));
                     lr.startWidth = 0.08f; lr.endWidth = 0.08f;
-                    var col = GetPipeColor(src.ColorIndex);
-                    col.a = 0.35f;
+                    var col = GetPipeColor(src.ColorIndex); col.a = 0.35f;
                     lr.material = new Material(Shader.Find("Sprites/Default"));
                     lr.startColor = col; lr.endColor = col;
-                    lr.textureMode = LineTextureMode.Tile;
                     lr.sortingOrder = -5;
-                    // Destroy on solve
                     StartCoroutine(DestroyOnSolve(line));
                 }
             }
@@ -134,9 +126,6 @@ namespace ChromaVale.Presentation.Views
             if (go != null) Destroy(go);
         }
 
-        /// <summary>
-        /// Quick synthesized beep — no audio files needed.
-        /// </summary>
         private void PlayBeep(float freq = 440f, float duration = 0.1f)
         {
             int sampleRate = 44100;
@@ -146,7 +135,6 @@ namespace ChromaVale.Presentation.Views
             for (int i = 0; i < samples; i++)
                 data[i] = Mathf.Sin(2f * Mathf.PI * freq * i / sampleRate) * 0.3f;
             clip.SetData(data, 0);
-            // Play on the main camera's AudioListener
             var cam = Camera.main;
             if (cam != null)
             {
@@ -368,7 +356,7 @@ namespace ChromaVale.Presentation.Views
                 if (_tutorialHint != null && _tutorialHint.activeSelf)
                     _tutorialHint.SetActive(false);
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
-                PlayBeep(660f, 0.08f); // placement pop
+                PlayBeep(660f, 0.08f);
 
                 // Auto-trigger flow when a path is completed
                 if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
@@ -463,7 +451,7 @@ namespace ChromaVale.Presentation.Views
             if (result == SimulationResult.AllTargetsReached)
             {
                 _solved = true;
-                PlayBeep(880f, 0.3f); // victory beep!
+                PlayBeep(880f, 0.3f);
                 _starsEarned = CalculateStars();
                 yield return new WaitForSeconds(0.5f);
                 ShowWinPopup();
