@@ -138,6 +138,16 @@ namespace ChromaVale.Presentation.Views
             bgSr.transform.localScale = new Vector3(20f, 12f, 1f);
             bgSr.transform.localPosition = Vector3.zero;
 
+            // TEST: bright square to verify rendering
+            var test = new GameObject("TEST_SQUARE");
+            test.transform.SetParent(transform);
+            var tSr = test.AddComponent<SpriteRenderer>();
+            tSr.sprite = CreatePixelSprite();
+            tSr.color = Color.magenta;
+            tSr.sortingOrder = -10;
+            test.transform.localScale = new Vector3(3f, 3f, 1f);
+            test.transform.localPosition = new Vector3(0f, 1f, 0f);
+
             // City skyline — layered buildings
             CreateBuildingLayer(-18, 8, 5, new Color(0.08f, 0.04f, 0.18f));
             CreateBuildingLayer(-17, 15, 3.5f, new Color(0.12f, 0.05f, 0.22f));
