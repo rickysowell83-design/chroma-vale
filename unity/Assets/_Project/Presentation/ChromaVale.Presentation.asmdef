@@ -4,7 +4,8 @@
   "references": [
     "ChromaVale.Core",
     "ChromaVale.Domain",
-    "ChromaVale.Infrastructure"
+    "ChromaVale.Infrastructure",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
