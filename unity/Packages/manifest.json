@@ -14,7 +14,7 @@
     "com.unity.inputsystem": "1.8.0",
     "com.unity.mobile.notifications": "2.3.0",
     "com.unity.services.analytics": "6.0.0",
-    "jp.hadashikick.vcontainer": "https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer#1.16.0",
+    "jp.hadashikick.vcontainer": "https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer#1.16.8",
     "com.neuecc.unirx": "https://github.com/neuecc/UniRx.git?path=Assets/Plugins/UniRx/Scripts",
     "com.unity.nuget.newtonsoft-json": "3.2.0",
     "com.unity.burst": "1.8.0",
