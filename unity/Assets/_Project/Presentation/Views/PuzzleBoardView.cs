@@ -88,6 +88,34 @@ namespace ChromaVale.Presentation.Views
             CreateUI();
 
             if (_audioService != null) _audioService.PlaySound("level_start");
+
+            // Start pulsing source tiles to show the player where to connect from
+            StartCoroutine(PulseSources());
+        }
+
+        private IEnumerator PulseSources()
+        {
+            while (!_solved)
+            {
+                foreach (var src in _level.Sources)
+                {
+                    if (_renderers[src.X, src.Y] != null)
+                    {
+                        var sr = _renderers[src.X, src.Y];
+                        sr.transform.localScale = Vector3.one * 1.25f;
+                    }
+                }
+                yield return new WaitForSeconds(0.6f);
+                foreach (var src in _level.Sources)
+                {
+                    if (_renderers[src.X, src.Y] != null)
+                    {
+                        var sr = _renderers[src.X, src.Y];
+                        sr.transform.localScale = Vector3.one;
+                    }
+                }
+                yield return new WaitForSeconds(0.6f);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -277,7 +305,35 @@ namespace ChromaVale.Presentation.Views
                 if (_tutorialHint != null && _tutorialHint.activeSelf)
                     _tutorialHint.SetActive(false);
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
+
+                // Auto-trigger flow when a path is completed
+                if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
+                {
+                    StartCoroutine(RunFlowSimulation());
+                }
             }
+        }
+
+        private bool CheckAllConnected()
+        {
+            if (_inventory.PlacedCount == 0) return false;
+            var router = new PipeRouter(_board);
+            foreach (var src in _level.Sources)
+            {
+                int srcX = src.X, srcY = src.Y;
+                bool foundPath = false;
+                foreach (var tgt in _level.Targets)
+                {
+                    if (tgt.ColorIndex != src.ColorIndex) continue;
+                    if (router.IsPathConnected(srcX, srcY, tgt.X, tgt.Y))
+                    {
+                        foundPath = true;
+                        break;
+                    }
+                }
+                if (!foundPath) return false;
+            }
+            return true;
         }
 
         private void UndoPlacement()
@@ -654,11 +710,12 @@ namespace ChromaVale.Presentation.Views
 
         private IEnumerator SelectionPulse(Transform t)
         {
+            if (t == null) yield break;
             float d = 0.4f;
             var orig = t.localScale;
             t.localScale = orig * 1.15f;
             yield return new WaitForSeconds(d);
-            t.localScale = orig;
+            if (t != null) t.localScale = orig;
         }
 
         private void DisableInventoryInteraction()
@@ -678,16 +735,25 @@ namespace ChromaVale.Presentation.Views
             var th = new GameObject("TutorialHint");
             th.transform.SetParent(transform);
             var cv = th.AddComponent<Canvas>();
-            cv.renderMode = RenderMode.ScreenSpaceOverlay; cv.sortingOrder = 55;
+            cv.renderMode = RenderMode.ScreenSpaceOverlay; cv.sortingOrder = 100;
             th.AddComponent<CanvasScaler>(); th.AddComponent<GraphicRaycaster>();
+
+            // Semi-transparent backdrop so text is readable
+            var bg = new GameObject("HintBG");
+            bg.transform.SetParent(th.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = new Color(0, 0, 0, 0.7f);
+            var bgr = bg.GetComponent<RectTransform>();
+            bgr.anchorMin = new Vector2(0f, 0.1f); bgr.anchorMax = new Vector2(1f, 0.28f);
+            bgr.offsetMin = Vector2.zero; bgr.offsetMax = Vector2.zero;
 
             var textGo = new GameObject("HintText");
             textGo.transform.SetParent(th.transform, false);
             var thtx = textGo.AddComponent<Text>();
             thtx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            thtx.fontSize = 13; thtx.alignment = TextAnchor.LowerCenter; thtx.color = new Color(0.5f, 0.7f, 0.8f, 0.9f);
+            thtx.fontSize = 18; thtx.alignment = TextAnchor.MiddleCenter; thtx.color = Color.white;
             var thr = thtx.GetComponent<RectTransform>();
-            thr.anchorMin = new Vector2(0.05f, 0.14f); thr.anchorMax = new Vector2(0.95f, 0.22f);
+            thr.anchorMin = new Vector2(0.05f, 0.12f); thr.anchorMax = new Vector2(0.95f, 0.26f);
             thr.offsetMin = Vector2.zero; thr.offsetMax = Vector2.zero;
 
             _tutorialHint = th;
@@ -695,10 +761,8 @@ namespace ChromaVale.Presentation.Views
             {
                 int srcColor = _level.Sources.Length > 0 ? _level.Sources[0].ColorIndex : 0;
                 string colorName = srcColor == 0 ? "CYAN" : srcColor == 1 ? "MAGENTA" : "YELLOW";
-                thtx.text = $"Connect the {colorName} source ▶ to the {colorName} target ◼\n" +
-                            "1. TAP a pipe piece below to select it\n" +
-                            "2. TAP dark cells to build a path\n" +
-                            "3. Press ▶ FLOW ON to send the flow!";
+                thtx.text = $"Connect the glowing {colorName} source to the {colorName} target!\n" +
+                            "TAP a pipe below → TAP a dark cell → watch the flow!";
             }
             else
                 th.SetActive(false);
