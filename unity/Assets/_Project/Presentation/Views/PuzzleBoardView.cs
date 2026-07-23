@@ -577,7 +577,6 @@ namespace ChromaVale.Presentation.Views
             var ct = new GameObject("CounterText");
             ct.transform.SetParent(mc.transform, false);
             var tx = ct.AddComponent<TextMeshProUGUI>();
-            tx
             tx.fontSize = 16; tx.alignment = TextAlignmentOptions.TopLeft; tx.color = NeonCyan;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = new Vector2(0.02f, 0.94f); tr.anchorMax = new Vector2(0.3f, 0.99f);
@@ -588,7 +587,6 @@ namespace ChromaVale.Presentation.Views
             var ll = new GameObject("LevelLabel");
             ll.transform.SetParent(mc.transform, false);
             var ltx = ll.AddComponent<TextMeshProUGUI>();
-            ltx
             ltx.fontSize = 16; ltx.alignment = TextAlignmentOptions.Top; ltx.color = new Color(0.4f, 0.4f, 0.5f);
             var llr = ltx.GetComponent<RectTransform>();
             llr.anchorMin = new Vector2(0.35f, 0.94f); llr.anchorMax = new Vector2(0.65f, 0.99f);
@@ -634,7 +632,6 @@ namespace ChromaVale.Presentation.Views
             txt.transform.SetParent(btnGo.transform, false);
             var ftx = txt.AddComponent<TextMeshProUGUI>();
             ftx.text = "▶ FLOW ON";
-            ftx
             ftx.fontSize = 20; ftx.alignment = TextAlignmentOptions.Center; ftx.color = Color.white;
             var ftr = ftx.GetComponent<RectTransform>();
             ftr.anchorMin = Vector2.zero; ftr.anchorMax = Vector2.one; ftr.sizeDelta = Vector2.zero;
@@ -705,7 +702,6 @@ namespace ChromaVale.Presentation.Views
                 labelGo.transform.SetParent(slot.transform, false);
                 var labelTx = labelGo.AddComponent<TextMeshProUGUI>();
                 labelTx.text = $"{ShapeSymbol(shape)} ×{count}";
-                labelTx
                 labelTx.fontSize = 11; labelTx.alignment = TextAlignmentOptions.Center; labelTx.color = Color.white;
                 var lr = labelTx.GetComponent<RectTransform>();
                 lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.sizeDelta = Vector2.zero;
@@ -803,7 +799,6 @@ namespace ChromaVale.Presentation.Views
             var textGo = new GameObject("HintText");
             textGo.transform.SetParent(th.transform, false);
             var thtx = textGo.AddComponent<TextMeshProUGUI>();
-            thtx
             thtx.fontSize = 18; thtx.alignment = TextAlignmentOptions.Center; thtx.color = Color.white;
             var thr = thtx.GetComponent<RectTransform>();
             thr.anchorMin = new Vector2(0.05f, 0.12f); thr.anchorMax = new Vector2(0.95f, 0.26f);
@@ -841,7 +836,6 @@ namespace ChromaVale.Presentation.Views
             t1.transform.SetParent(bg.transform, false);
             var wtx = t1.AddComponent<TextMeshProUGUI>();
             wtx.text = "PIPELINE ONLINE";
-            wtx
             wtx.fontSize = 32; wtx.alignment = TextAlignmentOptions.Center; wtx.color = NeonCyan;
             var wr = wtx.GetComponent<RectTransform>();
             wr.anchorMin = new Vector2(0.5f, 0.7f); wr.anchorMax = new Vector2(0.5f, 0.7f);
@@ -852,7 +846,6 @@ namespace ChromaVale.Presentation.Views
             t2.transform.SetParent(bg.transform, false);
             var wsx = t2.AddComponent<TextMeshProUGUI>();
             wsx.text = "Flow delivered successfully.";
-            wsx
             wsx.fontSize = 15; wsx.alignment = TextAlignmentOptions.Center; wsx.color = new Color(0.5f, 0.5f, 0.6f);
             var wr2 = wsx.GetComponent<RectTransform>();
             wr2.anchorMin = new Vector2(0.5f, 0.6f); wr2.anchorMax = new Vector2(0.5f, 0.6f);
@@ -862,8 +855,7 @@ namespace ChromaVale.Presentation.Views
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
             var scx = t3.AddComponent<TextMeshProUGUI>();
-            scx.text = "★☆☆";
-            scx
+            scx.text = "★★★";
             scx.fontSize = 30; scx.alignment = TextAlignmentOptions.Center; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
@@ -874,7 +866,6 @@ namespace ChromaVale.Presentation.Views
             t4.transform.SetParent(bg.transform, false);
             var scx2 = t4.AddComponent<TextMeshProUGUI>();
             scx2.text = "Completed in 12 moves";
-            scx2
             scx2.fontSize = 13; scx2.alignment = TextAlignmentOptions.Center; scx2.color = new Color(0.3f, 0.3f, 0.4f);
             var wr4 = scx2.GetComponent<RectTransform>();
             wr4.anchorMin = new Vector2(0.5f, 0.43f); wr4.anchorMax = new Vector2(0.5f, 0.43f);
@@ -906,8 +897,7 @@ namespace ChromaVale.Presentation.Views
             var txt = new GameObject(label + "Text");
             txt.transform.SetParent(go.transform, false);
             var tx = txt.AddComponent<TextMeshProUGUI>();
-            tx.text = label; tx
-            tx.fontSize = 14; tx.alignment = TextAlignmentOptions.Center; tx.color = Color.white;
+            tx.text = label; tx.fontSize = 14; tx.alignment = TextAlignmentOptions.Center; tx.color = Color.white;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
 
