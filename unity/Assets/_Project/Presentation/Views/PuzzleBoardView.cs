@@ -694,7 +694,7 @@ namespace ChromaVale.Presentation.Views
                 var labelGo = new GameObject("Label");
                 labelGo.transform.SetParent(slot.transform, false);
                 var labelTx = labelGo.AddComponent<TextMeshProUGUI>();
-                labelTx.text = $"{ShapeSymbol(shape)} ×{count}";
+                labelTx.text = $"{ShapeSymbol(shape)} x{count}";
                 labelTx.fontSize = 11; labelTx.alignment = TextAlignmentOptions.Center; labelTx.color = Color.white;
                 var lr = labelTx.GetComponent<RectTransform>();
                 lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.sizeDelta = Vector2.zero;
@@ -848,7 +848,7 @@ namespace ChromaVale.Presentation.Views
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
             var scx = t3.AddComponent<TextMeshProUGUI>();
-            scx.text = "★★★";
+            scx.text = "*** 3 STARS ***";
             scx.fontSize = 30; scx.alignment = TextAlignmentOptions.Center; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
@@ -917,9 +917,9 @@ namespace ChromaVale.Presentation.Views
                 {
                     string starStr = _starsEarned switch
                     {
-                        3 => "★★★",
-                        2 => "★★☆",
-                        _ => "★☆☆"
+                        3 => "[3 STARS]",
+                        2 => "[2 STARS]",
+                        _ => "[1 STAR]"
                     };
                     t.text = starStr;
                     t.color = _starsEarned switch { 3 => NeonYellow, 2 => new Color(0.9f, 0.9f, 0.2f), _ => new Color(0.5f, 0.5f, 0.5f) };
