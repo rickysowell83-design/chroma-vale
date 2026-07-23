@@ -65,6 +65,14 @@ namespace ChromaVale.Presentation.Views
         private static readonly Color FlowGateRight = new(0.10f, 0.15f, 0.25f);
         private static readonly Color FlowGateLeft = new(0.20f, 0.10f, 0.15f);
 
+        private static Font _cachedFont;
+        private static Font GetUIFont()
+        {
+            if (_cachedFont == null)
+                _cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            return _cachedFont;
+        }
+
         private void Start()
         {
             _maxLevel = _levelRepo.LevelCount;
@@ -524,7 +532,7 @@ namespace ChromaVale.Presentation.Views
             var ct = new GameObject("CounterText");
             ct.transform.SetParent(mc.transform, false);
             var tx = ct.AddComponent<Text>();
-            tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            tx.font = GetUIFont();
             tx.fontSize = 16; tx.alignment = TextAnchor.UpperLeft; tx.color = NeonCyan;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = new Vector2(0.02f, 0.94f); tr.anchorMax = new Vector2(0.3f, 0.99f);
@@ -535,7 +543,7 @@ namespace ChromaVale.Presentation.Views
             var ll = new GameObject("LevelLabel");
             ll.transform.SetParent(mc.transform, false);
             var ltx = ll.AddComponent<Text>();
-            ltx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ltx.font = GetUIFont();
             ltx.fontSize = 16; ltx.alignment = TextAnchor.UpperCenter; ltx.color = new Color(0.4f, 0.4f, 0.5f);
             var llr = ltx.GetComponent<RectTransform>();
             llr.anchorMin = new Vector2(0.35f, 0.94f); llr.anchorMax = new Vector2(0.65f, 0.99f);
@@ -553,7 +561,7 @@ namespace ChromaVale.Presentation.Views
             var rt = new GameObject("ResetText");
             rt.transform.SetParent(rb.transform, false);
             var rtx = rt.AddComponent<Text>();
-            rtx.text = "RESET"; rtx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rtx.text = "RESET"; rtx.font = GetUIFont();
             rtx.fontSize = 14; rtx.alignment = TextAnchor.MiddleCenter; rtx.color = Color.white;
             var rtr = rtx.GetComponent<RectTransform>();
             rtr.anchorMin = Vector2.zero; rtr.anchorMax = Vector2.one; rtr.sizeDelta = Vector2.zero;
@@ -581,7 +589,7 @@ namespace ChromaVale.Presentation.Views
             txt.transform.SetParent(btnGo.transform, false);
             var ftx = txt.AddComponent<Text>();
             ftx.text = "▶ FLOW ON";
-            ftx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ftx.font = GetUIFont();
             ftx.fontSize = 20; ftx.alignment = TextAnchor.MiddleCenter; ftx.color = Color.white;
             var ftr = ftx.GetComponent<RectTransform>();
             ftr.anchorMin = Vector2.zero; ftr.anchorMax = Vector2.one; ftr.sizeDelta = Vector2.zero;
@@ -652,7 +660,7 @@ namespace ChromaVale.Presentation.Views
                 labelGo.transform.SetParent(slot.transform, false);
                 var labelTx = labelGo.AddComponent<Text>();
                 labelTx.text = $"{ShapeSymbol(shape)} ×{count}";
-                labelTx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                labelTx.font = GetUIFont();
                 labelTx.fontSize = 11; labelTx.alignment = TextAnchor.MiddleCenter; labelTx.color = Color.white;
                 var lr = labelTx.GetComponent<RectTransform>();
                 lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one; lr.sizeDelta = Vector2.zero;
@@ -750,7 +758,7 @@ namespace ChromaVale.Presentation.Views
             var textGo = new GameObject("HintText");
             textGo.transform.SetParent(th.transform, false);
             var thtx = textGo.AddComponent<Text>();
-            thtx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            thtx.font = GetUIFont();
             thtx.fontSize = 18; thtx.alignment = TextAnchor.MiddleCenter; thtx.color = Color.white;
             var thr = thtx.GetComponent<RectTransform>();
             thr.anchorMin = new Vector2(0.05f, 0.12f); thr.anchorMax = new Vector2(0.95f, 0.26f);
@@ -788,7 +796,7 @@ namespace ChromaVale.Presentation.Views
             t1.transform.SetParent(bg.transform, false);
             var wtx = t1.AddComponent<Text>();
             wtx.text = "PIPELINE ONLINE";
-            wtx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            wtx.font = GetUIFont();
             wtx.fontSize = 32; wtx.alignment = TextAnchor.MiddleCenter; wtx.color = NeonCyan;
             var wr = wtx.GetComponent<RectTransform>();
             wr.anchorMin = new Vector2(0.5f, 0.7f); wr.anchorMax = new Vector2(0.5f, 0.7f);
@@ -799,7 +807,7 @@ namespace ChromaVale.Presentation.Views
             t2.transform.SetParent(bg.transform, false);
             var wsx = t2.AddComponent<Text>();
             wsx.text = "Flow delivered successfully.";
-            wsx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            wsx.font = GetUIFont();
             wsx.fontSize = 15; wsx.alignment = TextAnchor.MiddleCenter; wsx.color = new Color(0.5f, 0.5f, 0.6f);
             var wr2 = wsx.GetComponent<RectTransform>();
             wr2.anchorMin = new Vector2(0.5f, 0.6f); wr2.anchorMax = new Vector2(0.5f, 0.6f);
@@ -810,7 +818,7 @@ namespace ChromaVale.Presentation.Views
             t3.transform.SetParent(bg.transform, false);
             var scx = t3.AddComponent<Text>();
             scx.text = "★☆☆";
-            scx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            scx.font = GetUIFont();
             scx.fontSize = 30; scx.alignment = TextAnchor.MiddleCenter; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
@@ -821,7 +829,7 @@ namespace ChromaVale.Presentation.Views
             t4.transform.SetParent(bg.transform, false);
             var scx2 = t4.AddComponent<Text>();
             scx2.text = "Completed in 12 moves";
-            scx2.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            scx2.font = GetUIFont();
             scx2.fontSize = 13; scx2.alignment = TextAnchor.MiddleCenter; scx2.color = new Color(0.3f, 0.3f, 0.4f);
             var wr4 = scx2.GetComponent<RectTransform>();
             wr4.anchorMin = new Vector2(0.5f, 0.43f); wr4.anchorMax = new Vector2(0.5f, 0.43f);
@@ -853,7 +861,7 @@ namespace ChromaVale.Presentation.Views
             var txt = new GameObject(label + "Text");
             txt.transform.SetParent(go.transform, false);
             var tx = txt.AddComponent<Text>();
-            tx.text = label; tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            tx.text = label; tx.font = GetUIFont();
             tx.fontSize = 14; tx.alignment = TextAnchor.MiddleCenter; tx.color = Color.white;
             var tr = tx.GetComponent<RectTransform>();
             tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
