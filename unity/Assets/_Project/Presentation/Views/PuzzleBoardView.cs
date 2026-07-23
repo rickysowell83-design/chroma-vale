@@ -7,6 +7,7 @@ using ChromaVale.Domain.PuzzleBoard;
 using ChromaVale.Infrastructure.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace ChromaVale.Presentation.Views
@@ -1191,7 +1192,7 @@ namespace ChromaVale.Presentation.Views
         private void Update()
         {
             // Detect right-click while hovering over this tile
-            if (_isMouseOver && Input.GetMouseButtonDown(1))
+            if (_isMouseOver && Mouse.current.rightButton.wasPressedThisFrame)
             {
                 _board.OnRightClick();
             }
