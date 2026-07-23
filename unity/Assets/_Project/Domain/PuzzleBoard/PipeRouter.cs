@@ -35,7 +35,7 @@ namespace ChromaVale.Domain.PuzzleBoard
         public void Place(int x, int y, int colorIndex)
         {
             if (!CanPlace(x, y, colorIndex)) return;
-            _board.PlacePipe(x, y, colorIndex);
+            _board.PlacePipe(x, y);
             _history.Push((x, y));
         }
 
