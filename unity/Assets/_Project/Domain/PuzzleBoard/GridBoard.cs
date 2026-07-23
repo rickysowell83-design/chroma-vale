@@ -41,14 +41,15 @@ namespace ChromaVale.Domain.PuzzleBoard
         {
             if (!IsValidPosition(x, y)) return;
             var cell = _cells[x, y];
-            if (cell.Type is CellType.Source or CellType.Target or CellType.Obstacle or CellType.FlowGate)
-                return;
+            // Allow placement on Empty cells only. colorIndex of -1 means "uncolored pipe."
+            if (cell.Type != CellType.Empty) return;
+            if (cell.IsOccupied) return;
 
             _history.Push((x, y, cell));
             _cells[x, y] = new GridCell
             {
                 Type = CellType.Pipe,
-                ColorIndex = colorIndex,
+                ColorIndex = colorIndex, // -1 = uncolored (color assigned by flow)
                 IsOccupied = true,
                 FlowDirection = PipeDirection.None
             };
