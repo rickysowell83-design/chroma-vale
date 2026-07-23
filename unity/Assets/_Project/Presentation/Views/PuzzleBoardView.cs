@@ -73,14 +73,8 @@ namespace ChromaVale.Presentation.Views
             // Resolve audio service from the persistent installer
             _audioService = AudioServiceInstaller.Instance;
 
-            // Load saved progress — start from the highest unlocked level
-            if (SaveGameManager.Instance != null)
-            {
-                int savedLevel = SaveGameManager.Instance.CurrentLevel;
-                if (savedLevel >= 1 && savedLevel <= _maxLevel)
-                    _levelNumber = savedLevel;
-            }
-
+            // FORCE Level 1 for testing — bypass save system
+            _levelNumber = 1;
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
@@ -630,7 +624,7 @@ namespace ChromaVale.Presentation.Views
             var txt = new GameObject("FlowText");
             txt.transform.SetParent(btnGo.transform, false);
             var ftx = txt.AddComponent<TextMeshProUGUI>();
-            ftx.text = "▶ FLOW ON";
+            ftx.text = ">> FLOW";
             ftx.fontSize = 20; ftx.alignment = TextAlignmentOptions.Center; ftx.color = Color.white;
             var ftr = ftx.GetComponent<RectTransform>();
             ftr.anchorMin = Vector2.zero; ftr.anchorMax = Vector2.one; ftr.sizeDelta = Vector2.zero;
@@ -875,7 +869,7 @@ namespace ChromaVale.Presentation.Views
                 new Color(0.1f, 0.4f, 0.45f, 0.9f));
 
             // Next Level
-            var nl = CreatePopupButton(bg, "NEXT LEVEL ▶", new Vector2(0.5f, 0.2f), AdvanceLevel,
+            var nl = CreatePopupButton(bg, "NEXT LEVEL >>", new Vector2(0.5f, 0.2f), AdvanceLevel,
                 new Color(0.35f, 0.15f, 0.45f, 0.9f));
 
             _winPopup = wc;
@@ -1017,7 +1011,7 @@ namespace ChromaVale.Presentation.Views
             for (int x = 0; x < _board.Width; x++)
                 for (int y = 0; y < _board.Height; y++)
                     if (_renderers[x, y] != null)
-                        Destroy(_renderers[x, y].gameObject);
+                        DestroyImmediate(_renderers[x, y].gameObject);
 
             _solved = false;
             _moveCount = 0;
@@ -1053,7 +1047,7 @@ namespace ChromaVale.Presentation.Views
         private void UpdateMoveCounter()
         {
             if (_moveCounter == null) return;
-            var tx = _moveCounter.GetComponentInChildren<Text>();
+            var tx = _moveCounter.GetComponentInChildren<TextMeshProUGUI>();
             if (tx != null) tx.text = $"PIECES: {_moveCount}";
         }
 
