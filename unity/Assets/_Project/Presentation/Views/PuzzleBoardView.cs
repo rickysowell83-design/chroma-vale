@@ -81,6 +81,8 @@ namespace ChromaVale.Presentation.Views
             _inventory = new PipeInventory(_level.Inventory);
             BuildGrid();
             CreateUI();
+            CreateCyberpunkBackground();
+            StartCyberpunkMusic();
             DrawConnectionHint();
             PlayBeep(440f, 0.15f);
 
@@ -119,6 +121,163 @@ namespace ChromaVale.Presentation.Views
             while (!_solved) yield return null;
             if (go != null) Destroy(go);
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CYBERPUNK BACKGROUND
+        // ═══════════════════════════════════════════════════════════════
+
+        private void CreateCyberpunkBackground()
+        {
+            // Dark gradient background
+            var bg = new GameObject("CyberpunkBG");
+            bg.transform.SetParent(transform);
+            var bgSr = bg.AddComponent<SpriteRenderer>();
+            bgSr.sprite = CreatePixelSprite();
+            bgSr.color = new Color(0.02f, 0.01f, 0.06f); // Near-black purple
+            bgSr.sortingOrder = -20;
+            bgSr.transform.localScale = new Vector3(20f, 12f, 1f);
+            bgSr.transform.localPosition = Vector3.zero;
+
+            // City skyline — layered buildings
+            CreateBuildingLayer(-18, 8, 5, new Color(0.03f, 0.02f, 0.08f));
+            CreateBuildingLayer(-17, 15, 4, new Color(0.05f, 0.02f, 0.10f));
+            CreateBuildingLayer(-16, 22, 3, new Color(0.08f, 0.03f, 0.12f));
+
+            // Neon horizon line
+            var horizon = new GameObject("Horizon");
+            horizon.transform.SetParent(transform);
+            var hSr = horizon.AddComponent<SpriteRenderer>();
+            hSr.sprite = CreatePixelSprite();
+            hSr.color = NeonCyan * 0.3f;
+            hSr.sortingOrder = -15;
+            hSr.transform.localScale = new Vector3(20f, 0.04f, 1f);
+            hSr.transform.localPosition = new Vector3(0f, -2.5f, 0f);
+        }
+
+        private void CreateBuildingLayer(int order, int count, float maxHeight, Color color)
+        {
+            float startX = -9f;
+            float endX = 9f;
+            float spacing = (endX - startX) / count;
+            float baseY = -2.5f;
+
+            for (int i = 0; i < count; i++)
+            {
+                float x = startX + spacing * i + Random.Range(-0.3f, 0.3f);
+                float h = Random.Range(1f, maxHeight);
+                float w = Random.Range(0.4f, 1.2f);
+
+                var b = new GameObject($"Bldg_{order}_{i}");
+                b.transform.SetParent(transform);
+                var sr = b.AddComponent<SpriteRenderer>();
+                sr.sprite = CreatePixelSprite();
+                sr.color = color;
+                sr.sortingOrder = order;
+                sr.transform.localScale = new Vector3(w, h, 1f);
+                sr.transform.localPosition = new Vector3(x, baseY + h / 2f, 0f);
+
+                // Neon window dots
+                int windows = Random.Range(1, 5);
+                for (int ww = 0; ww < windows; ww++)
+                {
+                    var win = new GameObject($"Win_{order}_{i}_{ww}");
+                    win.transform.SetParent(b.transform);
+                    var wSr = win.AddComponent<SpriteRenderer>();
+                    wSr.sprite = CreatePixelSprite();
+                    wSr.sortingOrder = order + 1;
+                    wSr.transform.localScale = new Vector3(0.08f, 0.06f, 1f);
+                    wSr.transform.localPosition = new Vector3(
+                        Random.Range(-0.3f, 0.3f),
+                        Random.Range(-h / 2f + 0.2f, h / 2f - 0.2f), 0f);
+
+                    // Random neon color for windows
+                    Color[] neonColors = { NeonCyan * 0.7f, NeonMagenta * 0.7f, NeonYellow * 0.5f, NeonPurple * 0.6f };
+                    wSr.color = neonColors[Random.Range(0, neonColors.Length)];
+                }
+            }
+        }
+
+        private Sprite CreatePixelSprite()
+        {
+            var tex = new Texture2D(1, 1);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CYBERPUNK MUSIC — procedural synth loop
+        // ═══════════════════════════════════════════════════════════════
+
+        private void StartCyberpunkMusic()
+        {
+            var cam = Camera.main;
+            if (cam == null) return;
+            var src = cam.gameObject.GetComponent<AudioSource>();
+            if (src == null) src = cam.gameObject.AddComponent<AudioSource>();
+            src.loop = true;
+            src.volume = 0.15f;
+            src.clip = GenerateCyberpunkLoop();
+            src.Play();
+        }
+
+        private AudioClip GenerateCyberpunkLoop()
+        {
+            int sampleRate = 44100;
+            float duration = 8f; // 8-second loop
+            int samples = Mathf.CeilToInt(sampleRate * duration);
+            var clip = AudioClip.Create("cyberpunk_loop", samples, 1, sampleRate, false);
+            var data = new float[samples];
+
+            // Bass drone — low C (65 Hz) with slight detune
+            float bassFreq = 65.4f;
+            // Arp — C minor pentatonic
+            float[] arpNotes = { 261.6f, 311.1f, 349.2f, 392.0f, 466.2f };
+            float bpm = 90f;
+            float beatDuration = 60f / bpm;
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float sample = 0f;
+
+                // Bass drone (sine wave with slow LFO)
+                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * t) * 0.3f;
+                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * 0.5f * t) * 0.2f; // sub-bass
+
+                // Arpeggiated lead (square-ish wave)
+                int beatIndex = Mathf.FloorToInt(t / (beatDuration * 0.5f)) % arpNotes.Length;
+                float arpFreq = arpNotes[beatIndex];
+                float arpPhase = (t % (beatDuration * 0.5f)) / (beatDuration * 0.5f);
+                float arpEnv = Mathf.Exp(-arpPhase * 3f); // quick decay
+                float arpWave = Mathf.Sin(2f * Mathf.PI * arpFreq * t);
+                // Square-ify
+                arpWave = arpWave > 0 ? 0.5f : -0.5f;
+                sample += arpWave * arpEnv * 0.15f;
+
+                // Hi-hat pulse on 8th notes
+                float eighthNote = t % (beatDuration * 0.5f);
+                if (eighthNote < 0.02f)
+                {
+                    sample += (Random.value * 2f - 1f) * 0.1f; // noise burst
+                }
+
+                // Kick on beats 1 and 3
+                float beatPhase = (t % (beatDuration * 2f)) / beatDuration;
+                if (beatPhase < 0.05f || (beatPhase >= 2f && beatPhase < 2.05f))
+                {
+                    float kickEnv = Mathf.Exp(-beatPhase * 40f);
+                    sample += Mathf.Sin(2f * Mathf.PI * 80f * t * (1f - beatPhase)) * kickEnv * 0.4f;
+                }
+
+                data[i] = Mathf.Clamp(sample, -1f, 1f);
+            }
+
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
 
         private void PlayBeep(float freq = 440f, float duration = 0.1f)
         {
