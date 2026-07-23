@@ -128,43 +128,48 @@ namespace ChromaVale.Presentation.Views
 
         private void CreateCyberpunkBackground()
         {
+            var mat = new Material(Shader.Find("Sprites/Default"));
+
             // Dark gradient background
-            var bg = new GameObject("CyberpunkBG");
+            var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            bg.name = "CyberpunkBG";
             bg.transform.SetParent(transform);
-            var bgSr = bg.AddComponent<SpriteRenderer>();
-            bgSr.sprite = CreatePixelSprite();
-            bgSr.color = new Color(0.02f, 0.01f, 0.06f); // Near-black purple
-            bgSr.sortingOrder = -20;
-            bgSr.transform.localScale = new Vector3(20f, 12f, 1f);
-            bgSr.transform.localPosition = Vector3.zero;
+            bg.transform.localPosition = new Vector3(0f, 0f, 1f);
+            bg.transform.localScale = new Vector3(20f, 12f, 1f);
+            Destroy(bg.GetComponent<MeshCollider>());
+            bg.GetComponent<MeshRenderer>().material = mat;
+            bg.GetComponent<MeshRenderer>().material.color = new Color(0.02f, 0.01f, 0.06f);
+            bg.GetComponent<MeshRenderer>().sortingOrder = -20;
 
-            // TEST: bright square to verify rendering
-            var test = new GameObject("TEST_SQUARE");
+            // TEST: bright square
+            var test = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            test.name = "TEST_SQUARE";
             test.transform.SetParent(transform);
-            var tSr = test.AddComponent<SpriteRenderer>();
-            tSr.sprite = CreatePixelSprite();
-            tSr.color = Color.magenta;
-            tSr.sortingOrder = -10;
+            test.transform.localPosition = new Vector3(0f, 1f, 1f);
             test.transform.localScale = new Vector3(3f, 3f, 1f);
-            test.transform.localPosition = new Vector3(0f, 1f, 0f);
+            Destroy(test.GetComponent<MeshCollider>());
+            test.GetComponent<MeshRenderer>().material = mat;
+            test.GetComponent<MeshRenderer>().material.color = Color.magenta;
+            test.GetComponent<MeshRenderer>().sortingOrder = -10;
 
-            // City skyline — layered buildings
-            CreateBuildingLayer(-18, 8, 5, new Color(0.08f, 0.04f, 0.18f));
-            CreateBuildingLayer(-17, 15, 3.5f, new Color(0.12f, 0.05f, 0.22f));
-            CreateBuildingLayer(-16, 22, 2.5f, new Color(0.18f, 0.06f, 0.28f));
+            // City skyline
+            CreateBuildingLayer(-18, 8, 5, new Color(0.08f, 0.04f, 0.18f), mat);
+            CreateBuildingLayer(-17, 15, 3.5f, new Color(0.12f, 0.05f, 0.22f), mat);
+            CreateBuildingLayer(-16, 22, 2.5f, new Color(0.18f, 0.06f, 0.28f), mat);
 
             // Neon horizon line
-            var horizon = new GameObject("Horizon");
+            var horizon = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            horizon.name = "Horizon";
             horizon.transform.SetParent(transform);
-            var hSr = horizon.AddComponent<SpriteRenderer>();
-            hSr.sprite = CreatePixelSprite();
-            hSr.color = NeonCyan * 0.3f;
-            hSr.sortingOrder = -15;
-            hSr.transform.localScale = new Vector3(20f, 0.04f, 1f);
-            hSr.transform.localPosition = new Vector3(0f, -2.5f, 0f);
+            horizon.transform.localPosition = new Vector3(0f, -2.5f, 1f);
+            horizon.transform.localScale = new Vector3(20f, 0.04f, 1f);
+            Destroy(horizon.GetComponent<MeshCollider>());
+            horizon.GetComponent<MeshRenderer>().material = mat;
+            horizon.GetComponent<MeshRenderer>().material.color = NeonCyan * 0.3f;
+            horizon.GetComponent<MeshRenderer>().sortingOrder = -15;
         }
 
-        private void CreateBuildingLayer(int order, int count, float maxHeight, Color color)
+        private void CreateBuildingLayer(int order, int count, float maxHeight, Color color, Material mat)
         {
             float startX = -9f;
             float endX = 9f;
@@ -177,32 +182,32 @@ namespace ChromaVale.Presentation.Views
                 float h = Random.Range(1f, maxHeight);
                 float w = Random.Range(0.4f, 1.2f);
 
-                var b = new GameObject($"Bldg_{order}_{i}");
+                var b = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                b.name = $"Bldg_{order}_{i}";
                 b.transform.SetParent(transform);
-                var sr = b.AddComponent<SpriteRenderer>();
-                sr.sprite = CreatePixelSprite();
-                sr.color = color;
-                sr.sortingOrder = order;
-                sr.transform.localScale = new Vector3(w, h, 1f);
-                sr.transform.localPosition = new Vector3(x, baseY + h / 2f, 0f);
+                b.transform.localPosition = new Vector3(x, baseY + h / 2f, 1f);
+                b.transform.localScale = new Vector3(w, h, 1f);
+                Destroy(b.GetComponent<MeshCollider>());
+                b.GetComponent<MeshRenderer>().material = mat;
+                b.GetComponent<MeshRenderer>().material.color = color;
+                b.GetComponent<MeshRenderer>().sortingOrder = order;
 
                 // Neon window dots
                 int windows = Random.Range(1, 5);
                 for (int ww = 0; ww < windows; ww++)
                 {
-                    var win = new GameObject($"Win_{order}_{i}_{ww}");
+                    var win = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    win.name = $"Win_{order}_{i}_{ww}";
                     win.transform.SetParent(b.transform);
-                    var wSr = win.AddComponent<SpriteRenderer>();
-                    wSr.sprite = CreatePixelSprite();
-                    wSr.sortingOrder = order + 1;
-                    wSr.transform.localScale = new Vector3(0.08f, 0.06f, 1f);
-                    wSr.transform.localPosition = new Vector3(
+                    win.transform.localPosition = new Vector3(
                         Random.Range(-0.3f, 0.3f),
                         Random.Range(-h / 2f + 0.2f, h / 2f - 0.2f), 0f);
-
-                    // Random neon color for windows
+                    win.transform.localScale = new Vector3(0.08f, 0.06f, 1f);
+                    Destroy(win.GetComponent<MeshCollider>());
+                    win.GetComponent<MeshRenderer>().material = mat;
                     Color[] neonColors = { NeonCyan * 0.7f, NeonMagenta * 0.7f, NeonYellow * 0.5f, NeonPurple * 0.6f };
-                    wSr.color = neonColors[Random.Range(0, neonColors.Length)];
+                    win.GetComponent<MeshRenderer>().material.color = neonColors[Random.Range(0, neonColors.Length)];
+                    win.GetComponent<MeshRenderer>().sortingOrder = order + 1;
                 }
             }
         }
