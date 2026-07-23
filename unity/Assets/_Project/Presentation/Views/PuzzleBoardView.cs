@@ -604,8 +604,7 @@ namespace ChromaVale.Presentation.Views
             var rt = new GameObject("ResetText");
             rt.transform.SetParent(rb.transform, false);
             var rtx = rt.AddComponent<TextMeshProUGUI>();
-            rtx.text = "RESET"; rtx
-            rtx.fontSize = 14; rtx.alignment = TextAlignmentOptions.Center; rtx.color = Color.white;
+            rtx.text = "RESET"; rtx.fontSize = 14; rtx.alignment = TextAlignmentOptions.Center; rtx.color = Color.white;
             var rtr = rtx.GetComponent<RectTransform>();
             rtr.anchorMin = Vector2.zero; rtr.anchorMax = Vector2.one; rtr.sizeDelta = Vector2.zero;
         }
