@@ -630,6 +630,7 @@ namespace ChromaVale.Presentation.Views
             ftr.anchorMin = Vector2.zero; ftr.anchorMax = Vector2.one; ftr.sizeDelta = Vector2.zero;
 
             _flowButton = btnGo;
+            _flowButton.SetActive(false); // Auto-flow handles triggering
         }
 
         private void CreateInventoryPanel()
@@ -848,7 +849,7 @@ namespace ChromaVale.Presentation.Views
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
             var scx = t3.AddComponent<TextMeshProUGUI>();
-            scx.text = "*** 3 STARS ***";
+            scx.text = $"STARS: {_starsEarned} / 3";
             scx.fontSize = 30; scx.alignment = TextAlignmentOptions.Center; scx.color = NeonYellow;
             var wr3 = scx.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f); wr3.anchorMax = new Vector2(0.5f, 0.5f);
@@ -915,12 +916,7 @@ namespace ChromaVale.Presentation.Views
                     t.text = "Flow delivered successfully.";
                 if (t.name == "WinStars")
                 {
-                    string starStr = _starsEarned switch
-                    {
-                        3 => "[3 STARS]",
-                        2 => "[2 STARS]",
-                        _ => "[1 STAR]"
-                    };
+                    string starStr = $"{_starsEarned} / 3 STARS";
                     t.text = starStr;
                     t.color = _starsEarned switch { 3 => NeonYellow, 2 => new Color(0.9f, 0.9f, 0.2f), _ => new Color(0.5f, 0.5f, 0.5f) };
                 }
