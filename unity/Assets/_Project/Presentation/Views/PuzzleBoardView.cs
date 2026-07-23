@@ -139,9 +139,9 @@ namespace ChromaVale.Presentation.Views
             bgSr.transform.localPosition = Vector3.zero;
 
             // City skyline — layered buildings
-            CreateBuildingLayer(-18, 8, 5, new Color(0.03f, 0.02f, 0.08f));
-            CreateBuildingLayer(-17, 15, 4, new Color(0.05f, 0.02f, 0.10f));
-            CreateBuildingLayer(-16, 22, 3, new Color(0.08f, 0.03f, 0.12f));
+            CreateBuildingLayer(-18, 8, 5, new Color(0.08f, 0.04f, 0.18f));
+            CreateBuildingLayer(-17, 15, 3.5f, new Color(0.12f, 0.05f, 0.22f));
+            CreateBuildingLayer(-16, 22, 2.5f, new Color(0.18f, 0.06f, 0.28f));
 
             // Neon horizon line
             var horizon = new GameObject("Horizon");
@@ -224,51 +224,78 @@ namespace ChromaVale.Presentation.Views
         private AudioClip GenerateCyberpunkLoop()
         {
             int sampleRate = 44100;
-            float duration = 8f; // 8-second loop
+            float duration = 16f;
             int samples = Mathf.CeilToInt(sampleRate * duration);
             var clip = AudioClip.Create("cyberpunk_loop", samples, 1, sampleRate, false);
             var data = new float[samples];
 
-            // Bass drone — low C (65 Hz) with slight detune
-            float bassFreq = 65.4f;
-            // Arp — C minor pentatonic
-            float[] arpNotes = { 261.6f, 311.1f, 349.2f, 392.0f, 466.2f };
-            float bpm = 90f;
-            float beatDuration = 60f / bpm;
+            // D minor — moody cyberpunk key
+            float[] bassNotes = { 73.4f, 73.4f, 82.4f, 73.4f, 98.0f, 82.4f, 73.4f, 73.4f };
+            float[] arpNotes = { 293.7f, 349.2f, 440.0f, 349.2f, 293.7f, 440.0f, 523.3f, 440.0f };
+            float bpm = 100f;
+            float beatDur = 60f / bpm;
+            float measureDur = beatDur * 4f;
 
             for (int i = 0; i < samples; i++)
             {
                 float t = (float)i / sampleRate;
                 float sample = 0f;
 
-                // Bass drone (sine wave with slow LFO)
-                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * t) * 0.3f;
-                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * 0.5f * t) * 0.2f; // sub-bass
+                // ── Bass: slow pulse, filter sweep ──
+                int bassIdx = Mathf.FloorToInt(t / beatDur) % bassNotes.Length;
+                float bassFreq = bassNotes[bassIdx];
+                float bassEnv = 1f - Mathf.Abs(Mathf.Sin(Mathf.PI * (t % measureDur) / measureDur));
+                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * t) * bassEnv * 0.25f;
+                // Sub layer
+                sample += Mathf.Sin(2f * Mathf.PI * bassFreq * 0.5f * t) * bassEnv * 0.2f;
 
-                // Arpeggiated lead (square-ish wave)
-                int beatIndex = Mathf.FloorToInt(t / (beatDuration * 0.5f)) % arpNotes.Length;
-                float arpFreq = arpNotes[beatIndex];
-                float arpPhase = (t % (beatDuration * 0.5f)) / (beatDuration * 0.5f);
-                float arpEnv = Mathf.Exp(-arpPhase * 3f); // quick decay
-                float arpWave = Mathf.Sin(2f * Mathf.PI * arpFreq * t);
-                // Square-ify
-                arpWave = arpWave > 0 ? 0.5f : -0.5f;
-                sample += arpWave * arpEnv * 0.15f;
-
-                // Hi-hat pulse on 8th notes
-                float eighthNote = t % (beatDuration * 0.5f);
-                if (eighthNote < 0.02f)
+                // ── Arp: detuned saw-ish lead ──
+                int arpIdx = Mathf.FloorToInt(t / (beatDur * 0.25f)) % arpNotes.Length;
+                float arpFreq = arpNotes[arpIdx];
+                float arpPhase = (t % (beatDur * 0.25f)) / (beatDur * 0.25f);
+                if (arpPhase < 0.6f)
                 {
-                    sample += (Random.value * 2f - 1f) * 0.1f; // noise burst
+                    float arpEnv = 1f - arpPhase / 0.6f;
+                    // Detuned sawtooth approximation
+                    float saw = 2f * ((arpFreq * t) % 1f) - 1f;
+                    sample += saw * arpEnv * 0.08f;
                 }
 
-                // Kick on beats 1 and 3
-                float beatPhase = (t % (beatDuration * 2f)) / beatDuration;
-                if (beatPhase < 0.05f || (beatPhase >= 2f && beatPhase < 2.05f))
+                // ── Pad: slow filtered chord swell ──
+                float padFreq = 146.8f; // D3
+                float padEnv = (Mathf.Sin(2f * Mathf.PI * 0.125f * t) + 1f) * 0.5f; // 8-second swell
+                sample += Mathf.Sin(2f * Mathf.PI * padFreq * t) * padEnv * 0.06f;
+                sample += Mathf.Sin(2f * Mathf.PI * padFreq * 1.5f * t) * padEnv * 0.04f;
+
+                // ── Kick: deep thump on 1 and 3 ──
+                float beatInMeasure = (t % measureDur) / beatDur;
+                if (beatInMeasure < 0.08f || (beatInMeasure >= 2f && beatInMeasure < 2.08f))
                 {
-                    float kickEnv = Mathf.Exp(-beatPhase * 40f);
-                    sample += Mathf.Sin(2f * Mathf.PI * 80f * t * (1f - beatPhase)) * kickEnv * 0.4f;
+                    float kPhase = beatInMeasure < 0.08f ? beatInMeasure : beatInMeasure - 2f;
+                    float kEnv = Mathf.Exp(-kPhase * 50f);
+                    sample += Mathf.Sin(2f * Mathf.PI * 55f * t * (1f + kPhase * 3f)) * kEnv * 0.5f;
                 }
+
+                // ── Snare/rim on 2 and 4 ──
+                if ((beatInMeasure >= 1f && beatInMeasure < 1.05f) || (beatInMeasure >= 3f && beatInMeasure < 3.05f))
+                {
+                    float sPhase = beatInMeasure >= 3f ? beatInMeasure - 3f : beatInMeasure - 1f;
+                    float sEnv = Mathf.Exp(-sPhase * 30f);
+                    sample += Mathf.Sin(2f * Mathf.PI * 200f * t) * sEnv * 0.3f;
+                    sample += (Random.value * 2f - 1f) * sEnv * 0.2f; // noise
+                }
+
+                // ── Hi-hat: 16th note pattern ──
+                float sixteenth = (t % (beatDur * 0.25f));
+                if (sixteenth < 0.015f)
+                    sample += (Random.value * 2f - 1f) * 0.06f;
+                // Open hat on off-beats
+                if (sixteenth < 0.04f && Mathf.FloorToInt(t / (beatDur * 0.5f)) % 2 == 1)
+                    sample += (Random.value * 2f - 1f) * 0.04f;
+
+                // ── Master filter sweep (low-pass feel) ──
+                float filterCutoff = 0.3f + 0.3f * Mathf.Sin(2f * Mathf.PI * 0.05f * t);
+                sample *= filterCutoff;
 
                 data[i] = Mathf.Clamp(sample, -1f, 1f);
             }
