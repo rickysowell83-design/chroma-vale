@@ -85,10 +85,11 @@ namespace ChromaVale.Tests
         [Test]
         public void MixMultiple_ThreeDistinctIncludingMixed_ReturnsBrown()
         {
-            // 0, 1, 6 — normalizes to 0, 1, 0 → distinct={0,1} → only 2 distinct → Mix(0,1)=6
-            // Actually 6 normalizes to 0, so colors 0, 1, 0 = {0,1} = 2 distinct
+            // PINNED ENGINE BEHAVIOR: MixMultiple does NOT normalize mixed colors
+            // back to primaries. {0, 1, 6} = 3 distinct ints → Brown (9).
+            // Verified against the real ColorMixer via console harness 2026-07-23.
             int result = ColorMixer.MixMultiple(new[] { 0, 1, ColorMixer.Purple });
-            Assert.AreEqual(ColorMixer.Purple, result);
+            Assert.AreEqual(ColorMixer.Brown, result);
         }
 
         [Test]

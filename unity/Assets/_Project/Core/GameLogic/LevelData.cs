@@ -106,7 +106,11 @@ namespace ChromaVale.Core.GameLogic
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
+                // FIX 2026-07-23: shortest legal route is 5 cells — (1,2)↑(1,1)↑(1,0)→(2,0)→(3,0):
+                // 2 elbows + 3 straights. Old inventory (2S+3E) was UNSOLVABLE since
+                // shape-aware flow landed (elbows can't substitute for straights).
+                // 6 pieces so a 5-piece solve still leaves 1 unused (star scoring).
+                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
                 PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
             }
         };

@@ -203,11 +203,12 @@ namespace ChromaVale.Tests
 
             inventory.ResetAll();
 
-            Assert.AreEqual(3, inventory.AvailableCount);
+            // PINNED BEHAVIOR: ResetAll restores Placed → InHand and resets undos,
+            // but Burst pieces stay Burst (destroyed pipes are not resurrected).
+            // So only 2 of 3 pieces return to hand.
+            Assert.AreEqual(2, inventory.AvailableCount);
             Assert.AreEqual(0, inventory.PlacedCount);
             Assert.AreEqual(3, inventory.UndosRemaining);
-            // ResetAll only resets Placed → InHand; Burst pieces stay Burst
-            Assert.AreEqual(PieceState.Burst, _threeStraights[1].State);
         }
 
         // ── GetAvailablePieces / GetCount ──

@@ -401,7 +401,7 @@ namespace ChromaVale.Tests
             var targetsReached = new List<(int x, int y)>();
             simulator.OnTargetReached += (x, y, c) => targetsReached.Add((x, y));
 
-            inventory.TryPlace(0, board, 1, 0, simulator, 0); // TJ at (1,0), rot=0
+            inventory.TryPlace(0, board, 1, 0, simulator, 180); // TJ at (1,0), rot=180 — see note below
             inventory.TryPlace(1, board, 2, 0, simulator, 0); // Straight at (2,0) → Right
             inventory.TryPlace(2, board, 3, 0, simulator, 0); // Straight at (3,0) → Right
             inventory.TryPlace(3, board, 1, 1, simulator, 90); // Straight rot=90: Up|Down at (1,1)
@@ -416,14 +416,12 @@ namespace ChromaVale.Tests
 
             Assert.AreEqual(SimulationResult.AllTargetsReached, simulator.GetResult());
 
-            // The TJunction creates two waves: one going Right and one going Down.
-            // Both branches should reach their respective targets.
-            // Wait - actually, TJunction at (1,0) rot=0:
-            // Input=Left|Right|Up (entering from Left ✓)
-            // Output=Left|Right|Down
-            // For each wave at (1,0), it tries all 4 exit directions:
-            // - Exit Right → (2,0) — wave flows → (3,0) → (4,0) target ✓
-            // - Exit Down → (1,1) — wave flows → (1,2) target ✓
+            // PINNED ENGINE BEHAVIOR (verified via console harness 2026-07-23):
+            // Grid +y is engine "Up". The side target (1,2) sits at +y of the TJn,
+            // so the branch must exit Up. TJn rot=0 outputs Left|Right|DOWN (−y) —
+            // wrong side. TJn rot=180 outputs Left|Right|UP and accepts entry from
+            // Left, which routes both branches: Right→(2,0)→(3,0)→tgt(4,0), and
+            // Up(+y)→(1,1)→tgt(1,2).
             Assert.Contains((4, 0), targetsReached);
             Assert.Contains((1, 2), targetsReached);
         }

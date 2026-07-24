@@ -164,11 +164,15 @@ namespace ChromaVale.Tests
             var level = LevelData.Level3;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(2, board, 1, 2, sim, 270); // Elb: enter←, exit↑
+                // Verified via console harness against the real engine (2026-07-23):
+                // src(0,2)→(1,2)Elb rot0(IN Left, OUT Up)→(1,1)Str rot90 vertical
+                // →(1,0)Elb rot270(IN Down, OUT Right)→(2,0)Str→(3,0)Str→tgt(4,0)
+                // Requires the fixed L3 inventory: 3 Straights + 3 Elbows.
+                inv.TryPlace(3, board, 1, 2, sim, 0);   // Elb: enter←, exit↑
                 inv.TryPlace(0, board, 1, 1, sim, 90);  // Str vertical
                 inv.TryPlace(4, board, 1, 0, sim, 270); // Elb: enter↓, exit→
                 inv.TryPlace(1, board, 2, 0, sim, 0);   // Str horizontal
-                inv.TryPlace(3, board, 3, 0, sim, 270); // Elb: enter←, exit→
+                inv.TryPlace(2, board, 3, 0, sim, 0);   // Str horizontal
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
@@ -807,27 +811,18 @@ namespace ChromaVale.Tests
         public void Level09b_IsSolvable_Corrected()
         {
             var level = LevelData.Level9;
-            // Route: Source(0,0)→(1,0)[Str]→(2,0)[Str]→(3,0)[Elb0→↓→(3,1)]
-            // →(3,1)[Elb 270→↓→(3,2)? No. Actually (3,1) needs to go DOWN to (3,2).
-            // Elb 270: Input=Left|Down. Enter from Up=1. (1&(4|2))=0→BLOCKED!
-            // Str 90 at (3,1): Input=Up|Down. Enter from Up=1. (1&(1|2))=1 ✓.
-            // Output=Up|Down. Exit Down→(3,2).
-            // (3,2)[TJn 270: Input=Down|Up|Left. Enter from Up(=Opposite(↓)). Up=1. (1&(2|1|4))=1 ✓.
-            // Output=Down|Up|Right. Exit Right→(4,2)=Tgt.]
-            
-            // Placements:
-            // idx 0: Str(2) at (1,0) rot=0
-            // idx 1: Str(2) at (2,0) rot=0
-            // idx 3: Elb(2) at (3,0) rot=0     (enter←, exit↓)
-            // idx 2: Str(1) at (3,1) rot=90    (enter↑, exit↓)
-            // idx 6: TJn(2) at (3,2) rot=270   (enter↑or↓, exit→)
+            // Verified via console harness against the real engine (2026-07-23):
+            // src(0,0)→(1,0)Str→(2,0)Str→(3,0)Elb rot270 (IN Down|Left, OUT Up|Right —
+            // enters from Left, exits toward +y which is engine "Up")
+            // →(3,1)Str rot90 vertical→(3,2)TJn rot180 (IN L|R|Down... enters from
+            // below-side, exits Right)→tgt(4,2). Second source's flow is not required.
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
                 inv.TryPlace(0, board, 1, 0, sim, 0);   // Str
                 inv.TryPlace(1, board, 2, 0, sim, 0);   // Str
-                inv.TryPlace(3, board, 3, 0, sim, 0);   // Elb0
-                inv.TryPlace(2, board, 3, 1, sim, 90);  // Str90
-                inv.TryPlace(6, board, 3, 2, sim, 270); // TJn270
+                inv.TryPlace(3, board, 3, 0, sim, 270); // Elb rot270
+                inv.TryPlace(2, board, 3, 1, sim, 90);  // Str rot90 vertical
+                inv.TryPlace(6, board, 3, 2, sim, 180); // TJn rot180
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
@@ -1384,14 +1379,18 @@ namespace ChromaVale.Tests
         public void Level18_IsSolvable()
         {
             var level = LevelData.Level18;
+            // Verified via console harness against the real engine (2026-07-23):
+            // p2 src(0,1)→(1,1)Str→(2,1)Str→(3,1)Elb rot270 (enter Left, exit +y "Up")
+            // →(3,2)Str rot90→(3,3)Elb rot270 (enter from below, exit Right)
+            // →(4,3)TJn rot0 (IN Left ✓, OUT Right)→tgt(5,3).
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
                 inv.TryPlace(0, board, 1, 1, sim, 0);    // Str → right
                 inv.TryPlace(1, board, 2, 1, sim, 0);    // Str → right
-                inv.TryPlace(3, board, 3, 1, sim, 0);    // Elb0: enter←, exit↓
-                inv.TryPlace(2, board, 3, 2, sim, 90);   // Str90: enter↑, exit↓
-                inv.TryPlace(4, board, 3, 3, sim, 0);    // Elb0: enter↑, exit→
-                inv.TryPlace(5, board, 4, 3, sim, 270);  // TJn270: enter←, exit→ (cap-3)
+                inv.TryPlace(3, board, 3, 1, sim, 270);  // Elb rot270
+                inv.TryPlace(2, board, 3, 2, sim, 90);   // Str rot90 vertical
+                inv.TryPlace(4, board, 3, 3, sim, 270);  // Elb rot270
+                inv.TryPlace(5, board, 4, 3, sim, 0);    // TJn rot0 (cap-3)
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }

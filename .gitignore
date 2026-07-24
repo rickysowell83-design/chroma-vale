@@ -54,3 +54,9 @@ Packages/packages-lock.json
 
 # Hermes / Agent
 .hermes/
+
+# Dev tooling (outside Unity)
+/harness/bin/
+/harness/obj/
+/testrunner/bin/
+/testrunner/obj/

@@ -64,7 +64,9 @@ namespace ChromaVale.Domain.PuzzleBoard
         private struct Wave
         {
             public int X, Y, ColorIndex;
-            public int SourceIndex; // Which source emitted this wave
+            public int SourceIndex;         // Which source emitted this wave
+            public int Pressure;            // Units of flow this wave carries (≥1)
+            public PipeDirection CameFrom;  // Side this wave entered through (blocks backflow)
         }
 
         // ── Direction bit-flag constants ──
@@ -168,43 +170,58 @@ namespace ChromaVale.Domain.PuzzleBoard
         /// </summary>
         private void EmitFromSource(int sourceIndex, int sx, int sy, int color, int pressure)
         {
-            for (int p = 0; p < pressure; p++)
+            foreach (var (dx, dy) in Directions)
             {
-                foreach (var (dx, dy) in Directions)
+                int nx = sx + dx, ny = sy + dy;
+                if (!_board.IsValidPosition(nx, ny)) continue;
+
+                var cell = _board.GetCell(nx, ny);
+                var visitKey = (nx, ny, color);
+
+                if (_visited.Contains(visitKey)) continue;
+                if (cell.Type == CellType.Obstacle) continue;
+                if (_cellStates[nx, ny].State == OverloadState.Burst) continue;
+
+                if (cell.Type == CellType.Pipe || cell.Type == CellType.FlowGate)
                 {
-                    int nx = sx + dx, ny = sy + dy;
-                    if (!_board.IsValidPosition(nx, ny)) continue;
-
-                    var cell = _board.GetCell(nx, ny);
-                    var visitKey = (nx, ny, color);
-
-                    if (_visited.Contains(visitKey)) continue;
-                    if (cell.Type == CellType.Obstacle) continue;
-                    if (_cellStates[nx, ny].State == OverloadState.Burst) continue;
-
-                    if (cell.Type == CellType.Pipe || cell.Type == CellType.FlowGate)
+                    // ── Shape-aware entry check for Pipe cells ──
+                    if (cell.Type == CellType.Pipe)
                     {
-                        // ── Shape-aware entry check for Pipe cells ──
-                        if (cell.Type == CellType.Pipe)
-                        {
-                            PipeDirection neighborEntryDir = OppositeDirection(DirectionFromDelta(dx, dy));
-                            if (!CanEnterCell(nx, ny, neighborEntryDir)) continue;
-                        }
-
-                        _visited.Add(visitKey);
-                        _cellStates[nx, ny].Capacity = GetCapacity(nx, ny);
-
-                        bool stable = _cellStates[nx, ny].AddFlow(1, color);
-                        if (!stable) continue; // Burst on first tick — edge case
-
-                        OnFlowAdvance?.Invoke(nx, ny, color);
-                        _activeWaves.Add(new Wave { X = nx, Y = ny, ColorIndex = color, SourceIndex = sourceIndex });
+                        PipeDirection neighborEntryDir = OppositeDirection(DirectionFromDelta(dx, dy));
+                        if (!CanEnterCell(nx, ny, neighborEntryDir)) continue;
                     }
-                    else if (cell.Type == CellType.Target && cell.ColorIndex == color)
+
+                    _visited.Add(visitKey);
+                    _cellStates[nx, ny].Capacity = GetCapacity(nx, ny);
+
+                    // The wave carries the source's FULL pressure — this is what
+                    // makes capacity planning real. flow > capacity ⇒ burst.
+                    int prevMixedCount = _cellStates[nx, ny].MixedColorCount;
+                    bool stable = _cellStates[nx, ny].AddFlow(pressure, color);
+                    OnFlowAdvance?.Invoke(nx, ny, color);
+
+                    // Mixing can happen right next to sources (two sources feeding
+                    // one cell) — fire the event here too, not just in Tick().
+                    if (_cellStates[nx, ny].MixedColorCount == 2 && prevMixedCount < 2)
+                        OnColorMix?.Invoke(nx, ny, _cellStates[nx, ny].MixedColorA, _cellStates[nx, ny].MixedColorB);
+
+                    if (!stable)
                     {
-                        _visited.Add(visitKey);
-                        ReachTarget(nx, ny, color);
+                        OnPipeBurst?.Invoke(nx, ny);
+                        continue; // Burst on first tick — don't propagate
                     }
+
+                    _activeWaves.Add(new Wave
+                    {
+                        X = nx, Y = ny, ColorIndex = color, SourceIndex = sourceIndex,
+                        Pressure = pressure,
+                        CameFrom = OppositeDirection(DirectionFromDelta(dx, dy))
+                    });
+                }
+                else if (cell.Type == CellType.Target && cell.ColorIndex == color)
+                {
+                    _visited.Add(visitKey);
+                    ReachTarget(nx, ny, color);
                 }
             }
         }
@@ -219,23 +236,58 @@ namespace ChromaVale.Domain.PuzzleBoard
             foreach (var wave in _activeWaves)
             {
                 int cx = wave.X, cy = wave.Y, color = wave.ColorIndex;
+                int pressure = wave.Pressure > 0 ? wave.Pressure : 1;
 
+                // ── Pass 1: find all valid exit branches for this wave ──
+                // Pressure divides across branches (the "pressure math" mechanic:
+                // a T-Junction splits p2 into two p1 streams). Only cells that can
+                // actually ACCEPT flow count as branches — empty cells don't absorb pressure.
+                var branches = new List<(int dx, int dy)>();
                 foreach (var (dx, dy) in Directions)
                 {
                     PipeDirection exitDir = DirectionFromDelta(dx, dy);
 
-                    // ── CHECK 1: Can flow EXIT the current cell in this direction? ──
+                    // Never flow back out the side we came in (prevents 1-cell backwash)
+                    if (exitDir == wave.CameFrom) continue;
                     if (!CanExitCell(cx, cy, exitDir)) continue;
 
+                    int px = cx + dx, py = cy + dy;
+                    if (!_board.IsValidPosition(px, py)) continue;
+                    var pcell = _board.GetCell(px, py);
+                    if (pcell.Type == CellType.Obstacle) continue;
+                    if (_cellStates[px, py].State == OverloadState.Burst) continue;
+                    if (_visited.Contains((px, py, color))) continue;
+
+                    if (pcell.Type == CellType.Pipe)
+                    {
+                        if (!CanEnterCell(px, py, OppositeDirection(exitDir))) continue;
+                    }
+                    else if (pcell.Type == CellType.FlowGate)
+                    {
+                        if (!IsValidGateEntry(pcell.FlowDirection, dx, dy)) continue;
+                    }
+                    else if (pcell.Type != CellType.Target)
+                    {
+                        continue; // Empty / Source cells are not flow branches
+                    }
+
+                    branches.Add((dx, dy));
+                }
+
+                // ── Pass 2: propagate, distributing pressure across branches ──
+                for (int bi = 0; bi < branches.Count; bi++)
+                {
+                    var (dx, dy) = branches[bi];
+                    PipeDirection exitDir = DirectionFromDelta(dx, dy);
                     int nx = cx + dx, ny = cy + dy;
-                    if (!_board.IsValidPosition(nx, ny)) continue;
+
+                    // Even split; remainder goes to earliest branches; minimum 1.
+                    int branchPressure = pressure / branches.Count + (bi < pressure % branches.Count ? 1 : 0);
+                    if (branchPressure < 1) branchPressure = 1;
 
                     var cell = _board.GetCell(nx, ny);
                     var visitKey = (nx, ny, color);
-
                     if (_visited.Contains(visitKey)) continue;
-                    if (cell.Type == CellType.Obstacle) continue;
-                    if (_cellStates[nx, ny].State == OverloadState.Burst) continue;
 
                     // ── CHECK 2: Can flow ENTER the neighbor from the opposite direction? ──
                     PipeDirection neighborEntryDir = OppositeDirection(exitDir);
@@ -248,7 +300,11 @@ namespace ChromaVale.Domain.PuzzleBoard
 
                         _visited.Add(visitKey);
                         OnFlowAdvance?.Invoke(nx, ny, color);
-                        nextWaves.Add(new Wave { X = nx, Y = ny, ColorIndex = color, SourceIndex = wave.SourceIndex });
+                        nextWaves.Add(new Wave
+                        {
+                            X = nx, Y = ny, ColorIndex = color, SourceIndex = wave.SourceIndex,
+                            Pressure = pressure, CameFrom = neighborEntryDir
+                        });
                         continue;
                     }
 
@@ -266,7 +322,7 @@ namespace ChromaVale.Domain.PuzzleBoard
 
                         // Add flow — track previous state for color mix detection
                         int prevMixedCount = _cellStates[nx, ny].MixedColorCount;
-                        bool stable = _cellStates[nx, ny].AddFlow(1, color);
+                        bool stable = _cellStates[nx, ny].AddFlow(branchPressure, color);
 
                         OnFlowAdvance?.Invoke(nx, ny, color);
 
@@ -286,7 +342,11 @@ namespace ChromaVale.Domain.PuzzleBoard
                             continue; // Don't propagate from burst pipe
                         }
 
-                        nextWaves.Add(new Wave { X = nx, Y = ny, ColorIndex = color, SourceIndex = wave.SourceIndex });
+                        nextWaves.Add(new Wave
+                        {
+                            X = nx, Y = ny, ColorIndex = color, SourceIndex = wave.SourceIndex,
+                            Pressure = branchPressure, CameFrom = neighborEntryDir
+                        });
                     }
                     // ── Target: check match ──
                     else if (cell.Type == CellType.Target)
