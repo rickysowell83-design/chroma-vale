@@ -236,7 +236,7 @@ namespace ChromaVale.Presentation.Views
             var canvas = textCanvas.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.sortingOrder = -13;
-            var crt = textCanvas.AddComponent<RectTransform>();
+            var crt = textCanvas.GetComponent<RectTransform>();
             crt.sizeDelta = new Vector2(160f, 220f);
 
             var textGo = new GameObject("ScrollingLabel");
@@ -810,7 +810,7 @@ namespace ChromaVale.Presentation.Views
             {
                 var es = new GameObject("EventSystem");
                 es.AddComponent<EventSystem>();
-                es.AddComponent<StandaloneInputModule>();
+                es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
         }
 
@@ -1488,16 +1488,16 @@ namespace ChromaVale.Presentation.Views
     /// Left-click = rotate (or place piece on empty cell).
     /// Right-click = undo/remove most recently placed piece.
     /// </summary>
-    public class TileClickHandler : MonoBehaviour
+    public class TileClickHandler : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
     {
         private int _x, _y;
         private PuzzleBoardView _board;
         private bool _isMouseOver;
 
         public void Init(int x, int y, PuzzleBoardView b) { _x = x; _y = y; _board = b; }
-        private void OnMouseDown() { _board.OnPointerDown(_x, _y); }
-        private void OnMouseEnter() { _isMouseOver = true; }
-        private void OnMouseExit() { _isMouseOver = false; }
+        public void OnPointerClick(PointerEventData d) { _board.OnPointerDown(_x, _y); }
+        public void OnPointerEnter(PointerEventData d) { _isMouseOver = true; }
+        public void OnPointerExit(PointerEventData d) { _isMouseOver = false; }
 
         private void Update()
         {
