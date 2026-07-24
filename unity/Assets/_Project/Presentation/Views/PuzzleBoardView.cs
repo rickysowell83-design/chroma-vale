@@ -61,7 +61,7 @@ namespace ChromaVale.Presentation.Views
 
             _audioService = AudioServiceInstaller.Instance;
 
-            _levelNumber = 1;
+                        _levelNumber = SaveGameManager.Instance != null ? SaveGameManager.Instance.CurrentLevel : 1;
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
@@ -617,50 +617,24 @@ namespace ChromaVale.Presentation.Views
 
             var root = new GameObject("Shape_Root");
             root.transform.SetParent(tile.transform, false);
+            root.transform.localPosition = Vector3.zero;
+            root.transform.localScale = Vector3.one;
 
-            int effectiveRotation = shape switch
+            // Compute effective rotation for texture generation
+            int texRotation = shape switch
             {
                 PieceShape.Straight => rotation % 180,
-                PieceShape.Elbow => rotation,
-                PieceShape.TJunction => rotation,
-                PieceShape.Valve => rotation,
-                _ => 0
+                _ => rotation
             };
-            root.transform.localRotation = Quaternion.Euler(0, 0, effectiveRotation);
 
-            switch (shape)
-            {
-                case PieceShape.Straight:
-                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
-                    break;
-                case PieceShape.Elbow:
-                    AddBar(root, "h", new Vector3(0.45f, 0.2f, 1f), new Vector3(0.15f, -0.18f, 0), parentSr);
-                    AddBar(root, "v", new Vector3(0.2f, 0.45f, 1f), new Vector3(-0.18f, 0.15f, 0), parentSr);
-                    break;
-                case PieceShape.TJunction:
-                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(root, "v", new Vector3(0.2f, 0.35f, 1f), new Vector3(0f, 0.18f, 0), parentSr);
-                    break;
-                case PieceShape.Cross:
-                    AddBar(root, "h", new Vector3(0.65f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(root, "v", new Vector3(0.2f, 0.65f, 1f), Vector3.zero, parentSr);
-                    break;
-                case PieceShape.Valve:
-                    AddBar(root, "h", new Vector3(0.45f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(root, "arr", new Vector3(0.2f, 0.2f, 1f), new Vector3(0.25f, 0f, 0), parentSr);
-                    break;
-                case PieceShape.Amplifier:
-                    AddBar(root, "h", new Vector3(0.4f, 0.3f, 1f), Vector3.zero, parentSr);
-                    AddBar(root, "plus", new Vector3(0.2f, 0.2f, 1f), new Vector3(0f, 0.2f, 0), parentSr);
-                    break;
-                case PieceShape.Mixer:
-                    AddBar(root, "x1", new Vector3(0.55f, 0.2f, 1f), Vector3.zero, parentSr);
-                    AddBar(root, "x2", new Vector3(0.2f, 0.55f, 1f), Vector3.zero, parentSr);
-                    break;
-                case PieceShape.Blocker:
-                    AddBar(root, "blk", new Vector3(0.7f, 0.7f, 1f), Vector3.zero, parentSr);
-                    break;
-            }
+            // Neutral pipe color (colored during flow)
+            Color pipeColor = new Color(0.3f, 0.35f, 0.45f, 1f);
+            Color glowColor = pipeColor * 0.4f;
+            glowColor.a = 0.6f;
+
+            var sr = root.AddComponent<SpriteRenderer>();
+            sr.sprite = PipeTextureFactory.CreatePipeSprite(shape, texRotation, pipeColor, glowColor);
+            sr.sortingOrder = parentSr.sortingOrder + 3;
         }
 
         private static int _shapeCounter;

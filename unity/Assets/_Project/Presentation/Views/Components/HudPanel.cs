@@ -127,7 +127,7 @@ namespace ChromaVale.Presentation.Views.Components
         public void SetLevel(int current, int max)
         {
             if (_levelText != null)
-                _levelText.text = "LEVEL " + current + "/" + max;
+                _levelText.text = "LEVEL " + current + "-" + max;
         }
 
         public void ShowHint(string text)

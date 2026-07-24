@@ -52,7 +52,6 @@ namespace ChromaVale.Presentation.Views.Components
             ftr.anchorMax = Vector2.one;
             ftr.sizeDelta = Vector2.zero;
 
-            gameObject.SetActive(false); // Initially hidden; auto-flow handles triggering
         }
 
         public void SetInteractable(bool on)

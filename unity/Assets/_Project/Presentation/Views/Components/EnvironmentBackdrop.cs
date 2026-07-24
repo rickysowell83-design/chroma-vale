@@ -1,13 +1,11 @@
 using System.Collections;
 using UnityEngine;
-using TMPro;
+using UnityEngine.UI;
 
 namespace ChromaVale.Presentation.Views.Components
 {
     public class EnvironmentBackdrop : MonoBehaviour
     {
-        private TextMeshProUGUI _billboardText;
-
         public void Build()
         {
             var mat = new Material(Shader.Find("Sprites/Default"));
@@ -93,61 +91,57 @@ namespace ChromaVale.Presentation.Views.Components
 
         private void CreateBillboard(Material mat)
         {
-            // Billboard frame
+            // Load the billboard texture from Resources
+            var billboardTex = Resources.Load<Texture2D>("Sprites/billboard_tex");
+
+            // Billboard frame with the generated texture
             var frame = GameObject.CreatePrimitive(PrimitiveType.Quad);
             frame.name = "Billboard";
             frame.transform.SetParent(transform);
-            frame.transform.localPosition = new Vector3(6f, -0.5f, 1f);
-            frame.transform.localScale = new Vector3(1.8f, 2.5f, 1f);
+            frame.transform.localPosition = new Vector3(5.5f, 1.2f, 0.5f);
+            frame.transform.localScale = new Vector3(2.0f, 3.5f, 1f);
             Destroy(frame.GetComponent<MeshCollider>());
-            frame.GetComponent<MeshRenderer>().material = mat;
-            frame.GetComponent<MeshRenderer>().material.color = new Color(0.02f, 0.01f, 0.04f);
-            frame.GetComponent<MeshRenderer>().sortingOrder = -14;
+            var frameRenderer = frame.GetComponent<MeshRenderer>();
+            frameRenderer.material = new Material(Shader.Find("Sprites/Default"));
+            frameRenderer.sortingOrder = -14;
+            if (billboardTex != null)
+            {
+                frameRenderer.material.mainTexture = billboardTex;
+                frameRenderer.material.color = new Color(1f, 1f, 1f, 0.85f);
+            }
+            else
+            {
+                frameRenderer.material.color = new Color(0.01f, 0.005f, 0.03f);
+            }
 
-            // Neon border
+            // Neon border — cyan glow around the billboard
             var border = GameObject.CreatePrimitive(PrimitiveType.Quad);
             border.name = "BillboardBorder";
             border.transform.SetParent(frame.transform);
             border.transform.localPosition = new Vector3(0f, 0f, -0.1f);
-            border.transform.localScale = new Vector3(1.05f, 1.05f, 1f);
+            border.transform.localScale = new Vector3(1.08f, 1.06f, 1f);
             Destroy(border.GetComponent<MeshCollider>());
             border.GetComponent<MeshRenderer>().material = mat;
             border.GetComponent<MeshRenderer>().material.color = ChromaPalette.NeonCyan * 0.6f;
             border.GetComponent<MeshRenderer>().sortingOrder = -14;
 
-            // Scrolling text
-            var textCanvas = new GameObject("BillboardText");
-            textCanvas.transform.SetParent(frame.transform);
-            textCanvas.transform.localPosition = Vector3.zero;
-            textCanvas.transform.localScale = new Vector3(0.01f, 0.01f, 1f);
-            var canvas = textCanvas.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.sortingOrder = -13;
-            var crt = textCanvas.GetComponent<RectTransform>();
-            crt.sizeDelta = new Vector2(160f, 220f);
-
-            var textGo = new GameObject("ScrollingLabel");
-            textGo.transform.SetParent(textCanvas.transform);
-            _billboardText = textGo.AddComponent<TextMeshProUGUI>();
-            _billboardText.text = "CHROMA VALE /// PIPELINE ONLINE /// NEON FLOW ACTIVE ///";
-            _billboardText.fontSize = 8;
-            _billboardText.alignment = TextAlignmentOptions.Center;
-            _billboardText.color = ChromaPalette.NeonCyan;
-            _billboardText.rectTransform.sizeDelta = new Vector2(160f, 220f);
-
-            // Start scrolling
-            StartCoroutine(ScrollBillboard());
+            // Pulse the border
+            StartCoroutine(PulseBorder(border));
         }
 
-        private IEnumerator ScrollBillboard()
+        private IEnumerator PulseBorder(GameObject border)
         {
-            string baseText = "CHROMA VALE /// PIPELINE ONLINE /// NEON FLOW ACTIVE /// SYSTEM NOMINAL /// ";
-            int offset = 0;
-            while (_billboardText != null)
+            var renderer = border?.GetComponent<MeshRenderer>();
+            while (renderer != null)
             {
-                _billboardText.text = baseText.Substring(offset) + baseText.Substring(0, offset);
-                offset = (offset + 1) % baseText.Length;
-                yield return new WaitForSeconds(0.15f);
+                float t = 0f;
+                while (t < 2f && renderer != null)
+                {
+                    t += Time.deltaTime;
+                    float pulse = 0.4f + Mathf.Sin(t * 2.5f) * 0.4f;
+                    renderer.material.color = ChromaPalette.NeonCyan * pulse;
+                    yield return null;
+                }
             }
         }
     }

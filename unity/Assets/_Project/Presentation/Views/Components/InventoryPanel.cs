@@ -37,6 +37,7 @@ namespace ChromaVale.Presentation.Views.Components
             bg.transform.SetParent(transform, false);
             var bgImg = bg.AddComponent<Image>();
             bgImg.color = new Color(0.05f, 0.05f, 0.08f, 0.92f);
+            bgImg.raycastTarget = false; // Background only — don't block tile clicks
             var bgr = bg.GetComponent<RectTransform>();
             bgr.anchorMin = new Vector2(0f, 0f);
             bgr.anchorMax = new Vector2(1f, 0.12f);
@@ -215,14 +216,14 @@ namespace ChromaVale.Presentation.Views.Components
 
         public static string ShapeSymbol(PieceShape shape) => shape switch
         {
-            PieceShape.Straight => "\u2500", // ─
-            PieceShape.Elbow => "\u2514",    // └
-            PieceShape.TJunction => "\u251C",// ├
-            PieceShape.Cross => "\u253C",    // ┼
-            PieceShape.Valve => "\u25C7",    // ◇
-            PieceShape.Amplifier => "\u25B2",// ▲
-            PieceShape.Mixer => "\u2715",    // ✕
-            PieceShape.Blocker => "\u25A0",  // ■
+            PieceShape.Straight => "--",
+            PieceShape.Elbow => "L_",
+            PieceShape.TJunction => "-|-",
+            PieceShape.Cross => "+ ",
+            PieceShape.Valve => ">>",
+            PieceShape.Amplifier => "+A",
+            PieceShape.Mixer => "+M",
+            PieceShape.Blocker => "[]",
             _ => "?"
         };
     }
