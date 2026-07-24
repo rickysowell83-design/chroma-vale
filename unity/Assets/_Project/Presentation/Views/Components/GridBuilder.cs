@@ -105,8 +105,13 @@ namespace ChromaVale.Presentation.Views.Components
                 cam.fieldOfView = 32f;
                 float halfSpan = Mathf.Max(_board.Width, _board.Height) * _tileSize / 2f + 1.5f;
                 float dist = halfSpan / Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-                cam.transform.position = new Vector3(0, -0.8f, -dist);
-                cam.transform.rotation = Quaternion.identity;
+                dist *= 1.06f;
+                float tiltDeg = 14f;
+                float tiltRad = tiltDeg * Mathf.Deg2Rad;
+                Vector3 lookTarget = new Vector3(0f, -0.8f, 0f);
+                Vector3 camPos = lookTarget + new Vector3(0f, Mathf.Sin(tiltRad) * dist, -Mathf.Cos(tiltRad) * dist);
+                cam.transform.position = camPos;
+                cam.transform.rotation = Quaternion.LookRotation(lookTarget - camPos, Vector3.up);
                 cam.nearClipPlane = 0.3f;
                 cam.farClipPlane = 100f;
                 cam.backgroundColor = ChromaPalette.DarkBG;

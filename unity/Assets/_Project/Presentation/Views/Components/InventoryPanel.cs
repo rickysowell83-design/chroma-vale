@@ -14,6 +14,12 @@ namespace ChromaVale.Presentation.Views.Components
         private PipeInventory _inventory;
         private List<GameObject> _inventorySlots = new();
         private int _selectedPieceIndex = -1;
+        private CanvasGroup _canvasGroup;
+
+        private static readonly Color BodyDefault = new(0.06f, 0.08f, 0.12f, 0.92f);
+        private static readonly Color BodySelected = new(0.12f, 0.10f, 0.20f, 0.95f);
+        private static readonly Color DepletedBorder = new(0.25f, 0.28f, 0.32f);
+        private static readonly Color LabelColor = new(0.92f, 0.95f, 1f);
 
         public int SelectedPieceIndex => _selectedPieceIndex;
         public event Action<PieceShape> OnPieceSelected;
@@ -32,12 +38,18 @@ namespace ChromaVale.Presentation.Views.Components
             gameObject.AddComponent<CanvasScaler>();
             gameObject.AddComponent<GraphicRaycaster>();
 
+            // CanvasGroup for locked-state dimming
+            _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            _canvasGroup.alpha = 1f;
+            _canvasGroup.interactable = true;
+            _canvasGroup.blocksRaycasts = true;
+
             // Background strip
             var bg = new GameObject("InvBG");
             bg.transform.SetParent(transform, false);
             var bgImg = bg.AddComponent<Image>();
             bgImg.color = new Color(0.05f, 0.05f, 0.08f, 0.92f);
-            bgImg.raycastTarget = false; // Background only — don't block tile clicks
+            bgImg.raycastTarget = false;
             var bgr = bg.GetComponent<RectTransform>();
             bgr.anchorMin = new Vector2(0f, 0f);
             bgr.anchorMax = new Vector2(1f, 0.12f);
@@ -69,34 +81,81 @@ namespace ChromaVale.Presentation.Views.Components
             {
                 var shape = kvp.Key;
                 int count = kvp.Value;
+                bool depleted = count <= 0;
 
                 var slot = new GameObject("Slot_" + shape);
                 slot.transform.SetParent(transform, false);
 
-                var img = slot.AddComponent<Image>();
-                img.color = GetShapeColor(shape);
+                // --- Root: neon border (Image) + interactability (Button) ---
+                var borderImg = slot.AddComponent<Image>();
+                borderImg.color = depleted ? DepletedBorder : ChromaPalette.NeonCyan;
+                borderImg.raycastTarget = false;
+
+                var btn = slot.AddComponent<Button>();
+                btn.interactable = !depleted;
+                btn.transition = Selectable.Transition.None; // Full procedural styling
+
                 var sr = slot.GetComponent<RectTransform>();
                 sr.anchorMin = new Vector2(startX + idx * slotWidth, 0.02f);
                 sr.anchorMax = new Vector2(startX + (idx + 1) * slotWidth - 0.01f, 0.10f);
                 sr.offsetMin = Vector2.zero;
                 sr.offsetMax = Vector2.zero;
 
-                // Click handler
-                var btn = slot.AddComponent<Button>();
-                btn.onClick.AddListener(() => SelectInventoryPiece(shape));
+                // --- Body: dark translucent fill inset by 3px to reveal border ---
+                var bodyGo = new GameObject("Body");
+                bodyGo.transform.SetParent(slot.transform, false);
+                var bodyImg = bodyGo.AddComponent<Image>();
+                bodyImg.color = BodyDefault;
+                bodyImg.raycastTarget = false;
+                var bodyRt = bodyGo.GetComponent<RectTransform>();
+                bodyRt.anchorMin = Vector2.zero;
+                bodyRt.anchorMax = Vector2.one;
+                bodyRt.offsetMin = new Vector2(3f, 3f);
+                bodyRt.offsetMax = new Vector2(-3f, -3f);
 
-                // Label
+                // --- Shape label (bold, large, centered, near-white) ---
                 var labelGo = new GameObject("Label");
                 labelGo.transform.SetParent(slot.transform, false);
                 var labelTx = labelGo.AddComponent<TextMeshProUGUI>();
-                labelTx.text = ShapeSymbol(shape) + " x" + count;
-                labelTx.fontSize = 11;
+                labelTx.text = ShapeSymbol(shape);
+                labelTx.fontSize = 20;
+                labelTx.enableAutoSizing = false;
+                labelTx.fontStyle = FontStyles.Bold;
+                labelTx.color = LabelColor;
                 labelTx.alignment = TextAlignmentOptions.Center;
-                labelTx.color = Color.white;
+                if (depleted)
+                {
+                    var c = labelTx.color;
+                    labelTx.color = new Color(c.r, c.g, c.b, 0.35f);
+                }
                 var lr = labelTx.GetComponent<RectTransform>();
                 lr.anchorMin = Vector2.zero;
                 lr.anchorMax = Vector2.one;
-                lr.sizeDelta = Vector2.zero;
+                lr.offsetMin = Vector2.zero;
+                lr.offsetMax = Vector2.zero;
+
+                // --- Count badge (neon-yellow, small, top-right) ---
+                var badgeGo = new GameObject("Badge");
+                badgeGo.transform.SetParent(slot.transform, false);
+                var badgeTx = badgeGo.AddComponent<TextMeshProUGUI>();
+                badgeTx.text = count.ToString();
+                badgeTx.fontSize = 18;
+                badgeTx.enableAutoSizing = false;
+                badgeTx.fontStyle = FontStyles.Normal;
+                badgeTx.color = ChromaPalette.NeonYellow;
+                badgeTx.alignment = TextAlignmentOptions.TopRight;
+                if (depleted)
+                {
+                    var c = badgeTx.color;
+                    badgeTx.color = new Color(c.r, c.g, c.b, 0.35f);
+                }
+                var bdr = badgeTx.GetComponent<RectTransform>();
+                bdr.anchorMin = new Vector2(0.55f, 0.45f);
+                bdr.anchorMax = new Vector2(0.92f, 0.92f);
+                bdr.offsetMin = Vector2.zero;
+                bdr.offsetMax = Vector2.zero;
+
+                btn.onClick.AddListener(() => SelectInventoryPiece(shape));
 
                 _inventorySlots.Add(slot);
                 idx++;
@@ -145,30 +204,25 @@ namespace ChromaVale.Presentation.Views.Components
 
         private void ApplyHighlight(GameObject slot)
         {
-            // Deselect all — reset to default
+            // Deselect all — revert to default styling
             foreach (var s in _inventorySlots)
             {
-                if (s != null)
-                {
-                    var img = s.GetComponent<Image>();
-                    if (img != null)
-                    {
-                        var c = img.color;
-                        img.color = new Color(c.r, c.g, c.b, 0.75f);
-                    }
-                    s.transform.localScale = Vector3.one;
-                }
+                if (s == null) continue;
+                var border = s.GetComponent<Image>();
+                if (border != null)
+                    border.color = ChromaPalette.NeonCyan;
+                var body = s.transform.Find("Body")?.GetComponent<Image>();
+                if (body != null)
+                    body.color = BodyDefault;
             }
 
-            // Select — bright + scale up
+            // Select — magenta border + brighter body + pulse
             if (slot != null)
             {
-                var img = slot.GetComponent<Image>();
-                if (img != null)
-                {
-                    var c = img.color;
-                    img.color = new Color(c.r, c.g, c.b, 1f);
-                }
+                var border = slot.GetComponent<Image>();
+                if (border != null) border.color = ChromaPalette.NeonMagenta;
+                var body = slot.transform.Find("Body")?.GetComponent<Image>();
+                if (body != null) body.color = BodySelected;
                 StartCoroutine(SelectionPulse(slot.transform));
             }
         }
@@ -181,13 +235,11 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void SetLocked(bool locked)
         {
-            foreach (var slot in _inventorySlots)
+            if (_canvasGroup != null)
             {
-                if (slot != null)
-                {
-                    var btn = slot.GetComponent<Button>();
-                    if (btn != null) btn.interactable = !locked;
-                }
+                _canvasGroup.alpha = locked ? 0.45f : 1f;
+                _canvasGroup.interactable = !locked;
+                _canvasGroup.blocksRaycasts = !locked;
             }
         }
 
@@ -216,14 +268,14 @@ namespace ChromaVale.Presentation.Views.Components
 
         public static string ShapeSymbol(PieceShape shape) => shape switch
         {
-            PieceShape.Straight => "--",
-            PieceShape.Elbow => "L_",
-            PieceShape.TJunction => "-|-",
-            PieceShape.Cross => "+ ",
-            PieceShape.Valve => ">>",
-            PieceShape.Amplifier => "+A",
-            PieceShape.Mixer => "+M",
-            PieceShape.Blocker => "[]",
+            PieceShape.Straight => "STR",
+            PieceShape.Elbow => "ELB",
+            PieceShape.TJunction => "TEE",
+            PieceShape.Cross => "CRS",
+            PieceShape.Valve => "VLV",
+            PieceShape.Amplifier => "AMP",
+            PieceShape.Mixer => "MIX",
+            PieceShape.Blocker => "BLK",
             _ => "?"
         };
     }
