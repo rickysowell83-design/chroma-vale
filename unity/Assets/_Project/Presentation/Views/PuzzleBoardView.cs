@@ -29,6 +29,7 @@ namespace ChromaVale.Presentation.Views
         private FlowSimulator _flowSim;
         private PipeInventory _inventory;
         private SpriteRenderer[,] _renderers;
+        private Coroutine[,] _cellLerps;
         private LevelData _level;
         private LevelRepository _levelRepo = new();
         private int _maxLevel;
@@ -41,6 +42,8 @@ namespace ChromaVale.Presentation.Views
         private WinPopup _winPopupComponent;
         private EnvironmentBackdrop _envBackdrop;
         private MusicDirector _musicDirector;
+        private CameraShake _cameraShake;
+        private ParticleFxService _particleFx;
 
         // State
         private bool _solved;
@@ -69,6 +72,7 @@ namespace ChromaVale.Presentation.Views
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize,
                 _pipeTilePrefab, _sourceTilePrefab, _targetTilePrefab, _obstacleTilePrefab, this);
+            _cellLerps = new Coroutine[_board.Width, _board.Height];
             _envBackdrop.Build();
             _musicDirector.StartMusic();
 
@@ -110,6 +114,8 @@ namespace ChromaVale.Presentation.Views
             _winPopupComponent = CreateChildComponent<WinPopup>("WinPopup");
             _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
             _musicDirector = CreateChildComponent<MusicDirector>("MusicDirector");
+            _cameraShake = Camera.main.gameObject.AddComponent<CameraShake>();
+            _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
         }
 
         private void WireEvents()
@@ -258,6 +264,9 @@ namespace ChromaVale.Presentation.Views
                 _hudPanel.HideHint();
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
                 _musicDirector.PlayBeep(660f, 0.08f);
+                if (_particleFx != null)
+                    _particleFx.PlacementPuff(_renderers[x, y].transform.position, GetPipeColor(0));
+                if (_cameraShake != null) _cameraShake.Shake(0.05f, 0.03f);
 
                 if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
                 {
@@ -348,6 +357,11 @@ namespace ChromaVale.Presentation.Views
                 _solved = true;
                 _musicDirector.PlayBeep(880f, 0.3f);
                 _starsEarned = ScoreCalculator.Calculate(_inventory, _flowSim, _level);
+                if (_particleFx != null)
+                {
+                    var positions = _level.Targets.Select(t => _renderers[t.X, t.Y].transform.position).ToArray();
+                    _particleFx.WinCascade(positions);
+                }
                 yield return new WaitForSeconds(0.5f);
                 _winPopupComponent.Show(_starsEarned, _moveCount, _levelNumber >= _maxLevel);
             }
@@ -366,8 +380,10 @@ namespace ChromaVale.Presentation.Views
         {
             if (_renderers[x, y] != null)
             {
-                _renderers[x, y].color = GetPipeColor(colorIndex);
-                StartCoroutine(FlowPulseAnim(_renderers[x, y].transform));
+                // Stop any existing lerp on this cell — re-entrant safety
+                if (_cellLerps[x, y] != null)
+                    StopCoroutine(_cellLerps[x, y]);
+                _cellLerps[x, y] = StartCoroutine(FlowLerpAnim(_renderers[x, y], DarkTile, GetPipeColor(colorIndex)));
             }
             if (_audioService != null && Time.realtimeSinceStartup - _lastFlowTickSoundTime >= 0.1f)
             {
@@ -382,9 +398,12 @@ namespace ChromaVale.Presentation.Views
             {
                 _renderers[x, y].color = new Color(0.5f, 0.1f, 0.05f);
                 StartCoroutine(BurstAnim(_renderers[x, y].transform));
+                if (_particleFx != null)
+                    _particleFx.BurstExplosion(_renderers[x, y].transform.position);
             }
             _inventory.MarkBurst(x, y);
             if (_audioService != null) _audioService.PlaySound("pipe_burst");
+            if (_cameraShake != null) _cameraShake.Shake(0.2f, 0.15f);
         }
 
         private void HandleColorMix(int x, int y, int colorA, int colorB)
@@ -392,6 +411,8 @@ namespace ChromaVale.Presentation.Views
             if (_renderers[x, y] != null)
             {
                 StartCoroutine(MixFlashAnim(_renderers[x, y]));
+                if (_particleFx != null)
+                    _particleFx.MixSwirl(_renderers[x, y].transform.position, GetPipeColor(colorA), GetPipeColor(colorB));
             }
             if (_audioService != null) _audioService.PlaySound("color_mix");
         }
@@ -401,6 +422,8 @@ namespace ChromaVale.Presentation.Views
             if (_renderers[x, y] != null)
             {
                 StartCoroutine(TargetBloomAnim(_renderers[x, y], colorIndex));
+                if (_particleFx != null)
+                    _particleFx.TargetBloom(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
             }
             if (_audioService != null) _audioService.PlaySound("target_reached");
         }
@@ -497,6 +520,29 @@ namespace ChromaVale.Presentation.Views
             var o = t.localScale;
             while (e < d) { e += Time.deltaTime; t.localScale = o * (1f + Mathf.Sin(e / d * Mathf.PI) * 0.2f); yield return null; }
             t.localScale = o;
+        }
+
+        private IEnumerator FlowLerpAnim(SpriteRenderer sr, Color fromColor, Color toColor)
+        {
+            float duration = 0.15f;
+            float elapsed = 0f;
+            var originalScale = sr.transform.localScale;
+            sr.color = fromColor;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float smoothT = Mathf.SmoothStep(0f, 1f, t);
+                sr.color = Color.Lerp(fromColor, toColor, smoothT);
+                // Scale pulse: 1.15x at start → 1.0x at end
+                float scaleT = 1f + 0.15f * (1f - t);
+                sr.transform.localScale = originalScale * scaleT;
+                yield return null;
+            }
+
+            sr.color = toColor;
+            sr.transform.localScale = originalScale;
         }
 
         private IEnumerator BurstAnim(Transform t)
