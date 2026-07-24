@@ -17,10 +17,6 @@ namespace ChromaVale.Presentation.Views
 {
     public class PuzzleBoardView : MonoBehaviour
     {
-        [SerializeField] private GameObject _pipeTilePrefab;
-        [SerializeField] private GameObject _sourceTilePrefab;
-        [SerializeField] private GameObject _targetTilePrefab;
-        [SerializeField] private GameObject _obstacleTilePrefab;
         [SerializeField] private float _tileSize = 1.2f;
         [SerializeField] private int _levelNumber = 1;
         [SerializeField] private float _flowTickInterval = 0.3f;
@@ -28,7 +24,7 @@ namespace ChromaVale.Presentation.Views
         private GridBoard _board;
         private FlowSimulator _flowSim;
         private PipeInventory _inventory;
-        private SpriteRenderer[,] _renderers;
+        private TileVisual[,] _renderers;
         private Coroutine[,] _cellLerps;
         private LevelData _level;
         private LevelRepository _levelRepo = new();
@@ -70,8 +66,7 @@ namespace ChromaVale.Presentation.Views
             EnsureEventSystem();
             CreateComponents();
 
-            _renderers = _gridBuilder.Build(_level, _board, _tileSize,
-                _pipeTilePrefab, _sourceTilePrefab, _targetTilePrefab, _obstacleTilePrefab, this);
+            _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
             _cellLerps = new Coroutine[_board.Width, _board.Height];
             _envBackdrop.Build();
             _musicDirector.StartMusic();
@@ -229,11 +224,11 @@ namespace ChromaVale.Presentation.Views
 
             piece.Rotate();
 
-            DrawPipeShape(_renderers[x, y].gameObject, piece.Shape, piece.Rotation);
+            _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
 
             if (!_flowSim.IsRunning)
             {
-                _renderers[x, y].color = GetPipeColor(0);
+                _renderers[x, y].Color = GetPipeColor(0);
             }
 
             if (_flowSim != null)
@@ -255,9 +250,9 @@ namespace ChromaVale.Presentation.Views
                 _undoStack.Push((x, y, selIdx));
                 _moveCount++;
                 _hudPanel.SetMoves(_moveCount);
-                _renderers[x, y].color = GetPipeColor(0);
+                _renderers[x, y].Color = GetPipeColor(0);
                 var piece = _inventory.GetPieceAt(x, y);
-                if (piece != null) DrawPipeShape(_renderers[x, y].gameObject, piece.Shape, piece.Rotation);
+                if (piece != null) _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
                 StartCoroutine(PopAnim(_renderers[x, y].transform));
                 _inventoryPanelComponent.Refresh();
                 _inventoryPanelComponent.ClearSelection();
@@ -306,8 +301,8 @@ namespace ChromaVale.Presentation.Views
             bool undone = _inventory.TryUndo(_board);
             if (undone)
             {
-                ClearPipeShape(_renderers[x, y].gameObject);
-                _renderers[x, y].color = DarkTile;
+                _renderers[x, y].ClearShape();
+                _renderers[x, y].Color = DarkTile;
                 _moveCount = Mathf.Max(0, _moveCount - 1);
                 _hudPanel.SetMoves(_moveCount);
                 _inventoryPanelComponent.Refresh();
@@ -357,6 +352,8 @@ namespace ChromaVale.Presentation.Views
                 _solved = true;
                 _musicDirector.PlayBeep(880f, 0.3f);
                 _starsEarned = ScoreCalculator.Calculate(_inventory, _flowSim, _level);
+                if (SaveGameManager.Instance != null)
+                    SaveGameManager.Instance.RecordLevelComplete(_levelNumber, _starsEarned);
                 if (_particleFx != null)
                 {
                     var positions = _level.Targets.Select(t => _renderers[t.X, t.Y].transform.position).ToArray();
@@ -396,7 +393,7 @@ namespace ChromaVale.Presentation.Views
         {
             if (_renderers[x, y] != null)
             {
-                _renderers[x, y].color = new Color(0.5f, 0.1f, 0.05f);
+                _renderers[x, y].Color = new Color(0.5f, 0.1f, 0.05f);
                 StartCoroutine(BurstAnim(_renderers[x, y].transform));
                 if (_particleFx != null)
                     _particleFx.BurstExplosion(_renderers[x, y].transform.position);
@@ -439,18 +436,15 @@ namespace ChromaVale.Presentation.Views
 
         private void AdvanceLevel()
         {
-            int nextLevel;
-            if (SaveGameManager.Instance != null)
-                nextLevel = SaveGameManager.Instance.CurrentLevel;
-            else
-                nextLevel = _levelNumber + 1;
-
+            int nextLevel = SaveGameManager.Instance != null ? SaveGameManager.Instance.CurrentLevel : _levelNumber + 1;
+            if (nextLevel <= _levelNumber) nextLevel = _levelNumber + 1;
             if (nextLevel > _maxLevel) nextLevel = 1;
             LoadLevel(nextLevel);
         }
 
         private void LoadLevel(int levelNum)
         {
+            StopAllCoroutines();
             _gridBuilder.Clear();
 
             _solved = false;
@@ -462,16 +456,12 @@ namespace ChromaVale.Presentation.Views
             _levelNumber = levelNum;
             _level = _levelRepo.GetLevel(_levelNumber);
 
-            if (SaveGameManager.Instance != null)
-            {
-                SaveGameManager.Instance.SaveProgress();
-            }
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
             _inventory = new PipeInventory(_level.Inventory);
 
-            _renderers = _gridBuilder.Build(_level, _board, _tileSize,
-                _pipeTilePrefab, _sourceTilePrefab, _targetTilePrefab, _obstacleTilePrefab, this);
+            _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
+            _cellLerps = new Coroutine[_board.Width, _board.Height];
 
             _hudPanel.SetMoves(0);
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
@@ -484,6 +474,9 @@ namespace ChromaVale.Presentation.Views
                                    "TAP a pipe below \u2192 TAP a dark cell \u2192 watch the flow!");
             else
                 _hudPanel.HideHint();
+
+            DrawConnectionHint();
+            StartCoroutine(PulseSources());
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -522,27 +515,27 @@ namespace ChromaVale.Presentation.Views
             t.localScale = o;
         }
 
-        private IEnumerator FlowLerpAnim(SpriteRenderer sr, Color fromColor, Color toColor)
+        private IEnumerator FlowLerpAnim(TileVisual tv, Color fromColor, Color toColor)
         {
             float duration = 0.15f;
             float elapsed = 0f;
-            var originalScale = sr.transform.localScale;
-            sr.color = fromColor;
+            var originalScale = tv.transform.localScale;
+            tv.Color = fromColor;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
                 float smoothT = Mathf.SmoothStep(0f, 1f, t);
-                sr.color = Color.Lerp(fromColor, toColor, smoothT);
+                tv.Color = Color.Lerp(fromColor, toColor, smoothT);
                 // Scale pulse: 1.15x at start → 1.0x at end
                 float scaleT = 1f + 0.15f * (1f - t);
-                sr.transform.localScale = originalScale * scaleT;
+                tv.transform.localScale = originalScale * scaleT;
                 yield return null;
             }
 
-            sr.color = toColor;
-            sr.transform.localScale = originalScale;
+            tv.Color = toColor;
+            tv.transform.localScale = originalScale;
         }
 
         private IEnumerator BurstAnim(Transform t)
@@ -553,30 +546,30 @@ namespace ChromaVale.Presentation.Views
             t.localPosition = orig;
         }
 
-        private IEnumerator MixFlashAnim(SpriteRenderer sr)
+        private IEnumerator MixFlashAnim(TileVisual tv)
         {
-            var orig = sr.color;
-            sr.color = Color.white;
+            var orig = tv.Color;
+            tv.Color = Color.white;
             yield return new WaitForSeconds(0.1f);
-            sr.color = orig;
+            tv.Color = orig;
         }
 
-        private IEnumerator TargetBloomAnim(SpriteRenderer sr, int colorIndex)
+        private IEnumerator TargetBloomAnim(TileVisual tv, int colorIndex)
         {
             var targetColor = GetPipeColor(colorIndex);
             float d = 0.5f, e = 0f;
-            var o = sr.transform.localScale;
-            var origColor = sr.color;
+            var o = tv.transform.localScale;
+            var origColor = tv.Color;
             while (e < d)
             {
                 e += Time.deltaTime;
                 float t = e / d;
-                sr.color = Color.Lerp(origColor, targetColor * 1.5f, t);
-                sr.transform.localScale = o * (1f + t * 0.5f);
+                tv.Color = Color.Lerp(origColor, targetColor * 1.5f, t);
+                tv.transform.localScale = o * (1f + t * 0.5f);
                 yield return null;
             }
-            sr.color = targetColor;
-            sr.transform.localScale = o;
+            tv.Color = targetColor;
+            tv.transform.localScale = o;
         }
 
         private IEnumerator FlashFailure()
@@ -585,14 +578,14 @@ namespace ChromaVale.Presentation.Views
             for (int x = 0; x < _board.Width; x++)
                 for (int y = 0; y < _board.Height; y++)
                     if (_renderers[x, y] != null)
-                        _renderers[x, y].color = new Color(0.3f, 0.05f, 0.05f);
+                        _renderers[x, y].Color = new Color(0.3f, 0.05f, 0.05f);
             yield return new WaitForSeconds(d);
             for (int x = 0; x < _board.Width; x++)
                 for (int y = 0; y < _board.Height; y++)
                 {
                     if (_renderers[x, y] == null) continue;
                     var cell = _board.GetCell(x, y);
-                    _renderers[x, y].color = cell.Type switch
+                    _renderers[x, y].Color = cell.Type switch
                     {
                         CellType.Source when cell.ColorIndex == 0 => CyanHint,
                         CellType.Source when cell.ColorIndex == 1 => MagentaHint,
@@ -605,60 +598,5 @@ namespace ChromaVale.Presentation.Views
                 }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // PIPE SHAPE DRAWING (procedural — no external sprites needed)
-        // ═══════════════════════════════════════════════════════════════
-
-        private void DrawPipeShape(GameObject tile, PieceShape shape, int rotation = 0)
-        {
-            ClearPipeShape(tile);
-            var parentSr = tile.GetComponent<SpriteRenderer>();
-            if (parentSr == null) return;
-
-            var root = new GameObject("Shape_Root");
-            root.transform.SetParent(tile.transform, false);
-            root.transform.localPosition = Vector3.zero;
-            root.transform.localScale = Vector3.one;
-
-            // Compute effective rotation for texture generation
-            int texRotation = shape switch
-            {
-                PieceShape.Straight => rotation % 180,
-                _ => rotation
-            };
-
-            // Neutral pipe color (colored during flow)
-            Color pipeColor = new Color(0.3f, 0.35f, 0.45f, 1f);
-            Color glowColor = pipeColor * 0.4f;
-            glowColor.a = 0.6f;
-
-            var sr = root.AddComponent<SpriteRenderer>();
-            sr.sprite = PipeTextureFactory.CreatePipeSprite(shape, texRotation, pipeColor, glowColor);
-            sr.sortingOrder = parentSr.sortingOrder + 3;
-        }
-
-        private static int _shapeCounter;
-
-        private void AddBar(GameObject parent, string id, Vector3 scale, Vector3 offset, SpriteRenderer parentSr)
-        {
-            var go = new GameObject("Shape_" + id + "_" + _shapeCounter++);
-            go.transform.SetParent(parent.transform, false);
-            go.transform.localPosition = offset;
-            go.transform.localScale = scale;
-            var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = parentSr.sprite;
-            sr.color = new Color(0.5f, 0.5f, 0.55f, 0.7f);
-            sr.sortingOrder = parentSr.sortingOrder + 3;
-        }
-
-        private void ClearPipeShape(GameObject tile)
-        {
-            for (int i = tile.transform.childCount - 1; i >= 0; i--)
-            {
-                var child = tile.transform.GetChild(i);
-                if (child.name == "Shape_Root")
-                    Destroy(child.gameObject);
-            }
-        }
     }
 }

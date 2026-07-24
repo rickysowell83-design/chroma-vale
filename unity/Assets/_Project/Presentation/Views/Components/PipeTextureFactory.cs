@@ -8,6 +8,7 @@ namespace ChromaVale.Presentation.Views.Components
     /// proper connection openings, and direction indicators.
     /// Replaces the old "child GameObject bars" approach.
     /// </summary>
+    [System.Obsolete("Replaced by PipeMeshFactory3D — 3D overhaul")]
     public static class PipeTextureFactory
     {
         private const int TexSize = 64;
