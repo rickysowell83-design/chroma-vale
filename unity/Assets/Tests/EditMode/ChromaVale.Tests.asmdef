@@ -1,0 +1,22 @@
+{
+  "name": "ChromaVale.Tests",
+  "rootNamespace": "ChromaVale.Tests",
+  "references": [
+    "ChromaVale.Core",
+    "ChromaVale.Domain"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": []
+}
