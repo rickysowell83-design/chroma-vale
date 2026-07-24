@@ -164,13 +164,14 @@ namespace ChromaVale.Tests
             var level = LevelData.Level3;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                // Verified via console harness against the real engine (2026-07-23):
-                // src(0,2)→(1,2)Elb rot0(IN Left, OUT Up)→(1,1)Str rot90 vertical
-                // →(1,0)Elb rot270(IN Down, OUT Right)→(2,0)Str→(3,0)Str→tgt(4,0)
-                // Requires the fixed L3 inventory: 3 Straights + 3 Elbows.
-                inv.TryPlace(3, board, 1, 2, sim, 0);   // Elb: enter←, exit↑
+                // ENGINE: Elbow rot=0: Input=Up|Left=5, Output=Down|Right=10
+                // Path: (0,2)→(1,2) Right→(1,1) Down→(1,0) Down→(2,0) Right→(3,0) Right→(4,0)=Tgt
+                // (1,2)Elb rot0: Input=U|L=5, enter Left(4) ✓; Output=D|R=10, exit Down(2) ✓
+                // (1,1)Str rot90: Input=U|D=3, enter Up(1) ✓; Output=U|D=3, exit Down(2) ✓
+                // (1,0)Elb rot0: Input=U|L=5, enter Up(1) ✓; Output=D|R=10, exit Right(8) ✓
+                inv.TryPlace(3, board, 1, 2, sim, 0);   // Elb rot0: enter←, exit↓
                 inv.TryPlace(0, board, 1, 1, sim, 90);  // Str vertical
-                inv.TryPlace(4, board, 1, 0, sim, 270); // Elb: enter↓, exit→
+                inv.TryPlace(4, board, 1, 0, sim, 0);   // Elb rot0: enter↑, exit→
                 inv.TryPlace(1, board, 2, 0, sim, 0);   // Str horizontal
                 inv.TryPlace(2, board, 3, 0, sim, 0);   // Str horizontal
             });
@@ -783,25 +784,18 @@ namespace ChromaVale.Tests
         {
             var level = LevelData.Level9;
             // Route Source(0,0) path: right along row 0, then down column 3 to target.
-            // (1,0)[Str], (2,0)[Str], (3,0)[Elb0→down], (3,1)[Str90→down], (3,2)[Str0→right→(4,2)=Tgt]
             // Both sources are color 0; source(0,4) flow is extraneous but harmless.
+            // Uses TJn at (3,2) rot=180 to accept from both Up and Down, exit Right.
+            // Same as Level09b_Corrected — this is the canonical test.
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 1, 0, sim, 0);   // Str at (1,0)
-                inv.TryPlace(1, board, 2, 0, sim, 0);   // Str at (2,0)
-                inv.TryPlace(3, board, 3, 0, sim, 0);   // Elb0 at (3,0): enter←, exit↓
-                inv.TryPlace(2, board, 3, 1, sim, 90);  // Str90 at (3,1): enter↑, exit↓
-                inv.TryPlace(4, board, 3, 2, sim, 0);   // Str0 at (3,2): enter← (from ↑→flow turns at TJn-exit), exit→
-                // Wait, (3,2) entered... the wave at (3,1) exits Down→(3,2).
-                // CanEnterCell(3,2, neighborEntryDir=Opposite(Down)=Up).
-                // For Str0: Input=Left|Right=12. DirToFlag(Up)=1. (1&12)=0 → BLOCKED!
-                // Need Cross or TJn at (3,2) to accept entry from Up.
-                // Use TJn(5) at (3,2) rot=270: Input=Down|Up|Left=2|1|4=7. DirToFlag(Up)=1. (1&7)=1 ✓.
-                // Output=Down|Up|Right=2|1|8=11. DirToFlag(Right)=8. (8&11)=8 ✓ → Right→(4,2)=Tgt.
+                inv.TryPlace(0, board, 1, 0, sim, 0);   // Str
+                inv.TryPlace(1, board, 2, 0, sim, 0);   // Str
+                inv.TryPlace(3, board, 3, 0, sim, 270); // Elb rot270
+                inv.TryPlace(2, board, 3, 1, sim, 90);  // Str rot90 vertical
+                inv.TryPlace(6, board, 3, 2, sim, 180); // TJn rot180
             });
-            // ❌ This placement doesn't work because (3,2) as Str0 blocks entry from Up.
-            // Need to use TJn at (3,2). Let me re-issue with TJn.
-            Assert.Ignore("Level 9 routing needs TJn at (3,2); will fix below.");
+            Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
 
         /// <summary>

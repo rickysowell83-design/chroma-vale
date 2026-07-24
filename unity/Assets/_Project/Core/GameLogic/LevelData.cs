@@ -167,8 +167,11 @@ namespace ChromaVale.Core.GameLogic
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                // Only one capacity-2 pipe — must use it on the bottleneck segment
-                PipePiece.Straight(1), PipePiece.Straight(1),
+                // FIX 2026-07-23: pressure=2 → every cell on the direct path gets
+                // AddFlow(2,...). Cap-1 pipes burst instantly. Changed all straights
+                // to cap-2 so the 3-piece direct horizontal route survives. Cap-1
+                // elbows remain as burst-bait decoys (teaching: cap-1 ANYWHERE bursts).
+                PipePiece.Straight(2), PipePiece.Straight(2),
                 PipePiece.Straight(2),
                 PipePiece.Elbow(1), PipePiece.Elbow(1),
             }
@@ -659,7 +662,10 @@ namespace ChromaVale.Core.GameLogic
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
+                // FIX 2026-07-23: pressure=3 bursts cap-2 pipes instantly (AddFlow(3,...) > cap=2).
+                // Changed all 4 straights to cap-3 so the direct route handles p3 flow.
+                // Amp remains as 3-star enabler (use 3 pipes instead of 4 for ≤60% efficiency).
+                PipePiece.Straight(3), PipePiece.Straight(3), PipePiece.Straight(3), PipePiece.Straight(3),
                 PipePiece.Elbow(2), PipePiece.Elbow(2),
                 PipePiece.Amplifier(),
             }
