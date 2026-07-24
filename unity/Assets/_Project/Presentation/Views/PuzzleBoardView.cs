@@ -141,21 +141,13 @@ namespace ChromaVale.Presentation.Views
             bg.GetComponent<MeshRenderer>().material.color = new Color(0.02f, 0.01f, 0.06f);
             bg.GetComponent<MeshRenderer>().sortingOrder = -20;
 
-            // TEST: bright square
-            var test = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            test.name = "TEST_SQUARE";
-            test.transform.SetParent(transform);
-            test.transform.localPosition = new Vector3(0f, 1f, 1f);
-            test.transform.localScale = new Vector3(3f, 3f, 1f);
-            Destroy(test.GetComponent<MeshCollider>());
-            test.GetComponent<MeshRenderer>().material = mat;
-            test.GetComponent<MeshRenderer>().material.color = Color.magenta;
-            test.GetComponent<MeshRenderer>().sortingOrder = -10;
-
             // City skyline
             CreateBuildingLayer(-18, 8, 5, new Color(0.08f, 0.04f, 0.18f), mat);
             CreateBuildingLayer(-17, 15, 3.5f, new Color(0.12f, 0.05f, 0.22f), mat);
             CreateBuildingLayer(-16, 22, 2.5f, new Color(0.18f, 0.06f, 0.28f), mat);
+
+            // Cyberpunk billboard sign on a mid-ground building
+            CreateBillboard(mat);
 
             // Neon horizon line
             var horizon = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -209,6 +201,66 @@ namespace ChromaVale.Presentation.Views
                     win.GetComponent<MeshRenderer>().material.color = neonColors[Random.Range(0, neonColors.Length)];
                     win.GetComponent<MeshRenderer>().sortingOrder = order + 1;
                 }
+            }
+        }
+
+        private void CreateBillboard(Material mat)
+        {
+            // Billboard frame — tall dark rectangle on a building at left side
+            var frame = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            frame.name = "Billboard";
+            frame.transform.SetParent(transform);
+            frame.transform.localPosition = new Vector3(6f, -0.5f, 1f);
+            frame.transform.localScale = new Vector3(1.8f, 2.5f, 1f);
+            Destroy(frame.GetComponent<MeshCollider>());
+            frame.GetComponent<MeshRenderer>().material = mat;
+            frame.GetComponent<MeshRenderer>().material.color = new Color(0.02f, 0.01f, 0.04f);
+            frame.GetComponent<MeshRenderer>().sortingOrder = -14;
+
+            // Neon border — slightly larger quad behind the frame
+            var border = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            border.name = "BillboardBorder";
+            border.transform.SetParent(frame.transform);
+            border.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+            border.transform.localScale = new Vector3(1.05f, 1.05f, 1f);
+            Destroy(border.GetComponent<MeshCollider>());
+            border.GetComponent<MeshRenderer>().material = mat;
+            border.GetComponent<MeshRenderer>().material.color = NeonCyan * 0.6f;
+            border.GetComponent<MeshRenderer>().sortingOrder = -14;
+
+            // Scrolling text — world-space Canvas for TMP
+            var textCanvas = new GameObject("BillboardText");
+            textCanvas.transform.SetParent(frame.transform);
+            textCanvas.transform.localPosition = Vector3.zero;
+            textCanvas.transform.localScale = new Vector3(0.01f, 0.01f, 1f); // Scale down to fit
+            var canvas = textCanvas.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = -13;
+            var crt = textCanvas.AddComponent<RectTransform>();
+            crt.sizeDelta = new Vector2(160f, 220f);
+
+            var textGo = new GameObject("ScrollingLabel");
+            textGo.transform.SetParent(textCanvas.transform);
+            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            tmp.text = "CHROMA VALE /// PIPELINE ONLINE /// NEON FLOW ACTIVE ///";
+            tmp.fontSize = 8;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = NeonCyan;
+            tmp.rectTransform.sizeDelta = new Vector2(160f, 220f);
+
+            // Start scrolling coroutine
+            StartCoroutine(ScrollBillboard(tmp));
+        }
+
+        private IEnumerator ScrollBillboard(TextMeshProUGUI tmp)
+        {
+            string baseText = "CHROMA VALE /// PIPELINE ONLINE /// NEON FLOW ACTIVE /// SYSTEM NOMINAL /// ";
+            int offset = 0;
+            while (tmp != null)
+            {
+                tmp.text = baseText.Substring(offset) + baseText.Substring(0, offset);
+                offset = (offset + 1) % baseText.Length;
+                yield return new WaitForSeconds(0.15f);
             }
         }
 
