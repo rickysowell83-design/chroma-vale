@@ -1,11 +1,18 @@
-# Unity generated
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
+# Unity generated (any depth — project lives in unity/)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.slnx
+
+# Stray root-level Unity dirs (accidental — real project is unity/)
+/Packages/
+/ProjectSettings/
+/assets/Scenes/
+/assets/Scenes.meta
 
 # IDE / Editor
 .idea/
@@ -43,7 +50,7 @@ Desktop.ini
 crashlytics-build.properties
 
 # Package manager auto-generated (we track manifest.json manually)
-/Packages/packages-lock.json
+Packages/packages-lock.json
 
 # Hermes / Agent
 .hermes/
