@@ -95,7 +95,7 @@ namespace ChromaVale.Core.GameLogic
                 new LevelTarget { X = 3, Y = 0, ColorIndex = 0 },
                 new LevelTarget { X = 3, Y = 3, ColorIndex = 1 },
             },
-            Obstacles = new[] { new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 2 } },
+            Obstacles = new[] { new LevelObstacle { X = 2, Y = 2 } },
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {

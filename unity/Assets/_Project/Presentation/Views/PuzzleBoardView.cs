@@ -52,6 +52,9 @@ namespace ChromaVale.Presentation.Views
         private int _starsEarned;
         private readonly Stack<(int x, int y, int pieceIdx)> _undoStack = new();
 
+        // Pending rotation applied when placing from inventory (rotate-before-place)
+        private int _pendingRotation = 0;
+
         // Audio
         private IAudioService _audioService;
         private float _lastFlowTickSoundTime;
@@ -82,7 +85,6 @@ namespace ChromaVale.Presentation.Views
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
             _inventoryPanelComponent.Bind(_inventory);
 
-            DrawConnectionHint();
             _musicDirector.PlayBeep(440f, 0.15f);
 
             if (_audioService != null) _audioService.PlaySound("level_start");
@@ -119,6 +121,7 @@ namespace ChromaVale.Presentation.Views
             _winPopupComponent.OnReplay += ResetPuzzle;
             _flowButtonComponent.OnFlowRequested += OnFlowButtonPressed;
             _hudPanel.OnResetRequested += ResetPuzzle;
+            _inventoryPanelComponent.OnPieceSelected += _ => { _pendingRotation = 0; _inventoryPanelComponent.SetPendingRotation(0); };
         }
 
         private void EnsureEventSystem()
@@ -190,35 +193,7 @@ namespace ChromaVale.Presentation.Views
 
         // ═══════════════════════════════════════════════════════════════
 
-        private void DrawConnectionHint()
-        {
-            foreach (var src in _level.Sources)
-            {
-                foreach (var tgt in _level.Targets)
-                {
-                    if (tgt.ColorIndex != src.ColorIndex) continue;
-                    var line = new GameObject("Hint_" + src.ColorIndex);
-                    line.transform.SetParent(transform);
-                    var lr = line.AddComponent<LineRenderer>();
-                    lr.positionCount = 2;
-                    var off = new Vector3(-_board.Width * _tileSize / 2f, -_board.Height * _tileSize / 2f, 0);
-                    lr.SetPosition(0, new Vector3(src.X * _tileSize + off.x, src.Y * _tileSize + off.y, -0.5f));
-                    lr.SetPosition(1, new Vector3(tgt.X * _tileSize + off.x, tgt.Y * _tileSize + off.y, -0.5f));
-                    lr.startWidth = 0.08f; lr.endWidth = 0.08f;
-                    var col = GetPipeColor(src.ColorIndex); col.a = 0.35f;
-                    lr.material = new Material(Shader.Find("Sprites/Default"));
-                    lr.startColor = col; lr.endColor = col;
-                    lr.sortingOrder = -5;
-                    StartCoroutine(DestroyOnSolve(line));
-                }
-            }
-        }
 
-        private IEnumerator DestroyOnSolve(GameObject go)
-        {
-            while (!_solved) yield return null;
-            if (go != null) Destroy(go);
-        }
 
         private IEnumerator PulseSources()
         {
@@ -276,6 +251,70 @@ namespace ChromaVale.Presentation.Views
             UndoPlacement();
         }
 
+        private void Update()
+        {
+            // Scroll to rotate the pending piece before placement
+            if (_solved || _flowSim == null || _flowSim.IsRunning) return;
+
+            if (_inventoryPanelComponent.SelectedPieceIndex >= 0)
+            {
+                float scrollDelta = Mouse.current.scroll.ReadValue().y;
+                if (scrollDelta > 0f)
+                {
+                    _pendingRotation = (_pendingRotation + 90) % 360;
+                    _inventoryPanelComponent.SetPendingRotation(_pendingRotation);
+                }
+                else if (scrollDelta < 0f)
+                {
+                    _pendingRotation = (_pendingRotation - 90 + 360) % 360;
+                    _inventoryPanelComponent.SetPendingRotation(_pendingRotation);
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PLACEMENT PREVIEW GHOST
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Called by TileClickHandler when the pointer enters a tile cell.
+        /// If a piece is selected from the inventory and the cell is empty,
+        /// shows a translucent preview ghost of the pipe at this tile.
+        /// </summary>
+        public void OnTileHover(int x, int y)
+        {
+            if (_solved) return;
+            if (_flowSim == null || _flowSim.IsRunning) return;
+            if (_inventoryPanelComponent == null) return;
+            if (_renderers == null || x < 0 || y < 0 || x >= _renderers.GetLength(0) || y >= _renderers.GetLength(1)) return;
+            if (_inventory == null) return;
+
+            int selIdx = _inventoryPanelComponent.SelectedPieceIndex;
+            if (selIdx < 0) return;
+
+            var cell = _board.GetCell(x, y);
+            if (cell.Type != CellType.Empty) return;
+
+            var piece = _inventory.Pieces[selIdx];
+            if (_renderers[x, y] != null)
+            {
+                _renderers[x, y].ShowPlacementPreview(piece.Shape, _pendingRotation);
+            }
+        }
+
+        /// <summary>
+        /// Called by TileClickHandler when the pointer exits a tile cell.
+        /// Hides the placement preview ghost on this tile.
+        /// </summary>
+        public void OnTileHoverExit(int x, int y)
+        {
+            if (_renderers == null || x < 0 || y < 0 || x >= _renderers.GetLength(0) || y >= _renderers.GetLength(1)) return;
+            if (_renderers[x, y] != null)
+            {
+                _renderers[x, y].HidePlacementPreview();
+            }
+        }
+
         private void RotatePlacement(int x, int y, int pieceIdx)
         {
             var piece = _inventory.GetPieceAt(x, y);
@@ -303,7 +342,7 @@ namespace ChromaVale.Presentation.Views
             int selIdx = _inventoryPanelComponent.SelectedPieceIndex;
             if (selIdx < 0) return;
 
-            bool placed = _inventory.TryPlace(selIdx, _board, x, y, _flowSim, rotation: 0);
+            bool placed = _inventory.TryPlace(selIdx, _board, x, y, _flowSim, rotation: _pendingRotation);
             if (placed)
             {
                 _undoStack.Push((x, y, selIdx));
@@ -315,6 +354,8 @@ namespace ChromaVale.Presentation.Views
                 StartCoroutine(PopAnim(_renderers[x, y].transform));
                 _inventoryPanelComponent.Refresh();
                 _inventoryPanelComponent.ClearSelection();
+                _pendingRotation = 0;
+                _inventoryPanelComponent.SetPendingRotation(0);
 
                 // Tutorial step advancement
                 if (!_hasPlacedFirstPiece && _levelNumber == 1)
@@ -542,6 +583,7 @@ namespace ChromaVale.Presentation.Views
             _solved = false;
             _moveCount = 0;
             _starsEarned = 0;
+            _pendingRotation = 0;
             _undoStack.Clear();
             _winPopupComponent.Hide();
 
@@ -571,7 +613,6 @@ namespace ChromaVale.Presentation.Views
                 _hudPanel.HideHint();
             }
 
-            DrawConnectionHint();
             StartCoroutine(PulseSources());
         }
 
@@ -619,21 +660,19 @@ namespace ChromaVale.Presentation.Views
             float duration = 0.15f;
             float elapsed = 0f;
             var originalScale = tv.transform.localScale;
-            tv.Color = fromColor;
+            tv.SetFlowIdle();
+            tv.SetFlowActive(toColor);
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                float smoothT = Mathf.SmoothStep(0f, 1f, t);
-                tv.Color = Color.Lerp(fromColor, toColor, smoothT);
                 // Scale pulse: 1.15x at start → 1.0x at end
                 float scaleT = 1f + 0.15f * (1f - t);
                 tv.transform.localScale = originalScale * scaleT;
                 yield return null;
             }
 
-            tv.Color = toColor;
             tv.transform.localScale = originalScale;
         }
 

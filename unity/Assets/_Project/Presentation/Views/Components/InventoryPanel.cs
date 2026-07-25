@@ -16,6 +16,7 @@ namespace ChromaVale.Presentation.Views.Components
         private int _selectedPieceIndex = -1;
         private CanvasGroup _canvasGroup;
         private TextMeshProUGUI _headerLabel;
+        private TextMeshProUGUI _rotationLabel;
 
         private static readonly Color BodyDefault = new(0.06f, 0.08f, 0.12f, 0.92f);
         private static readonly Color BodySelected = new(0.12f, 0.10f, 0.20f, 0.95f);
@@ -26,6 +27,7 @@ namespace ChromaVale.Presentation.Views.Components
         private static readonly Color HeaderColor = new(0.35f, 0.55f, 0.65f, 0.7f);
 
         public int SelectedPieceIndex => _selectedPieceIndex;
+        public int PendingRotation { get; private set; } = 0;
         public event Action<PieceShape> OnPieceSelected;
 
         private void Awake()
@@ -86,6 +88,22 @@ namespace ChromaVale.Presentation.Views.Components
             headerRt.anchorMax = new Vector2(0.40f, 0.90f);
             headerRt.offsetMin = Vector2.zero;
             headerRt.offsetMax = Vector2.zero;
+
+            // Rotation indicator (hidden until set)
+            var rotGo = new GameObject("RotationLabel");
+            rotGo.transform.SetParent(bg.transform, false);
+            _rotationLabel = rotGo.AddComponent<TextMeshProUGUI>();
+            _rotationLabel.text = "";
+            _rotationLabel.fontSize = 10;
+            _rotationLabel.fontStyle = FontStyles.Bold;
+            _rotationLabel.alignment = TextAlignmentOptions.Right;
+            _rotationLabel.color = ChromaPalette.NeonMagenta;
+            var rotRt = _rotationLabel.GetComponent<RectTransform>();
+            rotRt.anchorMin = new Vector2(0.55f, 0.70f);
+            rotRt.anchorMax = new Vector2(0.97f, 0.90f);
+            rotRt.offsetMin = Vector2.zero;
+            rotRt.offsetMax = Vector2.zero;
+            _rotationLabel.gameObject.SetActive(false);
 
             // Scanline overlay (very thin repeating horizontal lines)
             var scanGo = new GameObject("Scanlines");
@@ -276,6 +294,27 @@ namespace ChromaVale.Presentation.Views.Components
         {
             _selectedPieceIndex = -1;
             ApplyHighlight(null);
+        }
+
+        /// <summary>
+        /// Show or hide the pending rotation indicator on the inventory panel.
+        /// </summary>
+        /// <param name="degrees">Rotation in degrees (0 = hidden).</param>
+        public void SetPendingRotation(int degrees)
+        {
+            PendingRotation = degrees;
+            if (_rotationLabel != null)
+            {
+                if (degrees > 0)
+                {
+                    _rotationLabel.text = $"SCROLL \u21BB {degrees}\u00B0";
+                    _rotationLabel.gameObject.SetActive(true);
+                }
+                else
+                {
+                    _rotationLabel.gameObject.SetActive(false);
+                }
+            }
         }
 
         public void SetLocked(bool locked)

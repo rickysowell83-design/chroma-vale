@@ -1,4 +1,5 @@
 using ChromaVale.Core.GameLogic;
+using System.Collections;
 using UnityEngine;
 
 namespace ChromaVale.Presentation.Views.Components
@@ -18,21 +19,24 @@ namespace ChromaVale.Presentation.Views.Components
     /// <summary>
     /// MonoBehaviour that renders one puzzle-grid cell as a 3D tile with URP Lit
     /// emissive materials.  Base slab + optional 3D pipe mesh + optional indicator
-    /// marker — all color-driven via a single cached MaterialPropertyBlock so no
-    /// per-frame material instancing occurs.
+    /// marker + PCB via details — all color-driven via a single cached MaterialPropertyBlock
+    /// so no per-frame material instancing occurs.
     /// </summary>
     public class TileVisual : MonoBehaviour
     {
         private static Material _baseMaterial;
+        private static Material _viaMaterial;
 
         private MeshRenderer _baseRenderer;
         private BoxCollider _boxCollider;
         private MaterialPropertyBlock _mpb;
         private GameObject _pipeRoot;
         private GameObject _indicatorRoot;
+        private GameObject _previewRoot;
         private float _tileSize = 1f;
         private Color _color;
-        private float _emissionIntensity = 5.0f;
+        private Color _darkColor = new Color(0.04f, 0.05f, 0.06f);
+        private float _emissionIntensity = 0.6f; // Subtle idle glow — pipes visible when placed
 
         /// <summary>
         /// Logical tile color.  Setting this drives both the HDR emission
@@ -51,7 +55,7 @@ namespace ChromaVale.Presentation.Views.Components
 
         /// <summary>
         /// HDR emission multiplier applied when setting <see cref="Color"/>.
-        /// Default: 2.5f.
+        /// Default: 0.0f (unpowered pipes are completely dead/dark).
         /// </summary>
         public float EmissionIntensity
         {
@@ -67,8 +71,9 @@ namespace ChromaVale.Presentation.Views.Components
         // ── Shared base material ──────────────────────────────────────────
 
         /// <summary>
-        /// Get or create the shared base-slab material (near-black, metallic, emission-enabled).
-        /// One instance shared across all tiles; per-tile variation via MaterialPropertyBlock.
+        /// Get or create the shared base-slab material (pitch-black PCB, metallic,
+        /// emission-enabled).  One instance shared across all tiles; per-tile
+        /// variation via MaterialPropertyBlock.
         /// </summary>
         private static Material BaseMaterial
         {
@@ -82,10 +87,10 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _baseMaterial = new Material(shader)
                     {
-                        color = new Color(0.05f, 0.06f, 0.09f)
+                        color = new Color(0.02f, 0.02f, 0.03f)
                     };
-                    _baseMaterial.SetFloat("_Metallic", 0.8f);
-                    _baseMaterial.SetFloat("_Smoothness", 0.75f);
+                    _baseMaterial.SetFloat("_Metallic", 0.3f);
+                    _baseMaterial.SetFloat("_Smoothness", 0.8f);
                     _baseMaterial.EnableKeyword("_EMISSION");
                     _baseMaterial.SetColor("_EmissionColor", Color.black);
                     _baseMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
@@ -94,11 +99,40 @@ namespace ChromaVale.Presentation.Views.Components
             }
         }
 
+        /// <summary>
+        /// Get or create the shared via / contact-pad material (copper/gold,
+        /// highly metallic, no emission).  Used for all PCB detail elements.
+        /// </summary>
+        private static Material ViaMaterial
+        {
+            get
+            {
+                if (_viaMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    if (shader == null) shader = Shader.Find("Sprites/Default");
+
+                    _viaMaterial = new Material(shader)
+                    {
+                        color = new Color(0.8f, 0.55f, 0.2f) // Brighter gold/copper
+                    };
+                    _viaMaterial.SetFloat("_Metallic", 0.95f);
+                    _viaMaterial.SetFloat("_Smoothness", 0.7f);
+                    _viaMaterial.EnableKeyword("_EMISSION");
+                    _viaMaterial.SetColor("_EmissionColor", new Color(0.4f, 0.25f, 0.08f) * 0.5f); // Subtle glow visible in dark
+                    _viaMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+                return _viaMaterial;
+            }
+        }
+
         // ── Factory ───────────────────────────────────────────────────────
 
         /// <summary>
         /// Create a new TileVisual GameObject with a base slab, MeshRenderer,
-        /// BoxCollider, and the TileVisual component attached.
+        /// BoxCollider, PCB via / contact-pad details, and the TileVisual
+        /// component attached.
         /// </summary>
         /// <param name="parent">Parent transform for the tile.</param>
         /// <param name="position">World/local position of the tile.</param>
@@ -126,14 +160,123 @@ namespace ChromaVale.Presentation.Views.Components
             tile._baseRenderer = slab.GetComponent<MeshRenderer>();
             tile._baseRenderer.sharedMaterial = BaseMaterial;
 
+            // ── Copper contact pads / vias ──────────────────────────────
+            //
+            // Central via: a flat copper disc at the centre of the tile
+            {
+                var centerVia = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                centerVia.name = "ViaCenter";
+                Object.DestroyImmediate(centerVia.GetComponent<Collider>());
+                centerVia.transform.SetParent(go.transform, false);
+                centerVia.transform.localPosition = new Vector3(0f, 0f, -0.06f);
+                // Rotate cylinder 90° around X so the disc lies flat on the slab
+                centerVia.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                centerVia.transform.localScale = new Vector3(tileSize * 0.12f, 0.01f, tileSize * 0.12f);
+                centerVia.GetComponent<MeshRenderer>().sharedMaterial = ViaMaterial;
+            }
+
+            // Four corner via dots at the pipe connection points
+            float cornerOffset = tileSize * 0.35f;
+            float dotScale = 0.04f;
+
+            var cornerPositions = new Vector3[]
+            {
+                new Vector3(-cornerOffset, -cornerOffset, -0.06f),
+                new Vector3(-cornerOffset,  cornerOffset, -0.06f),
+                new Vector3( cornerOffset, -cornerOffset, -0.06f),
+                new Vector3( cornerOffset,  cornerOffset, -0.06f)
+            };
+
+            for (int i = 0; i < cornerPositions.Length; i++)
+            {
+                var dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                dot.name = "ViaDot_" + i;
+                Object.DestroyImmediate(dot.GetComponent<Collider>());
+                dot.transform.SetParent(go.transform, false);
+                dot.transform.localPosition = cornerPositions[i];
+                dot.transform.localScale = Vector3.one * dotScale;
+                dot.GetComponent<MeshRenderer>().sharedMaterial = ViaMaterial;
+            }
+
             // BoxCollider on the root GameObject (click handling via PhysicsRaycaster)
             tile._boxCollider = go.AddComponent<BoxCollider>();
-            tile._boxCollider.size = new Vector3(tileSize, tileSize, 0.3f);
+            tile._boxCollider.size = new Vector3(tileSize, tileSize, 1.0f);
 
             // Initialize the MaterialPropertyBlock cache
             tile._mpb = new MaterialPropertyBlock();
 
             return tile;
+        }
+
+        // ── Flow emission control ────────────────────────────────────────
+
+        /// <summary>
+        /// Activate flow on this tile.  Sets the pipe color and smoothly ramps
+        /// emission intensity from 0 to 5 over 0.15 seconds using a coroutine
+        /// with SmoothStep interpolation.
+        /// </summary>
+        /// <param name="flowColor">The emissive flow colour to apply.</param>
+        public void SetFlowActive(Color flowColor)
+        {
+            _color = flowColor;
+            StopAllCoroutines();
+            StartCoroutine(FlowLerpCoroutine());
+        }
+
+        /// <summary>
+        /// Deactivate flow on this tile.  Resets emission intensity to 0 and
+        /// restores the tile's idle dark colour.
+        /// </summary>
+        public void SetFlowIdle()
+        {
+            _emissionIntensity = 0.0f;
+            _color = _darkColor;
+            ApplyColor();
+        }
+
+        private IEnumerator FlowLerpCoroutine()
+        {
+            float duration = 0.25f; // Slightly longer for the surge effect
+            float elapsed = 0f;
+            float surgeDuration = 0.06f; // First 60ms: bright white electricity surge
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+
+                if (elapsed <= surgeDuration)
+                {
+                    // Electricity surge: white-hot flash
+                    float surgeT = elapsed / surgeDuration;
+                    _emissionIntensity = Mathf.Lerp(12.0f, 8.0f, surgeT); // Start at 12, drop to 8
+                    ApplyColorSurge(Color.white, _color); // White flash blending to target color
+                }
+                else
+                {
+                    // Settle to target color at intensity 5.0
+                    float settleT = (elapsed - surgeDuration) / (duration - surgeDuration);
+                    _emissionIntensity = Mathf.SmoothStep(7.0f, 5.0f, settleT);
+                    ApplyColor();
+                }
+                yield return null;
+            }
+
+            _emissionIntensity = 5.0f;
+            ApplyColor();
+        }
+
+        private void ApplyColorSurge(Color surgeColor, Color targetColor)
+        {
+            if (_mpb == null) return;
+            float blend = Mathf.Clamp01(_emissionIntensity / 12.0f);
+            Color blended = Color.Lerp(targetColor, surgeColor, blend);
+            _mpb.SetColor("_EmissionColor", blended * _emissionIntensity);
+            // Keep copper base — only emission surges
+            _mpb.SetColor("_BaseColor", new Color(0.65f, 0.38f, 0.15f)); // Copper always
+
+            if (_pipeRoot != null)
+                ApplyMpbToTree(_pipeRoot.transform, _mpb);
         }
 
         // ── Shape management ──────────────────────────────────────────────
@@ -160,10 +303,82 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         public void ClearShape()
         {
+            HidePlacementPreview();
             if (_pipeRoot != null)
             {
                 Object.DestroyImmediate(_pipeRoot);
                 _pipeRoot = null;
+            }
+        }
+
+        // ── Placement Preview Ghost ────────────────────────────────────────
+
+        /// <summary>
+        /// Show a translucent placement preview ghost at this tile.
+        /// Builds a pipe mesh using PipeMeshFactory3D.BuildPipe with a
+        /// transparent URP/Lit material (alpha ~0.35, no emission).
+        /// </summary>
+        /// <param name="shape">The pipe shape to preview.</param>
+        /// <param name="rotationDeg">Z-axis rotation in degrees.</param>
+        public void ShowPlacementPreview(PieceShape shape, int rotationDeg)
+        {
+            HidePlacementPreview();
+
+            _previewRoot = PipeMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
+            _previewRoot.transform.localScale = Vector3.one * _tileSize;
+
+            // Create translucent preview material (URP/Lit, transparent, alpha ~0.35, no emission)
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            var previewMat = new Material(shader);
+            previewMat.color = new Color(0.2f, 0.9f, 0.95f, 0.35f); // NeonCyan with alpha ~0.35
+            previewMat.SetFloat("_Metallic", 1.0f);
+            previewMat.SetFloat("_Smoothness", 0.85f);
+
+            // Configure transparent surface mode
+            previewMat.SetFloat("_Surface", 1f);
+            previewMat.SetFloat("_Blend", 0f);
+            previewMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            previewMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            previewMat.SetFloat("_ZWrite", 0f);
+            previewMat.renderQueue = 3000;
+            previewMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            // No emission on preview ghost
+            previewMat.DisableKeyword("_EMISSION");
+            previewMat.SetColor("_EmissionColor", Color.black);
+
+            // Apply the translucent material to all pipe child meshes
+            ApplyPreviewMatToTree(_previewRoot.transform, previewMat);
+        }
+
+        /// <summary>
+        /// Hide and destroy the placement preview ghost on this tile.
+        /// </summary>
+        public void HidePlacementPreview()
+        {
+            if (_previewRoot != null)
+            {
+                Object.DestroyImmediate(_previewRoot);
+                _previewRoot = null;
+            }
+        }
+
+        /// <summary>
+        /// Recursively replace sharedMaterial on all MeshRenderers under the given
+        /// transform with the specified preview material.
+        /// </summary>
+        private static void ApplyPreviewMatToTree(Transform root, Material mat)
+        {
+            var renderer = root.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = mat;
+            }
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                ApplyPreviewMatToTree(root.GetChild(i), mat);
             }
         }
 
@@ -201,14 +416,28 @@ namespace ChromaVale.Presentation.Views.Components
                     Object.DestroyImmediate(dot.GetComponent<Collider>());
                     dot.transform.SetParent(_indicatorRoot.transform, false);
                     dot.transform.localPosition = new Vector3(0f, 0f, -0.2f);
-                    dot.transform.localScale = Vector3.one * (_tileSize * 0.15f);
+                    dot.transform.localScale = Vector3.one * (_tileSize * 0.35f); // Larger beacon
 
                     var rend = dot.GetComponent<MeshRenderer>();
                     rend.sharedMaterial = indicatorMat;
                     var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 6f);
-                    mpb.SetColor("_BaseColor", color * 0.5f);
+                    mpb.SetColor("_EmissionColor", color * 15f); // Intense electric glow
+                    mpb.SetColor("_BaseColor", color * 0.7f);
                     rend.SetPropertyBlock(mpb);
+
+                    // Add a larger outer glow halo
+                    var halo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    halo.name = "SourceHalo";
+                    Object.DestroyImmediate(halo.GetComponent<Collider>());
+                    halo.transform.SetParent(_indicatorRoot.transform, false);
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.25f);
+                    halo.transform.localScale = Vector3.one * (_tileSize * 0.55f);
+                    var haloRend = halo.GetComponent<MeshRenderer>();
+                    haloRend.sharedMaterial = indicatorMat;
+                    var haloMpb = new MaterialPropertyBlock();
+                    haloMpb.SetColor("_EmissionColor", color * 4f);
+                    haloMpb.SetColor("_BaseColor", color * 0.0f); // Emission-only, transparent base
+                    haloRend.SetPropertyBlock(haloMpb);
                     break;
                 }
 
@@ -225,8 +454,8 @@ namespace ChromaVale.Presentation.Views.Components
                     var rend = ring.GetComponent<MeshRenderer>();
                     rend.sharedMaterial = indicatorMat;
                     var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 4f);
-                    mpb.SetColor("_BaseColor", color * 0.3f);
+                    mpb.SetColor("_EmissionColor", color * 10f); // Bright target beacon
+                    mpb.SetColor("_BaseColor", color * 0.4f);
                     rend.SetPropertyBlock(mpb);
                     break;
                 }
@@ -274,7 +503,6 @@ namespace ChromaVale.Presentation.Views.Components
                     Object.DestroyImmediate(head.GetComponent<Collider>());
                     head.transform.SetParent(_indicatorRoot.transform, false);
                     head.transform.localPosition = new Vector3(_tileSize * 0.27f, 0f, -0.2f);
-                    // Diamond tip: cube rotated 45° reads as an arrowhead
                     head.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
                     head.transform.localScale = new Vector3(_tileSize * 0.09f, _tileSize * 0.09f, _tileSize * 0.04f);
 
@@ -311,13 +539,17 @@ namespace ChromaVale.Presentation.Views.Components
         {
             if (_mpb == null) return;
 
+            // Pipe KEEPS copper base — only EMISSION changes for flow glow
             _mpb.SetColor("_EmissionColor", _color * _emissionIntensity);
-            _mpb.SetColor("_BaseColor", _color * 0.25f);
+            _mpb.SetColor("_BaseColor", new Color(0.65f, 0.38f, 0.15f)); // Copper always
 
-            // Base slab
+            // Base slab ALWAYS stays dark PCB — never takes pipe color
             if (_baseRenderer != null)
             {
-                _baseRenderer.SetPropertyBlock(_mpb);
+                var slabMpb = new MaterialPropertyBlock();
+                slabMpb.SetColor("_EmissionColor", Color.black);
+                slabMpb.SetColor("_BaseColor", new Color(0.02f, 0.02f, 0.03f)); // PCB dark
+                _baseRenderer.SetPropertyBlock(slabMpb);
             }
 
             // All pipe mesh children

@@ -18,8 +18,8 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void Init(int x, int y, PuzzleBoardView b) { _x = x; _y = y; _board = b; }
         public void OnPointerClick(PointerEventData d) { if (_board != null) _board.OnPointerDown(_x, _y); }
-        public void OnPointerEnter(PointerEventData d) { _isMouseOver = true; }
-        public void OnPointerExit(PointerEventData d) { _isMouseOver = false; }
+        public void OnPointerEnter(PointerEventData d) { _isMouseOver = true; if (_board != null) _board.OnTileHover(_x, _y); }
+        public void OnPointerExit(PointerEventData d) { _isMouseOver = false; if (_board != null) _board.OnTileHoverExit(_x, _y); }
 
         private void Update()
         {

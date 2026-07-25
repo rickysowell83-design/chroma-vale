@@ -62,7 +62,80 @@ namespace ChromaVale.Presentation.Views.Components
                 if (cell.Type == CellType.Target)
                     tv.SetIndicator(TileIndicator.TargetRing, GetPipeColor(cell.ColorIndex));
                 if (cell.Type == CellType.Obstacle)
-                    tv.SetIndicator(TileIndicator.ObstacleBlock, ChromaPalette.ObstacleCol);
+                {
+                    // Build a burnt-out microchip mesh instead of an indicator block
+                    var chipRoot = new GameObject("BurntMicrochip");
+                    chipRoot.transform.SetParent(tv.transform, false);
+                    chipRoot.transform.localPosition = Vector3.zero;
+
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+
+                    // Dark burnt-red URP/Lit material for the chip body
+                    var chipMat = new Material(shader);
+                    chipMat.color = new Color(0.08f, 0.04f, 0.04f);
+                    chipMat.SetFloat("_Metallic", 0.5f);
+                    chipMat.SetFloat("_Smoothness", 0.3f);
+
+                    // Silver material for pins
+                    var pinMat = new Material(shader);
+                    pinMat.color = new Color(0.75f, 0.75f, 0.78f);
+                    pinMat.SetFloat("_Metallic", 0.9f);
+                    pinMat.SetFloat("_Smoothness", 0.8f);
+
+                    // 1. Flattened cube (microchip body)
+                    var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    body.name = "ChipBody";
+                    DestroyImmediate(body.GetComponent<Collider>());
+                    body.transform.SetParent(chipRoot.transform, false);
+                    body.transform.localPosition = new Vector3(0f, 0f, -0.15f);
+                    body.transform.localScale = new Vector3(_tileSize * 0.45f, _tileSize * 0.45f, 0.08f);
+                    var bodyRend = body.GetComponent<MeshRenderer>();
+                    bodyRend.sharedMaterial = chipMat;
+
+                    // 2. Four silver pins at the corners pointing DOWN (Z- direction)
+                    float pinOffset = _tileSize * 0.12f;
+                    float pinRadius = _tileSize * 0.015f;
+                    float pinLength = _tileSize * 0.08f;
+                    Vector3[] pinPositions = new[]
+                    {
+                        new Vector3(-pinOffset, -pinOffset, -0.15f - pinLength * 0.5f),
+                        new Vector3( pinOffset, -pinOffset, -0.15f - pinLength * 0.5f),
+                        new Vector3(-pinOffset,  pinOffset, -0.15f - pinLength * 0.5f),
+                        new Vector3( pinOffset,  pinOffset, -0.15f - pinLength * 0.5f),
+                    };
+
+                    for (int pi = 0; pi < pinPositions.Length; pi++)
+                    {
+                        var pin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                        pin.name = "Pin_" + pi;
+                        DestroyImmediate(pin.GetComponent<Collider>());
+                        pin.transform.SetParent(chipRoot.transform, false);
+                        pin.transform.localPosition = pinPositions[pi];
+                        // Rotate cylinder (default Y-axis) to point along Z
+                        pin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                        pin.transform.localScale = new Vector3(pinRadius, pinLength * 0.5f, pinRadius);
+                        var pinRend = pin.GetComponent<MeshRenderer>();
+                        pinRend.sharedMaterial = pinMat;
+                    }
+
+                    // 3. Dark scorch mark: glowing red sphere at center
+                    var scorch = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    scorch.name = "ScorchMark";
+                    DestroyImmediate(scorch.GetComponent<Collider>());
+                    scorch.transform.SetParent(chipRoot.transform, false);
+                    scorch.transform.localPosition = new Vector3(_tileSize * 0.04f, _tileSize * 0.04f, -0.18f);
+                    scorch.transform.localScale = Vector3.one * (_tileSize * 0.12f);
+                    var scorchRend = scorch.GetComponent<MeshRenderer>();
+                    var scorchMat = new Material(shader);
+                    scorchMat.color = new Color(0.15f, 0.02f, 0.02f);
+                    scorchMat.SetFloat("_Metallic", 0.1f);
+                    scorchMat.SetFloat("_Smoothness", 0.1f);
+                    scorchMat.EnableKeyword("_EMISSION");
+                    scorchMat.SetColor("_EmissionColor", new Color(1f, 0.05f, 0.05f) * 0.8f); // Bright red glow
+                    scorchMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    scorchRend.sharedMaterial = scorchMat;
+                }
                 if (cell.Type == CellType.FlowGate)
                 {
                     tv.SetIndicator(TileIndicator.FlowGateArrow, Color.white);
@@ -106,7 +179,7 @@ namespace ChromaVale.Presentation.Views.Components
                 float halfSpan = Mathf.Max(_board.Width, _board.Height) * _tileSize / 2f + 1.5f;
                 float dist = halfSpan / Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
                 dist *= 1.06f;
-                float tiltDeg = 20f;
+                float tiltDeg = 38f;
                 float tiltRad = tiltDeg * Mathf.Deg2Rad;
                 Vector3 lookTarget = new Vector3(0f, -0.8f, 0f);
                 Vector3 camPos = lookTarget + new Vector3(0f, Mathf.Sin(tiltRad) * dist, -Mathf.Cos(tiltRad) * dist);

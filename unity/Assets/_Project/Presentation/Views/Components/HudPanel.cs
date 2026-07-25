@@ -97,6 +97,7 @@ namespace ChromaVale.Presentation.Views.Components
             bg.transform.SetParent(_hintRoot.transform, false);
             var bgImg = bg.AddComponent<Image>();
             bgImg.color = new Color(0, 0, 0, 0.7f);
+            bgImg.raycastTarget = false;
             var bgr = bg.GetComponent<RectTransform>();
             bgr.anchorMin = new Vector2(0f, 0.1f);
             bgr.anchorMax = new Vector2(1f, 0.28f);
@@ -109,6 +110,7 @@ namespace ChromaVale.Presentation.Views.Components
             _hintText.fontSize = 18;
             _hintText.alignment = TextAlignmentOptions.Center;
             _hintText.color = Color.white;
+            _hintText.raycastTarget = false;
             var thr = _hintText.GetComponent<RectTransform>();
             thr.anchorMin = new Vector2(0.05f, 0.12f);
             thr.anchorMax = new Vector2(0.95f, 0.26f);
