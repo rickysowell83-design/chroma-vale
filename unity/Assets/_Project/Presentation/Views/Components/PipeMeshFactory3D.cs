@@ -16,9 +16,9 @@ namespace ChromaVale.Presentation.Views.Components
         private static Material _occlusionRingMaterial;
 
         /// <summary>
-        /// Radius of pipe cylinders, relative to tile size = 1.0.
+        /// Radius of pipe cylinders — thin like PCB traces.
         /// </summary>
-        private const float PipeRadius = 0.14f;
+        private const float PipeRadius = 0.08f;
 
         /// <summary>
         /// Radius of joint spheres, slightly larger to cover cylinder seams.
@@ -142,6 +142,46 @@ namespace ChromaVale.Presentation.Views.Components
         }
 
         /// <summary>
+        /// Try loading a Sketchfab pipe prefab from Resources. Instantiate on success.
+        /// Returns true if loaded, false to fall back to runtime cylinders.
+        /// </summary>
+        private static bool TryLoadPrefab(string resourcePath, Transform parent)
+        {
+            var prefab = Resources.Load<GameObject>("Models/SketchfabPipes/" + resourcePath);
+            if (prefab == null) return false;
+
+            var instance = Object.Instantiate(prefab, parent);
+            instance.name = resourcePath;
+            instance.transform.localPosition = new Vector3(0f, 0f, PipeZ);
+            // Model is vertical (Y-up), rotate to horizontal (X-aligned) like our cylinders
+            instance.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+
+            // Convert glTF shader to URP/Lit and scale to fit tile
+            var urpShader = Shader.Find("Universal Render Pipeline/Lit");
+            foreach (var mr in instance.GetComponentsInChildren<MeshRenderer>())
+            {
+                foreach (var mat in mr.sharedMaterials)
+                {
+                    if (mat != null && mat.shader.name.Contains("glTF"))
+                    {
+                        mat.shader = urpShader;
+                        mat.EnableKeyword("_EMISSION");
+                        mat.SetColor("_EmissionColor", Color.black);
+                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    }
+                }
+            }
+
+            // Scale: native ~5 units tall → fit in 1.0 unit
+            instance.transform.localScale = Vector3.one * 0.2f;
+
+            foreach (var col in instance.GetComponentsInChildren<Collider>())
+                Object.DestroyImmediate(col);
+
+            return true;
+        }
+
+        /// <summary>
         /// Build a 3D pipe mesh as a child of the given transform.
         /// </summary>
         /// <param name="shape">The pipe shape to build.</param>
@@ -201,8 +241,8 @@ namespace ChromaVale.Presentation.Views.Components
             cyl.transform.SetParent(parent, false);
             cyl.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
             cyl.transform.localRotation = Quaternion.Euler(0f, 0f, zRot);
-            // Slightly oval cross-section (radius*2.2f on Z instead of radius*2f) — reads as flat trace
-            cyl.transform.localScale = new Vector3(radius * 2f, height / 2f, radius * 2.2f);
+            // Flat wide cross-section like a PCB trace (wider than tall)
+            cyl.transform.localScale = new Vector3(radius * 2.5f, height / 2f, radius * 1.2f);
 
             var renderer = cyl.GetComponent<MeshRenderer>();
             if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;
@@ -321,60 +361,17 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         private static void BuildStraight(Transform parent)
         {
-            // Try loading the URP-converted Tripo model
-            var prefab = Resources.Load<GameObject>("Models/CopperPipe_v2");
-            if (prefab != null)
-            {
-                var instance = Object.Instantiate(prefab, parent);
-                instance.name = "Pipe_Copper_GLB";
-                instance.transform.localPosition = new Vector3(0f, 0f, PipeZ);
-                instance.transform.localRotation = Quaternion.identity;
-                instance.transform.localScale = Vector3.one;
-
-                // Ensure all materials stay URP/Lit with proper settings
-                foreach (var mr in instance.GetComponentsInChildren<MeshRenderer>())
-                {
-                    foreach (var mat in mr.sharedMaterials)
-                    {
-                        if (mat != null && mat.shader.name.Contains("Lit"))
-                        {
-                            mat.EnableKeyword("_EMISSION");
-                            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                        }
-                    }
-                }
-
-                // Remove colliders
-                foreach (var col in instance.GetComponentsInChildren<Collider>())
-                    Object.DestroyImmediate(col);
-
-                return;
-            }
-
-            // Fallback
             CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            AddSegmentRivets(Vector3.zero, 0.5f, true, parent);
         }
 
         /// <summary>
-        /// Build an elbow: two half-length cylinders (X and Y) meeting at a joint sphere.
-        /// Two small fillet spheres at the outer elbow curve create a smooth rounded-corner
-        /// look reminiscent of a PCB trace with 45° chamfer.
+        /// Build an elbow: two half-length cylinders meeting at a joint sphere.
         /// </summary>
         private static void BuildElbow(Transform parent)
         {
-            // Half-cylinder along +X from center
             CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0.25f, 0f, 0f), 90f, parent);
-            // Half-cylinder along +Y from center
             CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0f, 0.25f, 0f), 0f, parent);
-            // Joint sphere at center
             CreateJointSphere(Vector3.zero, parent);
-            // Two fillet spheres at outer elbow curve for 45° chamfer look
-            CreateFilletSphere(new Vector3(0.13f, 0.06f, 0f), JointRadius * 0.5f, parent);
-            CreateFilletSphere(new Vector3(0.06f, 0.13f, 0f), JointRadius * 0.5f, parent);
-            // Rivets at outer ends only (inner ends hidden by joint sphere)
-            AddSegmentRivets(new Vector3(0.25f, 0f, 0f), 0.25f, true, parent);
-            AddSegmentRivets(new Vector3(0f, 0.25f, 0f), 0.25f, false, parent);
         }
 
         /// <summary>
@@ -383,18 +380,9 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         private static void BuildTJunction(Transform parent)
         {
-            // Full cylinder along X
             CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            // Half stub along +Y from center
             CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0f, 0.25f, 0f), 0f, parent);
-            // Joint sphere at center
             CreateJointSphere(Vector3.zero, parent);
-            // Two fillet spheres at inner corners of the T
-            CreateFilletSphere(new Vector3(0.12f, 0.10f, 0f), JointRadius * 0.4f, parent);
-            CreateFilletSphere(new Vector3(-0.12f, 0.10f, 0f), JointRadius * 0.4f, parent);
-            // Rivets
-            AddSegmentRivets(Vector3.zero, 0.5f, true, parent);
-            AddSegmentRivets(new Vector3(0f, 0.25f, 0f), 0.25f, false, parent);
         }
 
         /// <summary>
@@ -403,20 +391,9 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         private static void BuildCross(Transform parent)
         {
-            // Full cylinder along X
             CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            // Full cylinder along Y
             CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 0f, parent);
-            // Joint sphere at center
             CreateJointSphere(Vector3.zero, parent);
-            // Four fillet spheres at inner corners for smooth fillet look
-            CreateFilletSphere(new Vector3(0.12f, 0.10f, 0f), JointRadius * 0.4f, parent);
-            CreateFilletSphere(new Vector3(-0.12f, 0.10f, 0f), JointRadius * 0.4f, parent);
-            CreateFilletSphere(new Vector3(0.12f, -0.10f, 0f), JointRadius * 0.4f, parent);
-            CreateFilletSphere(new Vector3(-0.12f, -0.10f, 0f), JointRadius * 0.4f, parent);
-            // Rivets
-            AddSegmentRivets(Vector3.zero, 0.5f, true, parent);
-            AddSegmentRivets(Vector3.zero, 0.5f, false, parent);
         }
 
         /// <summary>

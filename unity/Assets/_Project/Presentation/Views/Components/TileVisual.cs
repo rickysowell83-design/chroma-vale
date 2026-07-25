@@ -68,6 +68,27 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         public Transform Root => transform;
 
+        /// <summary>
+        /// Set a custom material on the slab (per-tile PCB texture with UV offset).
+        /// </summary>
+        public void SetSlabMaterial(Material mat)
+        {
+            if (_baseRenderer != null)
+                _baseRenderer.sharedMaterial = mat;
+        }
+
+        private MaterialPropertyBlock _slabMpb; // Per-tile UV offset for PCB texture
+
+        /// <summary>
+        /// Set a MaterialPropertyBlock for the slab (used for per-tile UV offsets).
+        /// </summary>
+        public void SetSlabPropertyBlock(MaterialPropertyBlock mpb)
+        {
+            _slabMpb = mpb;
+            if (_baseRenderer != null)
+                _baseRenderer.SetPropertyBlock(mpb);
+        }
+
         // ── Shared base material ──────────────────────────────────────────
 
         /// <summary>
@@ -87,10 +108,10 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _baseMaterial = new Material(shader)
                     {
-                        color = new Color(0.02f, 0.02f, 0.03f)
+                        color = new Color(0.03f, 0.06f, 0.03f) // Dark green PCB
                     };
-                    _baseMaterial.SetFloat("_Metallic", 0.3f);
-                    _baseMaterial.SetFloat("_Smoothness", 0.8f);
+                    _baseMaterial.SetFloat("_Metallic", 0.15f);
+                    _baseMaterial.SetFloat("_Smoothness", 0.5f);
                     _baseMaterial.EnableKeyword("_EMISSION");
                     _baseMaterial.SetColor("_EmissionColor", Color.black);
                     _baseMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
@@ -148,7 +169,7 @@ namespace ChromaVale.Presentation.Views.Components
             var tile = go.AddComponent<TileVisual>();
             tile._tileSize = tileSize;
 
-            // Build the base slab: a flat cube
+            // Build the base slab with per-tile PCB texture
             var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
             slab.name = "Slab";
             Object.DestroyImmediate(slab.GetComponent<Collider>());
@@ -160,43 +181,7 @@ namespace ChromaVale.Presentation.Views.Components
             tile._baseRenderer = slab.GetComponent<MeshRenderer>();
             tile._baseRenderer.sharedMaterial = BaseMaterial;
 
-            // ── Copper contact pads / vias ──────────────────────────────
-            //
-            // Central via: a flat copper disc at the centre of the tile
-            {
-                var centerVia = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                centerVia.name = "ViaCenter";
-                Object.DestroyImmediate(centerVia.GetComponent<Collider>());
-                centerVia.transform.SetParent(go.transform, false);
-                centerVia.transform.localPosition = new Vector3(0f, 0f, -0.06f);
-                // Rotate cylinder 90° around X so the disc lies flat on the slab
-                centerVia.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                centerVia.transform.localScale = new Vector3(tileSize * 0.12f, 0.01f, tileSize * 0.12f);
-                centerVia.GetComponent<MeshRenderer>().sharedMaterial = ViaMaterial;
-            }
-
-            // Four corner via dots at the pipe connection points
-            float cornerOffset = tileSize * 0.35f;
-            float dotScale = 0.04f;
-
-            var cornerPositions = new Vector3[]
-            {
-                new Vector3(-cornerOffset, -cornerOffset, -0.06f),
-                new Vector3(-cornerOffset,  cornerOffset, -0.06f),
-                new Vector3( cornerOffset, -cornerOffset, -0.06f),
-                new Vector3( cornerOffset,  cornerOffset, -0.06f)
-            };
-
-            for (int i = 0; i < cornerPositions.Length; i++)
-            {
-                var dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                dot.name = "ViaDot_" + i;
-                Object.DestroyImmediate(dot.GetComponent<Collider>());
-                dot.transform.SetParent(go.transform, false);
-                dot.transform.localPosition = cornerPositions[i];
-                dot.transform.localScale = Vector3.one * dotScale;
-                dot.GetComponent<MeshRenderer>().sharedMaterial = ViaMaterial;
-            }
+            // ── No 3D vias — PCB texture handles pads ──
 
             // BoxCollider on the root GameObject (click handling via PhysicsRaycaster)
             tile._boxCollider = go.AddComponent<BoxCollider>();
@@ -543,12 +528,11 @@ namespace ChromaVale.Presentation.Views.Components
             _mpb.SetColor("_EmissionColor", _color * _emissionIntensity);
             _mpb.SetColor("_BaseColor", new Color(0.65f, 0.38f, 0.15f)); // Copper always
 
-            // Base slab ALWAYS stays dark PCB — never takes pipe color
+            // Base slab: dark green PCB, no emission
             if (_baseRenderer != null)
             {
                 var slabMpb = new MaterialPropertyBlock();
                 slabMpb.SetColor("_EmissionColor", Color.black);
-                slabMpb.SetColor("_BaseColor", new Color(0.02f, 0.02f, 0.03f)); // PCB dark
                 _baseRenderer.SetPropertyBlock(slabMpb);
             }
 

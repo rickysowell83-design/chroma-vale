@@ -29,6 +29,9 @@ namespace ChromaVale.Presentation.Views.Components
             _renderers = new TileVisual[board.Width, board.Height];
             var off = new Vector3(-board.Width * tileSize / 2f, -board.Height * tileSize / 2f, 0);
 
+            // Load PCB texture material once, create per-tile copies with correct UV offsets
+            var pcbMaster = Resources.Load<Material>("Materials/PCB_Board");
+
             for (int x = 0; x < board.Width; x++)
             for (int y = 0; y < board.Height; y++)
             {
@@ -38,119 +41,26 @@ namespace ChromaVale.Presentation.Views.Components
 
                 _renderers[x, y] = tv;
 
-                tv.Color = cell.Type switch
+                // Per-tile PCB material copy with correct UV offset
+                if (pcbMaster != null)
                 {
-                    CellType.Source when cell.ColorIndex == 0 => ChromaPalette.CyanHint,
-                    CellType.Source when cell.ColorIndex == 1 => ChromaPalette.MagentaHint,
-                    CellType.Source when cell.ColorIndex == 2 => ChromaPalette.YellowHint,
-                    CellType.Target when cell.ColorIndex == 0 => ChromaPalette.CyanHint,
-                    CellType.Target when cell.ColorIndex == 1 => ChromaPalette.MagentaHint,
-                    CellType.Target when cell.ColorIndex == 2 => ChromaPalette.YellowHint,
-                    CellType.Target when cell.ColorIndex == 6 => ChromaPalette.PurpleHint,
-                    CellType.Target when cell.ColorIndex == 7 => new Color(0.05f, 0.15f, 0.05f),
-                    CellType.Obstacle => ChromaPalette.ObstacleCol,
-                    CellType.FlowGate when cell.FlowDirection == PipeDirection.Up => ChromaPalette.FlowGateUp,
-                    CellType.FlowGate when cell.FlowDirection == PipeDirection.Down => ChromaPalette.FlowGateDown,
-                    CellType.FlowGate when cell.FlowDirection == PipeDirection.Right => ChromaPalette.FlowGateRight,
-                    CellType.FlowGate when cell.FlowDirection == PipeDirection.Left => ChromaPalette.FlowGateLeft,
-                    _ => ChromaPalette.DarkTile
-                };
+                    var tileMat = new Material(pcbMaster);
+                    float uScale = 1f / board.Width;
+                    float vScale = 1f / board.Height;
+                    // V is inverted: row 0 = top of texture, row H-1 = bottom
+                    float vOff = (board.Height - 1 - y) * vScale;
+                    tileMat.SetTextureScale("_BaseMap", new Vector2(uScale, vScale));
+                    tileMat.SetTextureOffset("_BaseMap", new Vector2(x * uScale, vOff));
+                    tv.SetSlabMaterial(tileMat);
+                }
 
-                // Indicators
-                if (cell.Type == CellType.Source)
-                    tv.SetIndicator(TileIndicator.SourceDot, GetPipeColor(cell.ColorIndex));
-                if (cell.Type == CellType.Target)
-                    tv.SetIndicator(TileIndicator.TargetRing, GetPipeColor(cell.ColorIndex));
+                tv.Color = ChromaPalette.DarkTile;
+
+                // ── Burnt-out microchip at obstacle cells ──
                 if (cell.Type == CellType.Obstacle)
-                {
-                    // Build a burnt-out microchip mesh instead of an indicator block
-                    var chipRoot = new GameObject("BurntMicrochip");
-                    chipRoot.transform.SetParent(tv.transform, false);
-                    chipRoot.transform.localPosition = Vector3.zero;
+                    BuildBurntMicrochip(tv.transform, tileSize);
 
-                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-                    if (shader == null) shader = Shader.Find("Standard");
-
-                    // Dark burnt-red URP/Lit material for the chip body
-                    var chipMat = new Material(shader);
-                    chipMat.color = new Color(0.08f, 0.04f, 0.04f);
-                    chipMat.SetFloat("_Metallic", 0.5f);
-                    chipMat.SetFloat("_Smoothness", 0.3f);
-
-                    // Silver material for pins
-                    var pinMat = new Material(shader);
-                    pinMat.color = new Color(0.75f, 0.75f, 0.78f);
-                    pinMat.SetFloat("_Metallic", 0.9f);
-                    pinMat.SetFloat("_Smoothness", 0.8f);
-
-                    // 1. Flattened cube (microchip body)
-                    var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    body.name = "ChipBody";
-                    DestroyImmediate(body.GetComponent<Collider>());
-                    body.transform.SetParent(chipRoot.transform, false);
-                    body.transform.localPosition = new Vector3(0f, 0f, -0.15f);
-                    body.transform.localScale = new Vector3(_tileSize * 0.45f, _tileSize * 0.45f, 0.08f);
-                    var bodyRend = body.GetComponent<MeshRenderer>();
-                    bodyRend.sharedMaterial = chipMat;
-
-                    // 2. Four silver pins at the corners pointing DOWN (Z- direction)
-                    float pinOffset = _tileSize * 0.12f;
-                    float pinRadius = _tileSize * 0.015f;
-                    float pinLength = _tileSize * 0.08f;
-                    Vector3[] pinPositions = new[]
-                    {
-                        new Vector3(-pinOffset, -pinOffset, -0.15f - pinLength * 0.5f),
-                        new Vector3( pinOffset, -pinOffset, -0.15f - pinLength * 0.5f),
-                        new Vector3(-pinOffset,  pinOffset, -0.15f - pinLength * 0.5f),
-                        new Vector3( pinOffset,  pinOffset, -0.15f - pinLength * 0.5f),
-                    };
-
-                    for (int pi = 0; pi < pinPositions.Length; pi++)
-                    {
-                        var pin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                        pin.name = "Pin_" + pi;
-                        DestroyImmediate(pin.GetComponent<Collider>());
-                        pin.transform.SetParent(chipRoot.transform, false);
-                        pin.transform.localPosition = pinPositions[pi];
-                        // Rotate cylinder (default Y-axis) to point along Z
-                        pin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                        pin.transform.localScale = new Vector3(pinRadius, pinLength * 0.5f, pinRadius);
-                        var pinRend = pin.GetComponent<MeshRenderer>();
-                        pinRend.sharedMaterial = pinMat;
-                    }
-
-                    // 3. Dark scorch mark: glowing red sphere at center
-                    var scorch = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    scorch.name = "ScorchMark";
-                    DestroyImmediate(scorch.GetComponent<Collider>());
-                    scorch.transform.SetParent(chipRoot.transform, false);
-                    scorch.transform.localPosition = new Vector3(_tileSize * 0.04f, _tileSize * 0.04f, -0.18f);
-                    scorch.transform.localScale = Vector3.one * (_tileSize * 0.12f);
-                    var scorchRend = scorch.GetComponent<MeshRenderer>();
-                    var scorchMat = new Material(shader);
-                    scorchMat.color = new Color(0.15f, 0.02f, 0.02f);
-                    scorchMat.SetFloat("_Metallic", 0.1f);
-                    scorchMat.SetFloat("_Smoothness", 0.1f);
-                    scorchMat.EnableKeyword("_EMISSION");
-                    scorchMat.SetColor("_EmissionColor", new Color(1f, 0.05f, 0.05f) * 0.8f); // Bright red glow
-                    scorchMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    scorchRend.sharedMaterial = scorchMat;
-                }
-                if (cell.Type == CellType.FlowGate)
-                {
-                    tv.SetIndicator(TileIndicator.FlowGateArrow, Color.white);
-                    float angle = cell.FlowDirection switch
-                    {
-                        PipeDirection.Up => 0f,
-                        PipeDirection.Right => 270f,
-                        PipeDirection.Down => 180f,
-                        PipeDirection.Left => 90f,
-                        _ => 0f
-                    };
-                    tv.SetIndicatorRotation(angle);
-                }
-
-                // Click handler (BoxCollider already added by TileVisual.Create)
+                // Click handler
                 tv.gameObject.AddComponent<TileClickHandler>().Init(x, y, view);
             }
 
@@ -160,7 +70,7 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void Clear()
         {
-            // Destroy all child tiles
+            // Destroy all child tiles AND the background plane
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var child = transform.GetChild(i).gameObject;
@@ -205,5 +115,58 @@ namespace ChromaVale.Presentation.Views.Components
             9 => new Color(0.4f, 0.25f, 0.1f), // Brown
             _ => ChromaPalette.NeonCyan
         };
+
+        private void BuildBurntMicrochip(Transform parent, float ts)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            // Chip body
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            body.name = "ChipBody";
+            DestroyImmediate(body.GetComponent<Collider>());
+            body.transform.SetParent(parent, false);
+            body.transform.localPosition = new Vector3(0f, 0f, -0.15f);
+            body.transform.localScale = new Vector3(ts * 0.45f, ts * 0.45f, 0.08f);
+            var chipMat = new Material(shader) { color = new Color(0.08f, 0.04f, 0.04f) };
+            chipMat.SetFloat("_Metallic", 0.5f);
+            chipMat.SetFloat("_Smoothness", 0.3f);
+            body.GetComponent<MeshRenderer>().sharedMaterial = chipMat;
+
+            // Silver pins
+            var pinMat = new Material(shader) { color = new Color(0.75f, 0.75f, 0.78f) };
+            pinMat.SetFloat("_Metallic", 0.9f);
+            pinMat.SetFloat("_Smoothness", 0.8f);
+            float po = ts * 0.12f;
+            float pr = ts * 0.015f;
+            float pl = ts * 0.08f;
+            Vector3[] pins = { new(-po,-po), new(po,-po), new(-po,po), new(po,po) };
+            foreach (var p in pins)
+            {
+                var pin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                pin.name = "Pin";
+                DestroyImmediate(pin.GetComponent<Collider>());
+                pin.transform.SetParent(parent, false);
+                pin.transform.localPosition = new Vector3(p.x, p.y, -0.15f - pl * 0.5f);
+                pin.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                pin.transform.localScale = new Vector3(pr, pl * 0.5f, pr);
+                pin.GetComponent<MeshRenderer>().sharedMaterial = pinMat;
+            }
+
+            // Glowing scorch mark
+            var scorch = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            scorch.name = "ScorchMark";
+            DestroyImmediate(scorch.GetComponent<Collider>());
+            scorch.transform.SetParent(parent, false);
+            scorch.transform.localPosition = new Vector3(ts * 0.04f, ts * 0.04f, -0.18f);
+            scorch.transform.localScale = Vector3.one * (ts * 0.12f);
+            var scorchMat = new Material(shader) { color = new Color(0.15f, 0.02f, 0.02f) };
+            scorchMat.SetFloat("_Metallic", 0.1f);
+            scorchMat.SetFloat("_Smoothness", 0.1f);
+            scorchMat.EnableKeyword("_EMISSION");
+            scorchMat.SetColor("_EmissionColor", new Color(1f, 0.05f, 0.05f) * 0.8f);
+            scorchMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            scorch.GetComponent<MeshRenderer>().sharedMaterial = scorchMat;
+        }
     }
 }
