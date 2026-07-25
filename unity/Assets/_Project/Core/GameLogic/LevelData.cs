@@ -152,28 +152,25 @@ namespace ChromaVale.Core.GameLogic
 
         /// <summary>
         /// Level 5: "First Burst"
-        /// First overflow risk. Source has pressure 2, but some pipes are capacity 1.
-        /// Must use the capacity-2 pipe for the high-flow segment or it bursts.
-        /// Teaches: Capacity management, overflow/burst mechanic.
-        /// Grid: 5×5 | Par: 5 ticks
+        /// Source pressure 3 — short path (4 cells) bursts cap-1 pipes instantly.
+        /// Player must use the Amplifier to boost adjacent cells to cap-2,
+        /// or route the long way (6 cells) to spread flow thinner.
+        /// Teaches: Amplifier piece, burst mitigation via capacity boost.
+        /// Grid: 5×5 | Par: 7 ticks
         /// </summary>
         public static LevelData Level5 => new()
         {
-            Width = 5, Height = 5, ParTicks = 5,
+            Width = 5, Height = 5, ParTicks = 7,
             DisplayName = "First Burst",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 2 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 3 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 2, Y = 1 } },
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                // FIX 2026-07-23: pressure=2 → every cell on the direct path gets
-                // AddFlow(2,...). Cap-1 pipes burst instantly. Changed all straights
-                // to cap-2 so the 3-piece direct horizontal route survives. Cap-1
-                // elbows remain as burst-bait decoys (teaching: cap-1 ANYWHERE bursts).
                 PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(2),
-                PipePiece.Elbow(1), PipePiece.Elbow(1),
+                PipePiece.Straight(1), PipePiece.Straight(1),
+                PipePiece.Amplifier(),
             }
         };
 
@@ -183,18 +180,20 @@ namespace ChromaVale.Core.GameLogic
 
         /// <summary>
         /// Level 6: "Color Crossing"
-        /// Two colors must avoid contamination. No shared cells.
-        /// Teaches: Color separation, spatial planning.
-        /// Grid: 5×5 | Par: 7 ticks
+        /// Two sources at pressure 2 must cross without contamination.
+        /// Cap-1 elbows on corners risk burst from p=2 flow.
+        /// Cross piece required at the intersection.
+        /// Teaches: Cross routing under pressure, cap-1 burst risk.
+        /// Grid: 5×5 | Par: 8 ticks
         /// </summary>
         public static LevelData Level6 => new()
         {
-            Width = 5, Height = 5, ParTicks = 7,
+            Width = 5, Height = 5, ParTicks = 8,
             DisplayName = "Color Crossing",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 2 },
             },
             Targets = new[]
             {
@@ -206,22 +205,25 @@ namespace ChromaVale.Core.GameLogic
             Inventory = new[]
             {
                 PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
+                PipePiece.Straight(1), PipePiece.Straight(1),
+                PipePiece.Elbow(1), PipePiece.Elbow(1),
+                PipePiece.Cross(2),
             }
         };
 
         /// <summary>
         /// Level 7: "Valve Control"
-        /// Introduces Valve pieces — one-way flow gates placed by the player.
-        /// Teaches: Valve placement, forcing flow direction.
-        /// Grid: 5×5 | Par: 7 ticks
+        /// Source pressure 3 through a narrow channel. Environmental FlowGates
+        /// force specific routing. The Valve MUST be placed at the bottleneck
+        /// to prevent backflow; Amplifier boosts bottleneck cell capacity.
+        /// Teaches: Valve + Amplifier combo for high-pressure bottlenecks.
+        /// Grid: 5×5 | Par: 8 ticks
         /// </summary>
         public static LevelData Level7 => new()
         {
-            Width = 5, Height = 5, ParTicks = 7,
+            Width = 5, Height = 5, ParTicks = 8,
             DisplayName = "Valve Control",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 3 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[]
             {
@@ -229,28 +231,35 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 1, Y = 3 }, new LevelObstacle { X = 1, Y = 4 },
                 new LevelObstacle { X = 3, Y = 0 }, new LevelObstacle { X = 3, Y = 4 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            FlowGates = new[]
+            {
+                new LevelFlowGate { X = 2, Y = 1, Direction = PipeDirection.Right },
+                new LevelFlowGate { X = 2, Y = 3, Direction = PipeDirection.Right },
+            },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                // Valves force one-way flow — good for preventing backflow
+                PipePiece.Straight(2), PipePiece.Straight(2),
+                PipePiece.Straight(1),
+                PipePiece.Elbow(1), PipePiece.Elbow(1),
                 PipePiece.Valve(2, PipeDirection.Right),
+                PipePiece.Amplifier(),
             }
         };
 
         /// <summary>
         /// Level 8: "One-Way Maze"
-        /// Environmental flow gates (pre-placed) force specific routing.
-        /// Must enter gates from the correct side.
-        /// Teaches: Environmental flow gates, BFS direction enforcement.
-        /// Grid: 5×5 | Par: 8 ticks
+        /// Source pressure 2 forces cap-1 sections to risk burst.
+        /// Environmental flow gates at (2,1,Right) and (2,3,Up) force
+        /// a specific winding route. Cap-1 pipes on the short path
+        /// will struggle at p=2 unless routed around.
+        /// Teaches: Pressure + gate routing puzzle.
+        /// Grid: 5×5 | Par: 9 ticks
         /// </summary>
         public static LevelData Level8 => new()
         {
-            Width = 5, Height = 5, ParTicks = 8,
+            Width = 5, Height = 5, ParTicks = 9,
             DisplayName = "One-Way Maze",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 2 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
             FlowGates = new[]
@@ -260,26 +269,28 @@ namespace ChromaVale.Core.GameLogic
             },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
+                PipePiece.Straight(2), PipePiece.Straight(2),
+                PipePiece.Straight(1), PipePiece.Straight(1),
+                PipePiece.Elbow(1), PipePiece.Elbow(1),
             }
         };
 
         /// <summary>
         /// Level 9: "Double Pressure"
-        /// Two sources with different flow pressures share a bottleneck.
-        /// The shared pipe must handle combined pressure or burst.
-        /// Teaches: Capacity planning with multiple sources.
-        /// Grid: 5×5 | Par: 6 ticks
+        /// Two sources each at pressure 2 merge through a TJunction.
+        /// Combined flow = 4 per tick — all cap-1 pipes burst instantly.
+        /// Player MUST use Amplifiers on the merge path to handle p=4.
+        /// Teaches: Amplifier stacking for combined high-pressure flow.
+        /// Grid: 5×5 | Par: 7 ticks
         /// </summary>
         public static LevelData Level9 => new()
         {
-            Width = 5, Height = 5, ParTicks = 6,
+            Width = 5, Height = 5, ParTicks = 7,
             DisplayName = "Double Pressure",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 0, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 0, FlowPressure = 2 },
             },
             Targets = new[]
             {
@@ -289,18 +300,20 @@ namespace ChromaVale.Core.GameLogic
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), // This one will burst if both flows go through it
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.TJunction(2), // Merge point
+                PipePiece.Straight(2),
+                PipePiece.Straight(1), PipePiece.Straight(1),
+                PipePiece.Elbow(2), PipePiece.Elbow(2),
+                PipePiece.TJunction(2),
+                PipePiece.Amplifier(), PipePiece.Amplifier(),
             }
         };
 
         /// <summary>
         /// Level 10: "Crossfire"
-        /// Two colors with crossing routes. Must use Cross piece strategically.
-        /// First level with a genuine "plan ahead or fail" decision.
-        /// Teaches: Cross routing, color isolation within shared junctions.
+        /// Two colors at pressure 2 cross through the Cross piece.
+        /// Combined flow in the shared cell can overwhelm cap-1 approaches.
+        /// Amplifiers help boost bottleneck cells to survive p=2 on each route.
+        /// Teaches: Cross routing + Amplifier placement under dual pressure.
         /// Grid: 6×6 | Par: 10 ticks
         /// </summary>
         public static LevelData Level10 => new()
@@ -309,8 +322,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Crossfire",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 1, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 1, FlowPressure = 2 },
             },
             Targets = new[]
             {
@@ -325,10 +338,11 @@ namespace ChromaVale.Core.GameLogic
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
+                PipePiece.Straight(2), PipePiece.Straight(2),
+                PipePiece.Straight(1), PipePiece.Straight(1),
+                PipePiece.Elbow(1), PipePiece.Elbow(1),
                 PipePiece.Cross(2),
+                PipePiece.Amplifier(), PipePiece.Amplifier(),
             }
         };
 

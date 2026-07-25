@@ -5,19 +5,23 @@ namespace ChromaVale.Presentation.Views.Components
 {
     public class ParticleFxService : MonoBehaviour
     {
-        private ParticleSystem _placementPuff;
-        private ParticleSystem _burstExplosion;
-        private ParticleSystem _mixSwirl;
-        private ParticleSystem _targetBloom;
-        private ParticleSystem _winCascade;
+        private ParticleSystem _snapImpact;
+        private ParticleSystem _pipeBurst;
+        private ParticleSystem _pipeBurstRing;
+        private ParticleSystem _colorFusionVortex;
+        private ParticleSystem _cascadingBloom;
+        private ParticleSystem _cascadingBloomBurst;
+        private ParticleSystem _victoryFireworks;
+        private ParticleSystem _flowHead;
 
         private void Awake()
         {
-            BuildPlacementPuff();
-            BuildBurstExplosion();
-            BuildMixSwirl();
-            BuildTargetBloom();
-            BuildWinCascade();
+            BuildSnapImpact();
+            BuildPipeBurst();
+            BuildColorFusionVortex();
+            BuildCascadingBloom();
+            BuildVictoryFireworks();
+            BuildFlowHead();
         }
 
         private static Material GetParticleMaterial()
@@ -46,47 +50,74 @@ namespace ChromaVale.Presentation.Views.Components
             return ps;
         }
 
-        private void BuildPlacementPuff()
+        private void BuildSnapImpact()
         {
-            _placementPuff = BuildPooledSystem("PlacementPuff", 64);
-            var main = _placementPuff.main;
-            main.startLifetime = 0.25f;
-            main.startSpeed = 0.3f;
-            main.startSize = 0.08f;
+            _snapImpact = BuildPooledSystem("SnapImpact", 64);
+            var main = _snapImpact.main;
+            main.startLifetime = 0.2f;
+            main.startSpeed = 0.8f;
+            main.startSize = 0.12f;
             main.startColor = Color.white;
             main.loop = false;
             main.playOnAwake = false;
 
-            var emission = _placementPuff.emission;
+            var emission = _snapImpact.emission;
             emission.SetBursts(new ParticleSystem.Burst[]
             {
-                new ParticleSystem.Burst(0f, 8)
+                new ParticleSystem.Burst(0f, 12)
             });
 
-            var shape = _placementPuff.shape;
-            shape.enabled = false;
+            var shape = _snapImpact.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 30f;
+            shape.radius = 0.1f;
+
+            var colorOverLifetime = _snapImpact.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(Color.cyan, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
+
+            var sizeOverLifetime = _snapImpact.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            var curve = new AnimationCurve();
+            curve.AddKey(0f, 1f);
+            curve.AddKey(1f, 0f);
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
         }
 
         public void PlacementPuff(Vector3 position, Color color)
         {
-            var main = _placementPuff.main;
+            var main = _snapImpact.main;
             main.startColor = color;
-            _placementPuff.transform.position = position;
-            _placementPuff.Play();
+            _snapImpact.transform.position = position;
+            _snapImpact.Play();
         }
 
-        private void BuildBurstExplosion()
+        private void BuildPipeBurst()
         {
-            _burstExplosion = BuildPooledSystem("BurstExplosion", 64);
-            var main = _burstExplosion.main;
-            main.startLifetime = 0.6f;
-            main.startSpeed = 2.5f;
-            main.startSize = 0.15f;
+            _pipeBurst = BuildPooledSystem("PipeBurst", 64);
+            var main = _pipeBurst.main;
+            main.startLifetime = 0.8f;
+            main.startSpeed = 4.0f;
+            main.startSize = 0.22f;
             main.gravityModifier = 0.5f;
             main.loop = false;
             main.playOnAwake = false;
 
-            var colorOverLifetime = _burstExplosion.colorOverLifetime;
+            var colorOverLifetime = _pipeBurst.colorOverLifetime;
             colorOverLifetime.enabled = true;
             var gradient = new Gradient();
             gradient.SetKeys(
@@ -103,134 +134,303 @@ namespace ChromaVale.Presentation.Views.Components
             );
             colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
 
-            var emission = _burstExplosion.emission;
+            var emission = _pipeBurst.emission;
             emission.SetBursts(new ParticleSystem.Burst[]
             {
-                new ParticleSystem.Burst(0f, 30)
+                new ParticleSystem.Burst(0f, 50)
             });
 
-            var shape = _burstExplosion.shape;
+            var shape = _pipeBurst.shape;
             shape.enabled = false;
-        }
 
-        public void BurstExplosion(Vector3 position)
-        {
-            _burstExplosion.transform.position = position;
-            _burstExplosion.Play();
-        }
+            // Sub-emitter ring
+            _pipeBurstRing = BuildPooledSystem("PipeBurstRing", 32);
+            var ringMain = _pipeBurstRing.main;
+            ringMain.startLifetime = 0.4f;
+            ringMain.startSpeed = 2.0f;
+            ringMain.startSize = 0.15f;
+            ringMain.startColor = new Color(1f, 0.3f, 0f);
+            ringMain.loop = false;
+            ringMain.playOnAwake = false;
+            ringMain.startDelay = 0.15f;
 
-        private void BuildMixSwirl()
-        {
-            _mixSwirl = BuildPooledSystem("MixSwirl", 64);
-            var main = _mixSwirl.main;
-            main.startLifetime = 0.5f;
-            main.startSpeed = 2f;
-            main.startSize = 0.1f;
-            main.loop = false;
-            main.playOnAwake = false;
-
-            var emission = _mixSwirl.emission;
-            emission.SetBursts(new ParticleSystem.Burst[]
+            var ringEmission = _pipeBurstRing.emission;
+            ringEmission.SetBursts(new ParticleSystem.Burst[]
             {
                 new ParticleSystem.Burst(0f, 12)
             });
 
-            var shape = _mixSwirl.shape;
-            shape.enabled = false;
+            var ringShape = _pipeBurstRing.shape;
+            ringShape.enabled = true;
+            ringShape.shapeType = ParticleSystemShapeType.Sphere;
+            ringShape.radius = 0.3f;
+
+            var ringSizeOLT = _pipeBurstRing.sizeOverLifetime;
+            ringSizeOLT.enabled = true;
+            var ringCurve = new AnimationCurve();
+            ringCurve.AddKey(0f, 0.5f);
+            ringCurve.AddKey(1f, 1.5f);
+            ringSizeOLT.size = new ParticleSystem.MinMaxCurve(1f, ringCurve);
+
+            // Link sub-emitter
+            var subEmitters = _pipeBurst.subEmitters;
+            subEmitters.enabled = true;
+            subEmitters.AddSubEmitter(_pipeBurstRing, ParticleSystemSubEmitterType.Birth, ParticleSystemSubEmitterProperties.InheritEverything);
+
+            // Noise module
+            var noise = _pipeBurst.noise;
+            noise.enabled = true;
+            noise.strength = new ParticleSystem.MinMaxCurve(0.5f);
+            noise.frequency = 0.3f;
+            noise.scrollSpeed = 0.1f;
+
+            // Trails module
+            var trails = _pipeBurst.trails;
+            trails.enabled = true;
+            trails.ratio = 0.3f;
+            trails.lifetime = new ParticleSystem.MinMaxCurve(0.15f);
+            trails.minVertexDistance = 0.05f;
+        }
+
+        public void BurstExplosion(Vector3 position)
+        {
+            _pipeBurst.transform.position = position;
+            _pipeBurst.Play();
+        }
+
+        private void BuildColorFusionVortex()
+        {
+            _colorFusionVortex = BuildPooledSystem("ColorFusionVortex", 64);
+            var main = _colorFusionVortex.main;
+            main.startLifetime = 0.7f;
+            main.startSpeed = 1.5f;
+            main.startSize = 0.14f;
+            main.loop = false;
+            main.playOnAwake = false;
+
+            var emission = _colorFusionVortex.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 20)
+            });
+
+            var shape = _colorFusionVortex.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 25f;
+            shape.radius = 0.15f;
+
+            var rotationOverLifetime = _colorFusionVortex.rotationOverLifetime;
+            rotationOverLifetime.enabled = true;
+            rotationOverLifetime.z = new ParticleSystem.MinMaxCurve(45f, -45f);
+
+            var sizeOverLifetime = _colorFusionVortex.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            var curve = new AnimationCurve();
+            curve.AddKey(0f, 0.5f);
+            curve.AddKey(0.5f, 1.0f);
+            curve.AddKey(1f, 0f);
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
         }
 
         public void MixSwirl(Vector3 position, Color colorA, Color colorB)
         {
-            var main = _mixSwirl.main;
+            var main = _colorFusionVortex.main;
             main.startColor = new ParticleSystem.MinMaxGradient(colorA, colorB);
-            _mixSwirl.transform.position = position;
-            _mixSwirl.Play();
+            _colorFusionVortex.transform.position = position;
+            _colorFusionVortex.Play();
         }
 
-        private void BuildTargetBloom()
+        private void BuildCascadingBloom()
         {
-            _targetBloom = BuildPooledSystem("TargetBloom", 64);
-            var main = _targetBloom.main;
-            main.startLifetime = 0.8f;
-            main.startSpeed = 0f;
+            _cascadingBloom = BuildPooledSystem("CascadingBloom", 64);
+            var main = _cascadingBloom.main;
+            main.startLifetime = 1.0f;
+            main.startSpeed = 0.3f;
             main.startSize = 0.15f;
             main.loop = false;
             main.playOnAwake = false;
 
-            var shape = _targetBloom.shape;
+            var emission = _cascadingBloom.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 35)
+            });
+
+            var shape = _cascadingBloom.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Circle;
-            shape.radius = 0.3f;
+            shape.radius = 0.5f;
             shape.arc = 360f;
 
-            var sizeOverLifetime = _targetBloom.sizeOverLifetime;
+            var sizeOverLifetime = _cascadingBloom.sizeOverLifetime;
             sizeOverLifetime.enabled = true;
             var curve = new AnimationCurve();
             curve.AddKey(0f, 1f);
             curve.AddKey(1f, 0f);
             sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
 
-            var emission = _targetBloom.emission;
-            emission.SetBursts(new ParticleSystem.Burst[]
+            var colorOverLifetime = _cascadingBloom.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(Color.white, 0.5f),
+                    new GradientColorKey(Color.clear, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(1f, 0.4f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
+
+            // Sub-emitter burst
+            _cascadingBloomBurst = BuildPooledSystem("CascadingBloomBurst", 32);
+            var burstMain = _cascadingBloomBurst.main;
+            burstMain.startLifetime = 0.5f;
+            burstMain.startSpeed = 1.5f;
+            burstMain.startSize = 0.1f;
+            burstMain.startColor = Color.white;
+            burstMain.loop = false;
+            burstMain.playOnAwake = false;
+            burstMain.startDelay = 0.4f;
+
+            var burstEmission = _cascadingBloomBurst.emission;
+            burstEmission.SetBursts(new ParticleSystem.Burst[]
             {
-                new ParticleSystem.Burst(0f, 20)
+                new ParticleSystem.Burst(0f, 8)
             });
+
+            var burstShape = _cascadingBloomBurst.shape;
+            burstShape.enabled = true;
+            burstShape.shapeType = ParticleSystemShapeType.Circle;
+            burstShape.radius = 0.2f;
+            burstShape.arc = 360f;
+
+            var burstSizeOLT = _cascadingBloomBurst.sizeOverLifetime;
+            burstSizeOLT.enabled = true;
+            var burstCurve = new AnimationCurve();
+            burstCurve.AddKey(0f, 1f);
+            burstCurve.AddKey(1f, 2f);
+            burstSizeOLT.size = new ParticleSystem.MinMaxCurve(1f, burstCurve);
+
+            // Link sub-emitter
+            var subEmitters = _cascadingBloom.subEmitters;
+            subEmitters.enabled = true;
+            subEmitters.AddSubEmitter(_cascadingBloomBurst, ParticleSystemSubEmitterType.Birth, ParticleSystemSubEmitterProperties.InheritEverything);
         }
 
         public void TargetBloom(Vector3 position, Color color)
         {
-            var main = _targetBloom.main;
+            var main = _cascadingBloom.main;
             main.startColor = color;
-            _targetBloom.transform.position = position;
-            _targetBloom.Play();
+            _cascadingBloom.transform.position = position;
+            _cascadingBloom.Play();
         }
 
-        private void BuildWinCascade()
+        private void BuildVictoryFireworks()
         {
-            _winCascade = BuildPooledSystem("WinCascade", 64);
-            var main = _winCascade.main;
-            main.startLifetime = 0.8f;
-            main.startSpeed = 0f;
-            main.startSize = 0.15f;
+            _victoryFireworks = BuildPooledSystem("VictoryFireworks", 64);
+            var main = _victoryFireworks.main;
+            main.startLifetime = 1.2f;
+            main.startSpeed = 0.5f;
+            main.startSize = 0.2f;
             main.loop = false;
             main.playOnAwake = false;
 
-            var shape = _winCascade.shape;
+            var emission = _victoryFireworks.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 40)
+            });
+
+            var shape = _victoryFireworks.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Circle;
             shape.radius = 0.3f;
             shape.arc = 360f;
 
-            var sizeOverLifetime = _winCascade.sizeOverLifetime;
+            var sizeOverLifetime = _victoryFireworks.sizeOverLifetime;
             sizeOverLifetime.enabled = true;
             var curve = new AnimationCurve();
             curve.AddKey(0f, 1f);
             curve.AddKey(1f, 0f);
             sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
 
-            var emission = _winCascade.emission;
-            emission.SetBursts(new ParticleSystem.Burst[]
-            {
-                new ParticleSystem.Burst(0f, 20)
-            });
+            var colorOverLifetime = _victoryFireworks.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(Color.cyan, 0f),
+                    new GradientColorKey(Color.magenta, 0.5f),
+                    new GradientColorKey(Color.white, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(1f, 0.5f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
+
+            var noise = _victoryFireworks.noise;
+            noise.enabled = true;
+            noise.strength = new ParticleSystem.MinMaxCurve(0.2f);
         }
 
         public void WinCascade(Vector3[] positions)
         {
-            StartCoroutine(WinCascadeRoutine(positions));
+            StartCoroutine(VictoryFireworksRoutine(positions));
         }
 
-        private IEnumerator WinCascadeRoutine(Vector3[] positions)
+        private IEnumerator VictoryFireworksRoutine(Vector3[] positions)
         {
             for (int i = 0; i < positions.Length; i++)
             {
-                _winCascade.transform.position = positions[i];
+                _victoryFireworks.transform.position = positions[i];
                 float t = positions.Length > 1 ? (float)i / (positions.Length - 1) : 0f;
-                var main = _winCascade.main;
+                var main = _victoryFireworks.main;
                 main.startColor = Color.Lerp(Color.white, Color.cyan, t);
-                _winCascade.Play();
+                _victoryFireworks.Play();
                 yield return new WaitForSeconds(0.04f);
             }
+        }
+
+        private void BuildFlowHead()
+        {
+            _flowHead = BuildPooledSystem("FlowHead", 32);
+            var main = _flowHead.main;
+            main.startLifetime = 0.15f;
+            main.startSpeed = 0f;
+            main.startSize = 0.18f;
+            main.startColor = new Color(0.5f, 0.8f, 1f);
+            main.loop = false;
+            main.playOnAwake = false;
+
+            var emission = _flowHead.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 3)
+            });
+
+            var shape = _flowHead.shape;
+            shape.enabled = false;
+        }
+
+        public void FlowHeadPulse(Vector3 position, Color color)
+        {
+            var main = _flowHead.main;
+            main.startColor = color;
+            _flowHead.transform.position = position;
+            _flowHead.Play();
         }
     }
 }

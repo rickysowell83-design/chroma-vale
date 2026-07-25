@@ -32,7 +32,7 @@ namespace ChromaVale.Presentation.Views.Components
         private GameObject _indicatorRoot;
         private float _tileSize = 1f;
         private Color _color;
-        private float _emissionIntensity = 2.5f;
+        private float _emissionIntensity = 5.0f;
 
         /// <summary>
         /// Logical tile color.  Setting this drives both the HDR emission
@@ -85,7 +85,7 @@ namespace ChromaVale.Presentation.Views.Components
                         color = new Color(0.05f, 0.06f, 0.09f)
                     };
                     _baseMaterial.SetFloat("_Metallic", 0.8f);
-                    _baseMaterial.SetFloat("_Smoothness", 0.7f);
+                    _baseMaterial.SetFloat("_Smoothness", 0.75f);
                     _baseMaterial.EnableKeyword("_EMISSION");
                     _baseMaterial.SetColor("_EmissionColor", Color.black);
                     _baseMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
@@ -206,7 +206,7 @@ namespace ChromaVale.Presentation.Views.Components
                     var rend = dot.GetComponent<MeshRenderer>();
                     rend.sharedMaterial = indicatorMat;
                     var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 3f);
+                    mpb.SetColor("_EmissionColor", color * 6f);
                     mpb.SetColor("_BaseColor", color * 0.5f);
                     rend.SetPropertyBlock(mpb);
                     break;
@@ -225,7 +225,7 @@ namespace ChromaVale.Presentation.Views.Components
                     var rend = ring.GetComponent<MeshRenderer>();
                     rend.sharedMaterial = indicatorMat;
                     var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 1.5f);
+                    mpb.SetColor("_EmissionColor", color * 4f);
                     mpb.SetColor("_BaseColor", color * 0.3f);
                     rend.SetPropertyBlock(mpb);
                     break;

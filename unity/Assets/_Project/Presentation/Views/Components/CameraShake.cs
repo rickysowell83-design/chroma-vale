@@ -16,6 +16,10 @@ namespace ChromaVale.Presentation.Views.Components
             _seed = Random.Range(0f, 1000f);
         }
 
+        /// <summary>
+        /// Trigger a Perlin-noise camera shake.
+        /// Recommended: 0.05s/0.04mag for placement snap, 0.2s/0.25mag for pipe burst.
+        /// </summary>
         public void Shake(float duration = 0.2f, float magnitude = 0.15f)
         {
             // Re-entrant: restart the timer without stacking offsets

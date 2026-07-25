@@ -42,12 +42,14 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _pipeMaterial = new Material(shader)
                     {
-                        color = new Color(0.12f, 0.13f, 0.17f)
+                        color = new Color(0.10f, 0.11f, 0.15f)
                     };
-                    _pipeMaterial.SetFloat("_Metallic", 0.9f);
-                    _pipeMaterial.SetFloat("_Smoothness", 0.8f);
+                    _pipeMaterial.SetFloat("_Metallic", 1.0f);
+                    _pipeMaterial.SetFloat("_Smoothness", 0.85f);
                     _pipeMaterial.EnableKeyword("_EMISSION");
                     _pipeMaterial.SetColor("_EmissionColor", Color.black);
+                    _pipeMaterial.SetFloat("_CoatMask", 0.15f);
+                    _pipeMaterial.EnableKeyword("_CLEARCOAT");
                     _pipeMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
                 return _pipeMaterial;

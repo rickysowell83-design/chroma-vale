@@ -106,7 +106,7 @@ namespace ChromaVale.Presentation.Views.Components
                 float halfSpan = Mathf.Max(_board.Width, _board.Height) * _tileSize / 2f + 1.5f;
                 float dist = halfSpan / Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
                 dist *= 1.06f;
-                float tiltDeg = 14f;
+                float tiltDeg = 20f;
                 float tiltRad = tiltDeg * Mathf.Deg2Rad;
                 Vector3 lookTarget = new Vector3(0f, -0.8f, 0f);
                 Vector3 camPos = lookTarget + new Vector3(0f, Mathf.Sin(tiltRad) * dist, -Mathf.Cos(tiltRad) * dist);

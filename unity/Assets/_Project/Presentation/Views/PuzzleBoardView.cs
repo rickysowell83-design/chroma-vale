@@ -261,7 +261,7 @@ namespace ChromaVale.Presentation.Views
                 _musicDirector.PlayBeep(660f, 0.08f);
                 if (_particleFx != null)
                     _particleFx.PlacementPuff(_renderers[x, y].transform.position, GetPipeColor(0));
-                if (_cameraShake != null) _cameraShake.Shake(0.05f, 0.03f);
+                if (_cameraShake != null) _cameraShake.Shake(0.06f, 0.05f);
 
                 if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
                 {
@@ -335,6 +335,13 @@ namespace ChromaVale.Presentation.Views
 
             _flowSim.StartSimulation(_board, _level, _inventory);
 
+            // Pulse flow-head at each source to signal simulation start
+            if (_particleFx != null)
+            {
+                foreach (var src in _level.Sources)
+                    _particleFx.FlowHeadPulse(_renderers[src.X, src.Y].transform.position, GetPipeColor(src.ColorIndex));
+            }
+
             while (_flowSim.GetResult() == SimulationResult.InProgress)
             {
                 yield return new WaitForSeconds(_flowTickInterval);
@@ -387,6 +394,9 @@ namespace ChromaVale.Presentation.Views
                 _audioService.PlaySound("flow_tick");
                 _lastFlowTickSoundTime = Time.realtimeSinceStartup;
             }
+            // NEW: Flow-head particle pulse at the wave-front cell
+            if (_particleFx != null)
+                _particleFx.FlowHeadPulse(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
         }
 
         private void HandlePipeBurst(int x, int y)
@@ -400,7 +410,7 @@ namespace ChromaVale.Presentation.Views
             }
             _inventory.MarkBurst(x, y);
             if (_audioService != null) _audioService.PlaySound("pipe_burst");
-            if (_cameraShake != null) _cameraShake.Shake(0.2f, 0.15f);
+            if (_cameraShake != null) _cameraShake.Shake(0.25f, 0.30f);
         }
 
         private void HandleColorMix(int x, int y, int colorA, int colorB)

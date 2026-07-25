@@ -14,7 +14,7 @@ namespace ChromaVale.Presentation.Views.Components
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _subtitleText;
         private TextMeshProUGUI _scoreText;
-        private Text _starText; // Legacy Text (Arial has star character)
+        private TextMeshProUGUI _starText;
         private GameObject _nextLevelButton;
 
         public event Action OnNextLevel;
@@ -38,7 +38,7 @@ namespace ChromaVale.Presentation.Views.Components
             var bg = new GameObject("WinBG");
             bg.transform.SetParent(transform, false);
             _bgImage = bg.AddComponent<Image>();
-            _bgImage.color = new Color(0, 0, 0, 0f);
+            _bgImage.color = new Color(0.02f, 0.02f, 0.06f, 0f);
             _bgImage.raycastTarget = false;
             var br = bg.GetComponent<RectTransform>();
             br.anchorMin = Vector2.zero;
@@ -71,14 +71,14 @@ namespace ChromaVale.Presentation.Views.Components
             wr2.anchorMax = new Vector2(0.5f, 0.6f);
             wr2.sizeDelta = new Vector2(400, 35);
 
-            // Stars — use legacy Text with Arial font (has star character)
+            // Stars — ASCII bracket display with TMP (LiberationSans SDF)
             var t3 = new GameObject("WinStars");
             t3.transform.SetParent(bg.transform, false);
-            _starText = t3.AddComponent<Text>();
-            _starText.text = "☆☆☆";
-            _starText.font = Font.CreateDynamicFontFromOSFont("Arial", 30);
-            _starText.fontSize = 30;
-            _starText.alignment = TextAnchor.MiddleCenter;
+            _starText = t3.AddComponent<TextMeshProUGUI>();
+            _starText.text = "[   ]";
+            _starText.fontSize = 36;
+            _starText.fontStyle = FontStyles.Bold;
+            _starText.alignment = TextAlignmentOptions.Center;
             _starText.color = ChromaPalette.NeonYellow;
             var wr3 = _starText.GetComponent<RectTransform>();
             wr3.anchorMin = new Vector2(0.5f, 0.5f);
@@ -119,6 +119,7 @@ namespace ChromaVale.Presentation.Views.Components
             var img = go.AddComponent<Image>();
             img.color = color;
             var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None;
             btn.onClick.AddListener(onClick);
             var r = go.GetComponent<RectTransform>();
             r.anchorMin = anchor;
@@ -144,21 +145,20 @@ namespace ChromaVale.Presentation.Views.Components
         public void Show(int starsEarned, int moveCount, bool isLastLevel)
         {
             _titleText.text = "PIPELINE ONLINE";
-            _subtitleText.text = "Flow delivered successfully.";
+            _subtitleText.text = starsEarned >= 3
+                ? "All targets reached. Maximum efficiency."
+                : "Flow delivered successfully.";
+            _subtitleText.color = starsEarned >= 3
+                ? ChromaPalette.NeonCyan
+                : new Color(0.5f, 0.5f, 0.6f);
             _scoreText.text = "Completed in " + moveCount + " moves";
 
-            // Stars
+            // Stars — ASCII brackets
             _starText.text = starsEarned switch
             {
-                3 => "★★★",
-                2 => "★★☆",
-                _ => "★☆☆"
-            };
-            _starText.color = starsEarned switch
-            {
-                3 => ChromaPalette.NeonYellow,
-                2 => new Color(0.9f, 0.9f, 0.2f),
-                _ => new Color(0.5f, 0.5f, 0.5f)
+                3 => "[***]",
+                2 => "[**-]",
+                _ => "[*--]"
             };
 
             // Disable next level button if on last level
