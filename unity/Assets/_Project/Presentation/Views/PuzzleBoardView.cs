@@ -30,6 +30,11 @@ namespace ChromaVale.Presentation.Views
         private LevelRepository _levelRepo = new();
         private int _maxLevel;
 
+        // Tutorial step system
+        private int _tutorialStep;
+        private Coroutine _typewriterCoroutine;
+        private bool _hasPlacedFirstPiece;
+
         // Component references
         private GridBuilder _gridBuilder;
         private HudPanel _hudPanel;
@@ -84,13 +89,8 @@ namespace ChromaVale.Presentation.Views
 
             StartCoroutine(PulseSources());
 
-            if (_levelNumber == 1)
-            {
-                int srcColor = _level.Sources.Length > 0 ? _level.Sources[0].ColorIndex : 0;
-                string colorName = srcColor == 0 ? "CYAN" : srcColor == 1 ? "MAGENTA" : "YELLOW";
-                _hudPanel.ShowHint("Connect the glowing " + colorName + " source to the " + colorName + " target!\n" +
-                                   "TAP a pipe below \u2192 TAP a dark cell \u2192 watch the flow!");
-            }
+            // Show initial tutorial hint for Level 1
+            ShowTutorialStep(0);
         }
 
         private T CreateChildComponent<T>(string name) where T : MonoBehaviour
@@ -130,6 +130,65 @@ namespace ChromaVale.Presentation.Views
                 es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TUTORIAL STEP SYSTEM
+        // ═══════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Show a contextual tutorial hint for the current step.
+        /// Each step displays a typewriter-style message appropriate to the player's progress.
+        /// </summary>
+        private void ShowTutorialStep(int step)
+        {
+            if (_levelNumber != 1) return;
+
+            _tutorialStep = step;
+
+            string hintText = step switch
+            {
+                0 => _level.DisplayName + " v1.0\u2014Route the flow past the firewalls.\n" +
+                     "TAP a pipe below \u2192 TAP a dark cell to place it.",
+                1 => "Good. Now complete the circuit to the target.",
+                _ => ""
+            };
+
+            if (!string.IsNullOrEmpty(hintText))
+            {
+                StartTypewriterHint(hintText);
+            }
+        }
+
+        /// <summary>
+        /// Display hint text with a typewriter character-reveal effect over ~1 second.
+        /// </summary>
+        private void StartTypewriterHint(string text)
+        {
+            if (_typewriterCoroutine != null)
+                StopCoroutine(_typewriterCoroutine);
+            _typewriterCoroutine = StartCoroutine(TypewriterEffect(text));
+        }
+
+        private IEnumerator TypewriterEffect(string fullText)
+        {
+            float totalDuration = 1.0f;
+            int totalChars = fullText.Length;
+            float delayPerChar = totalDuration / totalChars;
+            string currentText = "";
+
+            for (int i = 0; i <= totalChars; i++)
+            {
+                currentText = fullText.Substring(0, i);
+                _hudPanel.ShowHint(currentText + (i < totalChars ? "<color=#80808080>\u258C</color>" : ""));
+                yield return new WaitForSeconds(delayPerChar);
+            }
+
+            // Full text without cursor blink
+            _hudPanel.ShowHint(fullText);
+            _typewriterCoroutine = null;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
 
         private void DrawConnectionHint()
         {
@@ -256,7 +315,18 @@ namespace ChromaVale.Presentation.Views
                 StartCoroutine(PopAnim(_renderers[x, y].transform));
                 _inventoryPanelComponent.Refresh();
                 _inventoryPanelComponent.ClearSelection();
-                _hudPanel.HideHint();
+
+                // Tutorial step advancement
+                if (!_hasPlacedFirstPiece && _levelNumber == 1)
+                {
+                    _hasPlacedFirstPiece = true;
+                    ShowTutorialStep(1);
+                }
+                else
+                {
+                    _hudPanel.HideHint();
+                }
+
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
                 _musicDirector.PlayBeep(660f, 0.08f);
                 if (_particleFx != null)
@@ -308,6 +378,13 @@ namespace ChromaVale.Presentation.Views
                 _inventoryPanelComponent.Refresh();
                 _undoStack.Pop();
                 if (_audioService != null) _audioService.PlaySound("undo");
+
+                // Reset tutorial step if player undid first piece
+                if (_undoStack.Count == 0 && _levelNumber == 1)
+                {
+                    _hasPlacedFirstPiece = false;
+                    _tutorialStep = 0;
+                }
             }
         }
 
@@ -457,6 +534,11 @@ namespace ChromaVale.Presentation.Views
             StopAllCoroutines();
             _gridBuilder.Clear();
 
+            // Reset tutorial state
+            _tutorialStep = 0;
+            _hasPlacedFirstPiece = false;
+            _typewriterCoroutine = null;
+
             _solved = false;
             _moveCount = 0;
             _starsEarned = 0;
@@ -479,11 +561,15 @@ namespace ChromaVale.Presentation.Views
             _flowButtonComponent.SetInteractable(true);
             _inventoryPanelComponent.SetLocked(false);
 
+            // Show contextual tutorial for level 1 using the level's DisplayName
             if (_levelNumber == 1)
-                _hudPanel.ShowHint("Connect the glowing CYAN source to the CYAN target!\n" +
-                                   "TAP a pipe below \u2192 TAP a dark cell \u2192 watch the flow!");
+            {
+                ShowTutorialStep(0);
+            }
             else
+            {
                 _hudPanel.HideHint();
+            }
 
             DrawConnectionHint();
             StartCoroutine(PulseSources());
@@ -498,6 +584,9 @@ namespace ChromaVale.Presentation.Views
             0 => NeonCyan,
             1 => NeonMagenta,
             2 => NeonYellow,
+            3 => NeonOrange,
+            4 => NeonPurple,
+            5 => NeonRed,
             6 => NeonPurple,
             7 => NeonGreen,
             8 => NeonOrange,

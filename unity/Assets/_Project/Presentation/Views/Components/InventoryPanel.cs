@@ -15,11 +15,15 @@ namespace ChromaVale.Presentation.Views.Components
         private List<GameObject> _inventorySlots = new();
         private int _selectedPieceIndex = -1;
         private CanvasGroup _canvasGroup;
+        private TextMeshProUGUI _headerLabel;
 
         private static readonly Color BodyDefault = new(0.06f, 0.08f, 0.12f, 0.92f);
         private static readonly Color BodySelected = new(0.12f, 0.10f, 0.20f, 0.95f);
         private static readonly Color DepletedBorder = new(0.25f, 0.28f, 0.32f);
         private static readonly Color LabelColor = new(0.92f, 0.95f, 1f);
+        private static readonly Color BgStripColor = new(0.02f, 0.02f, 0.04f, 0.94f);
+        private static readonly Color BgStripTopBorder = new(0.0f, 0.4f, 0.5f, 0.3f);
+        private static readonly Color HeaderColor = new(0.35f, 0.55f, 0.65f, 0.7f);
 
         public int SelectedPieceIndex => _selectedPieceIndex;
         public event Action<PieceShape> OnPieceSelected;
@@ -48,13 +52,54 @@ namespace ChromaVale.Presentation.Views.Components
             var bg = new GameObject("InvBG");
             bg.transform.SetParent(transform, false);
             var bgImg = bg.AddComponent<Image>();
-            bgImg.color = new Color(0.05f, 0.05f, 0.08f, 0.92f);
+            bgImg.color = BgStripColor;
             bgImg.raycastTarget = false;
             var bgr = bg.GetComponent<RectTransform>();
-            bgr.anchorMin = new Vector2(0f, 0f);
-            bgr.anchorMax = new Vector2(1f, 0.12f);
+            bgr.anchorMin = new Vector2(0f, 0.12f);
+            bgr.anchorMax = new Vector2(1f, 0.24f);
             bgr.offsetMin = Vector2.zero;
             bgr.offsetMax = Vector2.zero;
+
+            // Top border line (neon cyan glow)
+            var topLine = new GameObject("InvTopBorder");
+            topLine.transform.SetParent(bg.transform, false);
+            var topLineImg = topLine.AddComponent<Image>();
+            topLineImg.color = BgStripTopBorder;
+            topLineImg.raycastTarget = false;
+            var topLineRt = topLine.GetComponent<RectTransform>();
+            topLineRt.anchorMin = new Vector2(0f, 0.92f);
+            topLineRt.anchorMax = new Vector2(1f, 1f);
+            topLineRt.offsetMin = Vector2.zero;
+            topLineRt.offsetMax = Vector2.zero;
+
+            // "INVENTORY" header label
+            var headerGo = new GameObject("InventoryHeader");
+            headerGo.transform.SetParent(bg.transform, false);
+            _headerLabel = headerGo.AddComponent<TextMeshProUGUI>();
+            _headerLabel.text = "INVENTORY";
+            _headerLabel.fontSize = 11;
+            _headerLabel.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
+            _headerLabel.alignment = TextAlignmentOptions.Left;
+            _headerLabel.color = HeaderColor;
+            var headerRt = _headerLabel.GetComponent<RectTransform>();
+            headerRt.anchorMin = new Vector2(0.03f, 0.70f);
+            headerRt.anchorMax = new Vector2(0.40f, 0.90f);
+            headerRt.offsetMin = Vector2.zero;
+            headerRt.offsetMax = Vector2.zero;
+
+            // Scanline overlay (very thin repeating horizontal lines)
+            var scanGo = new GameObject("Scanlines");
+            scanGo.transform.SetParent(bg.transform, false);
+            var scanImg = scanGo.AddComponent<Image>();
+            scanImg.color = new Color(0f, 0f, 0f, 0.04f);
+            scanImg.raycastTarget = false;
+            var scanRt = scanGo.GetComponent<RectTransform>();
+            scanRt.anchorMin = Vector2.zero;
+            scanRt.anchorMax = Vector2.one;
+            scanRt.sizeDelta = Vector2.zero;
+            // Set a tiling sprite for scanlines if we had one; for now use a repeated
+            // raw image effect via a simple shader-like approach
+            scanImg.type = Image.Type.Tiled;
         }
 
         public void Bind(PipeInventory inventory)
@@ -96,12 +141,12 @@ namespace ChromaVale.Presentation.Views.Components
                 btn.transition = Selectable.Transition.None; // Full procedural styling
 
                 var sr = slot.GetComponent<RectTransform>();
-                sr.anchorMin = new Vector2(startX + idx * slotWidth, 0.02f);
-                sr.anchorMax = new Vector2(startX + (idx + 1) * slotWidth - 0.01f, 0.10f);
+                sr.anchorMin = new Vector2(startX + idx * slotWidth, 0.14f);
+                sr.anchorMax = new Vector2(startX + (idx + 1) * slotWidth - 0.01f, 0.22f);
                 sr.offsetMin = Vector2.zero;
                 sr.offsetMax = Vector2.zero;
 
-                // --- Body: dark translucent fill inset by 3px to reveal border ---
+                // --- Body: dark translucent fill inset by 4px to reveal border (was 3px) ---
                 var bodyGo = new GameObject("Body");
                 bodyGo.transform.SetParent(slot.transform, false);
                 var bodyImg = bodyGo.AddComponent<Image>();
@@ -110,15 +155,15 @@ namespace ChromaVale.Presentation.Views.Components
                 var bodyRt = bodyGo.GetComponent<RectTransform>();
                 bodyRt.anchorMin = Vector2.zero;
                 bodyRt.anchorMax = Vector2.one;
-                bodyRt.offsetMin = new Vector2(3f, 3f);
-                bodyRt.offsetMax = new Vector2(-3f, -3f);
+                bodyRt.offsetMin = new Vector2(4f, 4f);
+                bodyRt.offsetMax = new Vector2(-4f, -4f);
 
                 // --- Shape label (bold, large, centered, near-white) ---
                 var labelGo = new GameObject("Label");
                 labelGo.transform.SetParent(slot.transform, false);
                 var labelTx = labelGo.AddComponent<TextMeshProUGUI>();
                 labelTx.text = ShapeSymbol(shape);
-                labelTx.fontSize = 20;
+                labelTx.fontSize = 18;
                 labelTx.enableAutoSizing = false;
                 labelTx.fontStyle = FontStyles.Bold;
                 labelTx.color = LabelColor;
@@ -139,7 +184,7 @@ namespace ChromaVale.Presentation.Views.Components
                 badgeGo.transform.SetParent(slot.transform, false);
                 var badgeTx = badgeGo.AddComponent<TextMeshProUGUI>();
                 badgeTx.text = count.ToString();
-                badgeTx.fontSize = 18;
+                badgeTx.fontSize = 16;
                 badgeTx.enableAutoSizing = false;
                 badgeTx.fontStyle = FontStyles.Normal;
                 badgeTx.color = ChromaPalette.NeonYellow;
