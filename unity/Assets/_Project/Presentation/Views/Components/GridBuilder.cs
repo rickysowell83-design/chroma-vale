@@ -100,9 +100,54 @@ namespace ChromaVale.Presentation.Views.Components
                 cam.backgroundColor = ChromaPalette.DarkBG;
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 if (cam.GetComponent<UnityEngine.EventSystems.PhysicsRaycaster>() == null)
-                    cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
+                                FitBackdrop();
+cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
             }
         }
+
+        private void FitBackdrop()
+        {
+            var backdrop = GameObject.Find("CyberpunkBackdrop");
+            if (backdrop == null) return;
+            var cam = Camera.main;
+            if (cam == null) return;
+
+            // Sample a few backdrop children to find the max viewport Y
+            float maxVpY = 0f;
+            float maxWorldY = float.MinValue;
+            Transform maxChild = null;
+            foreach (Transform child in backdrop.transform)
+            {
+                var vp = cam.WorldToViewportPoint(child.position);
+                if (vp.z > 0 && vp.y > maxVpY)
+                {
+                    maxVpY = vp.y;
+                    maxWorldY = child.position.y;
+                    maxChild = child;
+                }
+            }
+
+            // Target: place the highest building so its vpY is around 0.85
+            // Compute how much world-Y maps to one viewport-Y unit at this depth
+            if (maxChild == null || maxVpY <= 0.85f) return;
+            float targetVpY = 0.85f;
+            // Estimate: shift a small test amount to calibrate
+            float testOffsetY = -1f;
+            var testPos = maxChild.position + new Vector3(0, testOffsetY, 0);
+            var testVp = cam.WorldToViewportPoint(testPos);
+            if (testVp.z <= 0) return;
+            float vpDelta = maxVpY - testVp.y; // how much vpY changes per unit of world Y
+            if (Mathf.Abs(vpDelta) < 0.0001f) return;
+            float neededOffset = (maxVpY - targetVpY) / vpDelta;
+
+            // Apply the offset to the entire backdrop
+            var pos = backdrop.transform.position;
+            backdrop.transform.position = new Vector3(pos.x, pos.y - neededOffset, pos.z);
+
+            Debug.Log($"[GridBuilder] FitBackdrop: shifted backdrop Y by {-neededOffset:F2} " +
+                      $"(max vpY {maxVpY:F2} -> target {targetVpY:F2})");
+        }
+
 
         private Color GetPipeColor(int ci) => ci switch
         {
