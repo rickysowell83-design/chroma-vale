@@ -131,6 +131,35 @@ namespace ChromaVale.Presentation.Views.Components
             }
         }
 
+        private static Material _blockerBarrierMaterial;
+
+        /// <summary>
+        /// Dark red-black material for the Blocker barrier — communicates danger / do not pass.
+        /// </summary>
+        private static Material BlockerBarrierMaterial
+        {
+            get
+            {
+                if (_blockerBarrierMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    if (shader == null) shader = Shader.Find("Sprites/Default");
+
+                    _blockerBarrierMaterial = new Material(shader)
+                    {
+                        color = new Color(0.15f, 0.02f, 0.02f)
+                    };
+                    _blockerBarrierMaterial.SetFloat("_Metallic", 0.3f);
+                    _blockerBarrierMaterial.SetFloat("_Smoothness", 0.2f);
+                    _blockerBarrierMaterial.EnableKeyword("_EMISSION");
+                    _blockerBarrierMaterial.SetColor("_EmissionColor", new Color(0.3f, 0.01f, 0.01f) * 2f);
+                    _blockerBarrierMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+                return _blockerBarrierMaterial;
+            }
+        }
+
         /// <summary>
         /// Set the _EmissionColor on a MaterialPropertyBlock for per-tile pipe glow.
         /// Intensity is multiplied by 5.0 for a punchy neon effect.
@@ -217,8 +246,19 @@ namespace ChromaVale.Presentation.Views.Components
                     BuildValve(root.transform);
                     break;
 
+                case PieceShape.Amplifier:
+                    BuildAmplifier(root.transform);
+                    break;
+
+                case PieceShape.Mixer:
+                    BuildMixer(root.transform);
+                    break;
+
+                case PieceShape.Blocker:
+                    BuildBlocker(root.transform);
+                    break;
+
                 default:
-                    // Amplifier, Mixer, Blocker — render as straight pipe by default
                     BuildStraight(root.transform);
                     break;
             }
@@ -426,6 +466,90 @@ namespace ChromaVale.Presentation.Views.Components
             handle.transform.localScale = new Vector3(0.22f, 0.04f, 0.22f);
             var handleRenderer = handle.GetComponent<MeshRenderer>();
             if (handleRenderer != null) handleRenderer.sharedMaterial = PipeMaterial;
+        }
+
+        /// <summary>
+        /// Build an amplifier: triangle of 3 angled cylinders + apex joint on a straight trace.
+        /// The triangle/chevron shape is unique — reads like an op-amp symbol.
+        /// </summary>
+        private static void BuildAmplifier(Transform parent)
+        {
+            // Main horizontal trace through the component
+            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
+
+            // Triangle body — 3 angled cylinders forming a right-pointing triangle
+            CreatePipeCylinder(0.36f, PipeRadius, new Vector3(0.10f, 0f, 0f), 0f, parent);
+            CreatePipeCylinder(0.28f, PipeRadius, new Vector3(0.20f, 0.09f, 0f), 45f, parent);
+            CreatePipeCylinder(0.28f, PipeRadius, new Vector3(0.20f, -0.09f, 0f), -45f, parent);
+
+            // Joint sphere at triangle apex (right point)
+            CreateJointSphere(new Vector3(0.30f, 0f, 0f), parent);
+
+            // Output trace stub to the right of the triangle
+            CreatePipeCylinder(0.20f, PipeRadius, new Vector3(0.50f, 0f, 0f), 90f, parent);
+
+            // Small input marker dot on the left side
+            CreateFilletSphere(new Vector3(0.02f, 0f, 0f), 0.04f, parent);
+        }
+
+        /// <summary>
+        /// Build a mixer: X-shaped diagonal crossing + oversized mixing chamber sphere.
+        /// The enlarged center sphere immediately reads as "something happens here."
+        /// </summary>
+        private static void BuildMixer(Transform parent)
+        {
+            // Main horizontal trace
+            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
+
+            // X-shaped diagonals crossing at center
+            CreatePipeCylinder(0.35f, PipeRadius, Vector3.zero, 45f, parent);
+            CreatePipeCylinder(0.35f, PipeRadius, Vector3.zero, -45f, parent);
+
+            // Enlarged mixing chamber sphere (2.5x normal joint diameter)
+            var mixer = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            mixer.name = "MixerChamber";
+            Object.DestroyImmediate(mixer.GetComponent<Collider>());
+            mixer.transform.SetParent(parent, false);
+            mixer.transform.localPosition = new Vector3(0f, 0f, PipeZ);
+            mixer.transform.localScale = Vector3.one * (JointRadius * 5f);
+            var mr = mixer.GetComponent<MeshRenderer>();
+            if (mr != null) mr.sharedMaterial = CopperPipeMaterial;
+
+            // Larger glow ring around mixing chamber
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "MixerGlowRing";
+            Object.DestroyImmediate(ring.GetComponent<Collider>());
+            ring.transform.SetParent(parent, false);
+            ring.transform.localPosition = new Vector3(0f, 0f, GlowRingZ);
+            ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            ring.transform.localScale = new Vector3(GlowRingRadius * 5f, 0.015f, GlowRingRadius * 5f);
+            var rr = ring.GetComponent<MeshRenderer>();
+            if (rr != null) rr.sharedMaterial = OcclusionRingMaterial;
+        }
+
+        /// <summary>
+        /// Build a blocker: truncated stubs + dark red-black barrier block.
+        /// The gap and red-black barrier communicate "flow stops here."
+        /// </summary>
+        private static void BuildBlocker(Transform parent)
+        {
+            // Truncated stubs — don't reach center, leaving a gap
+            CreatePipeCylinder(0.30f, PipeRadius, new Vector3(-0.35f, 0f, 0f), 90f, parent);
+            CreatePipeCylinder(0.30f, PipeRadius, new Vector3(0.35f, 0f, 0f), 90f, parent);
+
+            // Solid barrier block across the gap
+            var barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrier.name = "BlockerBarrier";
+            Object.DestroyImmediate(barrier.GetComponent<Collider>());
+            barrier.transform.SetParent(parent, false);
+            barrier.transform.localPosition = new Vector3(0f, 0f, PipeZ - 0.02f);
+            barrier.transform.localScale = new Vector3(0.12f, 0.55f, 0.30f);
+            var br = barrier.GetComponent<MeshRenderer>();
+            if (br != null) br.sharedMaterial = BlockerBarrierMaterial;
+
+            // Warning X mark on the barrier face
+            CreateRivet(new Vector3(0f, 0.06f, PipeZ - 0.03f), PipeRadius * 0.4f, parent);
+            CreateRivet(new Vector3(0f, -0.06f, PipeZ - 0.03f), PipeRadius * 0.4f, parent);
         }
     }
 }
