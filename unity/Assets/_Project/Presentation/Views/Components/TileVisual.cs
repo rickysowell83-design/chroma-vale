@@ -13,7 +13,7 @@ namespace ChromaVale.Presentation.Views.Components
         SourceDot,
         TargetRing,
         ObstacleBlock,
-        FlowGateArrow
+        SignalGateArrow
     }
 
     /// <summary>
@@ -30,14 +30,15 @@ namespace ChromaVale.Presentation.Views.Components
         private MeshRenderer _baseRenderer;
         private BoxCollider _boxCollider;
         private MaterialPropertyBlock _mpb;
-        private GameObject _pipeRoot;
+        private GameObject _traceRoot;
         private GameObject _indicatorRoot;
         private GameObject _previewRoot;
         private Color _indicatorColor; // Stored for source pulse coroutine
         private float _tileSize = 1f;
         private Color _color;
         private Color _darkColor = new Color(0.04f, 0.05f, 0.06f);
-        private float _emissionIntensity = 0.6f; // Subtle idle glow — pipes visible when placed
+        private Color _copperIdle = new Color(0.72f, 0.42f, 0.18f); // Copper idle color for placed traces
+        private float _emissionIntensity = 0.4f; // Subtle warm copper idle glow
 
         /// <summary>
         /// Logical tile color.  Setting this drives both the HDR emission
@@ -259,10 +260,10 @@ namespace ChromaVale.Presentation.Views.Components
             Color blended = Color.Lerp(targetColor, surgeColor, blend);
             _mpb.SetColor("_EmissionColor", blended * _emissionIntensity);
             // Keep copper base — only emission surges
-            _mpb.SetColor("_BaseColor", new Color(0.65f, 0.38f, 0.15f)); // Copper always
+            _mpb.SetColor("_BaseColor", new Color(0.72f, 0.42f, 0.18f)); // Bright copper always
 
-            if (_pipeRoot != null)
-                ApplyMpbToTree(_pipeRoot.transform, _mpb);
+            if (_traceRoot != null)
+                ApplyMpbToTree(_traceRoot.transform, _mpb);
         }
 
         // ── Shape management ──────────────────────────────────────────────
@@ -271,14 +272,14 @@ namespace ChromaVale.Presentation.Views.Components
         /// Instantiate or replace the 3D pipe mesh child for the given shape,
         /// rotated about the Z axis by <paramref name="rotationDeg"/> degrees.
         /// </summary>
-        /// <param name="shape">The pipe shape to display.</param>
+        /// <param name="shape">The trace shape to display.</param>
         /// <param name="rotationDeg">Z-axis rotation in degrees.</param>
-        public void SetShape(PieceShape shape, int rotationDeg)
+        public void SetShape(SegmentShape shape, int rotationDeg)
         {
             ClearShape();
 
-            _pipeRoot = PipeMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
-            _pipeRoot.transform.localScale = Vector3.one * _tileSize;
+            _traceRoot = TraceMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
+            _traceRoot.transform.localScale = Vector3.one * _tileSize;
 
             // Re-apply the current color to the new pipe meshes
             ApplyColor();
@@ -290,10 +291,10 @@ namespace ChromaVale.Presentation.Views.Components
         public void ClearShape()
         {
             HidePlacementPreview();
-            if (_pipeRoot != null)
+            if (_traceRoot != null)
             {
-                Object.DestroyImmediate(_pipeRoot);
-                _pipeRoot = null;
+                Object.DestroyImmediate(_traceRoot);
+                _traceRoot = null;
             }
         }
 
@@ -301,16 +302,16 @@ namespace ChromaVale.Presentation.Views.Components
 
         /// <summary>
         /// Show a translucent placement preview ghost at this tile.
-        /// Builds a pipe mesh using PipeMeshFactory3D.BuildPipe with a
+        /// Builds a pipe mesh using TraceMeshFactory3D.BuildPipe with a
         /// transparent URP/Lit material (alpha ~0.35, no emission).
         /// </summary>
-        /// <param name="shape">The pipe shape to preview.</param>
+        /// <param name="shape">The trace shape to preview.</param>
         /// <param name="rotationDeg">Z-axis rotation in degrees.</param>
-        public void ShowPlacementPreview(PieceShape shape, int rotationDeg)
+        public void ShowPlacementPreview(SegmentShape shape, int rotationDeg)
         {
             HidePlacementPreview();
 
-            _previewRoot = PipeMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
+            _previewRoot = TraceMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
             _previewRoot.transform.localScale = Vector3.one * _tileSize;
 
             // Create translucent preview material (URP/Lit, transparent, alpha ~0.35, no emission)
@@ -375,7 +376,7 @@ namespace ChromaVale.Presentation.Views.Components
         /// </summary>
         /// <param name="kind">The indicator type to display.</param>
         /// <param name="color">Emissive color for the indicator.</param>
-        public void SetIndicator(TileIndicator kind, Color color)
+public void SetIndicator(TileIndicator kind, Color color)
         {
             ClearIndicator();
             _indicatorColor = color;
@@ -391,59 +392,122 @@ namespace ChromaVale.Presentation.Views.Components
             if (shader == null) shader = Shader.Find("Sprites/Default");
 
             var indicatorMat = new Material(shader);
+            indicatorMat.color = color * 0.8f;
+            indicatorMat.SetFloat("_Metallic", 0f);
+            indicatorMat.SetFloat("_Smoothness", 0.5f);
             indicatorMat.EnableKeyword("_EMISSION");
+            indicatorMat.SetColor("_EmissionColor", color * 2f);
             indicatorMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
 
             switch (kind)
             {
                 case TileIndicator.SourceDot:
                 {
-                    var dot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    dot.name = "SourceDot";
-                    Object.DestroyImmediate(dot.GetComponent<Collider>());
-                    dot.transform.SetParent(_indicatorRoot.transform, false);
-                    dot.transform.localPosition = new Vector3(0f, 0f, -0.2f);
-                    dot.transform.localScale = Vector3.one * (_tileSize * 0.35f); // Larger beacon
+                    // Concentric glowing rings (portal / reticle look per GDD mockup)
+                    var outerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    outerRing.name = "SourceOuterRing";
+                    Object.DestroyImmediate(outerRing.GetComponent<Collider>());
+                    outerRing.transform.SetParent(_indicatorRoot.transform, false);
+                    outerRing.transform.localPosition = new Vector3(0f, 0f, -0.20f);
+                    outerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float outerRadius = _tileSize * 0.35f;
+                    outerRing.transform.localScale = new Vector3(outerRadius * 2f, 0.08f, outerRadius * 2f);
+                    var outerRend = outerRing.GetComponent<MeshRenderer>();
+                    outerRend.sharedMaterial = indicatorMat;
+                    var outerMpb = new MaterialPropertyBlock();
+                    outerMpb.SetColor("_EmissionColor", color * 15f);
+                    outerMpb.SetColor("_BaseColor", color * 0.4f);
+                    outerRend.SetPropertyBlock(outerMpb);
 
-                    var rend = dot.GetComponent<MeshRenderer>();
-                    rend.sharedMaterial = indicatorMat;
-                    var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 15f); // Intense electric glow
-                    mpb.SetColor("_BaseColor", color * 0.7f);
-                    rend.SetPropertyBlock(mpb);
+                    var innerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    innerRing.name = "SourceInnerRing";
+                    Object.DestroyImmediate(innerRing.GetComponent<Collider>());
+                    innerRing.transform.SetParent(_indicatorRoot.transform, false);
+                    innerRing.transform.localPosition = new Vector3(0f, 0f, -0.22f);
+                    innerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float innerRadius = _tileSize * 0.18f;
+                    innerRing.transform.localScale = new Vector3(innerRadius * 2f, 0.10f, innerRadius * 2f);
+                    var innerRend = innerRing.GetComponent<MeshRenderer>();
+                    innerRend.sharedMaterial = indicatorMat;
+                    var innerMpb = new MaterialPropertyBlock();
+                    innerMpb.SetColor("_EmissionColor", color * 20f);
+                    innerMpb.SetColor("_BaseColor", color * 0.5f);
+                    innerRend.SetPropertyBlock(innerMpb);
 
-                    // Add a larger outer glow halo
-                    var halo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    var centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    centerDot.name = "SourceCenterDot";
+                    Object.DestroyImmediate(centerDot.GetComponent<Collider>());
+                    centerDot.transform.SetParent(_indicatorRoot.transform, false);
+                    centerDot.transform.localPosition = new Vector3(0f, 0f, -0.30f);
+                    centerDot.transform.localScale = Vector3.one * (_tileSize * 0.08f);
+                    var dotRend = centerDot.GetComponent<MeshRenderer>();
+                    dotRend.sharedMaterial = indicatorMat;
+                    var dotMpb = new MaterialPropertyBlock();
+                    dotMpb.SetColor("_EmissionColor", color * 25f);
+                    dotMpb.SetColor("_BaseColor", color * 0.9f);
+                    dotRend.SetPropertyBlock(dotMpb);
+
+                    var halo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                     halo.name = "SourceHalo";
                     Object.DestroyImmediate(halo.GetComponent<Collider>());
                     halo.transform.SetParent(_indicatorRoot.transform, false);
-                    halo.transform.localPosition = new Vector3(0f, 0f, -0.25f);
-                    halo.transform.localScale = Vector3.one * (_tileSize * 0.55f);
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.26f);
+                    halo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float haloRadius = _tileSize * 0.50f;
+                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.05f, haloRadius * 2f);
                     var haloRend = halo.GetComponent<MeshRenderer>();
                     haloRend.sharedMaterial = indicatorMat;
                     var haloMpb = new MaterialPropertyBlock();
-                    haloMpb.SetColor("_EmissionColor", color * 4f);
-                    haloMpb.SetColor("_BaseColor", color * 0.0f); // Emission-only, transparent base
+                    haloMpb.SetColor("_EmissionColor", color * 6f);
+                    haloMpb.SetColor("_BaseColor", color * 0.0f);
                     haloRend.SetPropertyBlock(haloMpb);
                     break;
                 }
 
                 case TileIndicator.TargetRing:
                 {
-                    // Build a ring approximation: a flattened sphere disk
-                    var ring = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    ring.name = "TargetRing";
-                    Object.DestroyImmediate(ring.GetComponent<Collider>());
-                    ring.transform.SetParent(_indicatorRoot.transform, false);
-                    ring.transform.localPosition = new Vector3(0f, 0f, -0.2f);
-                    ring.transform.localScale = new Vector3(_tileSize * 0.35f, _tileSize * 0.35f, _tileSize * 0.05f);
+                    var outerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    outerRing.name = "TargetOuterRing";
+                    Object.DestroyImmediate(outerRing.GetComponent<Collider>());
+                    outerRing.transform.SetParent(_indicatorRoot.transform, false);
+                    outerRing.transform.localPosition = new Vector3(0f, 0f, -0.20f);
+                    outerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float ringRadius = _tileSize * 0.30f;
+                    outerRing.transform.localScale = new Vector3(ringRadius * 2f, 0.08f, ringRadius * 2f);
+                    var ringRend = outerRing.GetComponent<MeshRenderer>();
+                    ringRend.sharedMaterial = indicatorMat;
+                    var ringMpb = new MaterialPropertyBlock();
+                    ringMpb.SetColor("_EmissionColor", color * 18f);
+                    ringMpb.SetColor("_BaseColor", color * 0.4f);
+                    ringRend.SetPropertyBlock(ringMpb);
 
-                    var rend = ring.GetComponent<MeshRenderer>();
-                    rend.sharedMaterial = indicatorMat;
-                    var mpb = new MaterialPropertyBlock();
-                    mpb.SetColor("_EmissionColor", color * 10f); // Bright target beacon
-                    mpb.SetColor("_BaseColor", color * 0.4f);
-                    rend.SetPropertyBlock(mpb);
+                    var centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    centerDot.name = "TargetCenterDot";
+                    Object.DestroyImmediate(centerDot.GetComponent<Collider>());
+                    centerDot.transform.SetParent(_indicatorRoot.transform, false);
+                    centerDot.transform.localPosition = new Vector3(0f, 0f, -0.28f);
+                    centerDot.transform.localScale = Vector3.one * (_tileSize * 0.10f);
+                    var dotRend = centerDot.GetComponent<MeshRenderer>();
+                    dotRend.sharedMaterial = indicatorMat;
+                    var dotMpb = new MaterialPropertyBlock();
+                    dotMpb.SetColor("_EmissionColor", color * 25f);
+                    dotMpb.SetColor("_BaseColor", color * 0.9f);
+                    dotRend.SetPropertyBlock(dotMpb);
+
+                    var halo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    halo.name = "TargetHalo";
+                    Object.DestroyImmediate(halo.GetComponent<Collider>());
+                    halo.transform.SetParent(_indicatorRoot.transform, false);
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.24f);
+                    halo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float haloRadius = _tileSize * 0.42f;
+                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.05f, haloRadius * 2f);
+                    var haloRend = halo.GetComponent<MeshRenderer>();
+                    haloRend.sharedMaterial = indicatorMat;
+                    var haloMpb = new MaterialPropertyBlock();
+                    haloMpb.SetColor("_EmissionColor", color * 6f);
+                    haloMpb.SetColor("_BaseColor", color * 0.0f);
+                    haloRend.SetPropertyBlock(haloMpb);
                     break;
                 }
 
@@ -455,7 +519,6 @@ namespace ChromaVale.Presentation.Views.Components
                     block.transform.SetParent(_indicatorRoot.transform, false);
                     block.transform.localPosition = new Vector3(0f, 0f, -0.15f);
                     block.transform.localScale = new Vector3(_tileSize * 0.4f, _tileSize * 0.4f, _tileSize * 0.4f);
-
                     var rend = block.GetComponent<MeshRenderer>();
                     rend.sharedMaterial = indicatorMat;
                     var mpb = new MaterialPropertyBlock();
@@ -465,18 +528,15 @@ namespace ChromaVale.Presentation.Views.Components
                     break;
                 }
 
-                case TileIndicator.FlowGateArrow:
+                case TileIndicator.SignalGateArrow:
                 {
-                    // Arrow shaft
                     var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                     shaft.name = "ArrowShaft";
                     Object.DestroyImmediate(shaft.GetComponent<Collider>());
                     shaft.transform.SetParent(_indicatorRoot.transform, false);
                     shaft.transform.localPosition = new Vector3(_tileSize * 0.12f, 0f, -0.2f);
-                    // Cylinder defaults along Y — rotate to align with +X (shaft direction)
                     shaft.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
                     shaft.transform.localScale = new Vector3(_tileSize * 0.04f, _tileSize * 0.25f, _tileSize * 0.04f);
-
                     var shaftRend = shaft.GetComponent<MeshRenderer>();
                     shaftRend.sharedMaterial = indicatorMat;
                     var shaftMpb = new MaterialPropertyBlock();
@@ -484,7 +544,6 @@ namespace ChromaVale.Presentation.Views.Components
                     shaftMpb.SetColor("_BaseColor", color * 0.4f);
                     shaftRend.SetPropertyBlock(shaftMpb);
 
-                    // Diamond tip: cube rotated 45° reads as an arrowhead
                     var head = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     head.name = "ArrowHead";
                     Object.DestroyImmediate(head.GetComponent<Collider>());
@@ -492,7 +551,6 @@ namespace ChromaVale.Presentation.Views.Components
                     head.transform.localPosition = new Vector3(_tileSize * 0.27f, 0f, -0.2f);
                     head.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
                     head.transform.localScale = new Vector3(_tileSize * 0.09f, _tileSize * 0.09f, _tileSize * 0.04f);
-
                     var headRend = head.GetComponent<MeshRenderer>();
                     headRend.sharedMaterial = indicatorMat;
                     var headMpb = new MaterialPropertyBlock();
@@ -505,7 +563,7 @@ namespace ChromaVale.Presentation.Views.Components
         }
 
         /// <summary>
-        /// Rotate the indicator about the Z axis (used for FlowGateArrow direction).
+        /// Rotate the indicator about the Z axis (used for SignalGateArrow direction).
         /// </summary>
         /// <param name="zDeg">Z rotation in degrees.</param>
         public void SetIndicatorRotation(float zDeg)
@@ -522,15 +580,20 @@ namespace ChromaVale.Presentation.Views.Components
         /// Apply the current color to the base renderer and all pipe-child renderers
         /// via the cached MaterialPropertyBlock.
         /// </summary>
-        private void ApplyColor()
+private void ApplyColor()
         {
             if (_mpb == null) return;
 
             // Pipe KEEPS copper base — only EMISSION changes for flow glow
-            _mpb.SetColor("_EmissionColor", _color * _emissionIntensity);
-            _mpb.SetColor("_BaseColor", new Color(0.65f, 0.38f, 0.15f)); // Copper always
+            // When idle (no flow active), emit warm copper glow instead of dead black
+            Color emissionColor = _color * _emissionIntensity;
+            if (emissionColor.r < 0.01f && emissionColor.g < 0.01f && emissionColor.b < 0.01f)
+            {
+                emissionColor = _copperIdle * Mathf.Max(_emissionIntensity, 0.4f);
+            }
+            _mpb.SetColor("_EmissionColor", emissionColor);
+            _mpb.SetColor("_BaseColor", new Color(0.72f, 0.42f, 0.18f));
 
-            // Base slab: dark green PCB, no emission
             if (_baseRenderer != null)
             {
                 var slabMpb = new MaterialPropertyBlock();
@@ -538,10 +601,9 @@ namespace ChromaVale.Presentation.Views.Components
                 _baseRenderer.SetPropertyBlock(slabMpb);
             }
 
-            // All pipe mesh children
-            if (_pipeRoot != null)
+            if (_traceRoot != null)
             {
-                ApplyMpbToTree(_pipeRoot.transform, _mpb);
+                ApplyMpbToTree(_traceRoot.transform, _mpb);
             }
         }
 
@@ -575,35 +637,71 @@ namespace ChromaVale.Presentation.Views.Components
 
         private IEnumerator SourcePulseCoroutine()
         {
-            var dot = _indicatorRoot.transform.Find("SourceDot");
+            var outerRing = _indicatorRoot.transform.Find("SourceOuterRing");
+            var innerRing = _indicatorRoot.transform.Find("SourceInnerRing");
+            var centerDot = _indicatorRoot.transform.Find("SourceCenterDot");
             var halo = _indicatorRoot.transform.Find("SourceHalo");
-            if (dot == null || halo == null) yield break;
+            if (outerRing == null || innerRing == null) yield break;
 
-            var dotRend = dot.GetComponent<MeshRenderer>();
-            var haloRend = halo.GetComponent<MeshRenderer>();
-            if (dotRend == null || haloRend == null) yield break;
+            var outerRend = outerRing.GetComponent<MeshRenderer>();
+            var innerRend = innerRing.GetComponent<MeshRenderer>();
+            if (outerRend == null || innerRend == null) yield break;
 
             Color pulseColor = _indicatorColor;
-            float baseDotIntensity = 15f;
-            float baseHaloIntensity = 4f;
+            float baseOuterIntensity = 15f;
+            float baseInnerIntensity = 20f;
 
-            while (_indicatorRoot != null && dot != null && halo != null)
+            while (_indicatorRoot != null && outerRing != null && innerRing != null)
             {
                 // Sine wave 0→1→0 every ~2.1 seconds (3 rad/s)
                 float t = (Mathf.Sin(Time.time * 3f) + 1f) * 0.5f;
 
-                float dotIntensity = Mathf.Lerp(baseDotIntensity * 0.4f, baseDotIntensity * 1.6f, t);
-                float haloIntensity = Mathf.Lerp(baseHaloIntensity * 0.2f, baseHaloIntensity * 2.0f, t);
+                float outerIntensity = Mathf.Lerp(baseOuterIntensity * 0.5f, baseOuterIntensity * 1.8f, t);
+                float innerIntensity = Mathf.Lerp(baseInnerIntensity * 0.4f, baseInnerIntensity * 2.0f, t);
 
-                var dotMpb = new MaterialPropertyBlock();
-                dotMpb.SetColor("_EmissionColor", pulseColor * dotIntensity);
-                dotMpb.SetColor("_BaseColor", pulseColor * 0.7f);
-                if (dotRend != null) dotRend.SetPropertyBlock(dotMpb);
+                if (outerRend != null)
+                {
+                    var outerMpb = new MaterialPropertyBlock();
+                    outerMpb.SetColor("_EmissionColor", pulseColor * outerIntensity);
+                    outerMpb.SetColor("_BaseColor", pulseColor * 0.15f);
+                    outerRend.SetPropertyBlock(outerMpb);
+                }
 
-                var haloMpb = new MaterialPropertyBlock();
-                haloMpb.SetColor("_EmissionColor", pulseColor * haloIntensity);
-                haloMpb.SetColor("_BaseColor", pulseColor * 0.0f);
-                if (haloRend != null) haloRend.SetPropertyBlock(haloMpb);
+                if (innerRend != null)
+                {
+                    var innerMpb = new MaterialPropertyBlock();
+                    innerMpb.SetColor("_EmissionColor", pulseColor * innerIntensity);
+                    innerMpb.SetColor("_BaseColor", pulseColor * 0.25f);
+                    innerRend.SetPropertyBlock(innerMpb);
+                }
+
+                // Pulse halo too
+                if (halo != null)
+                {
+                    var haloRend = halo.GetComponent<MeshRenderer>();
+                    if (haloRend != null)
+                    {
+                        float haloIntensity = Mathf.Lerp(1.5f, 6f, t);
+                        var haloMpb = new MaterialPropertyBlock();
+                        haloMpb.SetColor("_EmissionColor", pulseColor * haloIntensity);
+                        haloMpb.SetColor("_BaseColor", pulseColor * 0.0f);
+                        haloRend.SetPropertyBlock(haloMpb);
+                    }
+                }
+
+                // Center dot: constant bright
+                if (centerDot != null)
+                {
+                    var dotRend = centerDot.GetComponent<MeshRenderer>();
+                    if (dotRend != null)
+                    {
+                        float dotIntensity = Mathf.Lerp(15f, 25f, t);
+                        var dotMpb = new MaterialPropertyBlock();
+                        dotMpb.SetColor("_EmissionColor", pulseColor * dotIntensity);
+                        dotMpb.SetColor("_BaseColor", pulseColor * 0.8f);
+                        dotRend.SetPropertyBlock(dotMpb);
+                    }
+                }
 
                 yield return null;
             }

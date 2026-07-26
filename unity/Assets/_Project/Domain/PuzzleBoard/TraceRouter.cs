@@ -3,20 +3,20 @@ using System.Collections.Generic;
 
 namespace ChromaVale.Domain.PuzzleBoard
 {
-    public class PipeRouter : IPipeRouter
+    public class TraceRouter : ITraceRouter
     {
         private readonly GridBoard _board;
         private readonly Stack<(int x, int y)> _history = new();
 
-        private static readonly (int dx, int dy, PipeDirection dir)[] Neighbors =
+        private static readonly (int dx, int dy, TraceDirection dir)[] Neighbors =
         {
-            ( 0,  1, PipeDirection.Up),
-            ( 0, -1, PipeDirection.Down),
-            ( 1,  0, PipeDirection.Right),
-            (-1,  0, PipeDirection.Left),
+            ( 0,  1, TraceDirection.Up),
+            ( 0, -1, TraceDirection.Down),
+            ( 1,  0, TraceDirection.Right),
+            (-1,  0, TraceDirection.Left),
         };
 
-        public PipeRouter(GridBoard board)
+        public TraceRouter(GridBoard board)
         {
             _board = board;
         }
@@ -28,14 +28,14 @@ namespace ChromaVale.Domain.PuzzleBoard
             return cell.Type != CellType.Source
                 && cell.Type != CellType.Target
                 && cell.Type != CellType.Obstacle
-                && cell.Type != CellType.FlowGate
+                && cell.Type != CellType.SignalGate
                 && !cell.IsOccupied;
         }
 
         public void Place(int x, int y, int colorIndex)
         {
             if (!CanPlace(x, y, colorIndex)) return;
-            _board.PlacePipe(x, y);
+            _board.PlaceTrace(x, y);
             _history.Push((x, y));
         }
 
@@ -66,27 +66,27 @@ namespace ChromaVale.Domain.PuzzleBoard
                     var fromCell = _board.GetCell(cx, cy);
                     var toCell = _board.GetCell(nx, ny);
 
-                    // Can't walk through obstacles
+                    // Can't route through obstacles
                     if (toCell.Type == CellType.Obstacle) continue;
 
-                    // Must be able to traverse a pipe or reach a target
-                    bool toIsWalkable = toCell.Type == CellType.Pipe
+                    // Must be able to traverse a trace or reach a target
+                    bool toIsWalkable = toCell.Type == CellType.Trace
                                      || toCell.Type == CellType.Target
-                                     || toCell.Type == CellType.FlowGate;
+                                     || toCell.Type == CellType.SignalGate;
 
                     if (!toIsWalkable && toCell.Type != CellType.Target) continue;
 
                     // ── Directional flow constraint ──
-                    // If the FROM cell is a flow gate, flow must exit in the gate's direction
-                    if (fromCell.Type == CellType.FlowGate && fromCell.FlowDirection != dir)
+                    // If the FROM cell is a signal gate, signal must exit in the gate's direction
+                    if (fromCell.Type == CellType.SignalGate && fromCell.SignalDirection != dir)
                         continue;
 
-                    // If the TO cell is a flow gate, flow must enter from the gate's input side
-                    if (toCell.Type == CellType.FlowGate && toCell.FlowDirection != dir)
+                    // If the TO cell is a signal gate, signal must enter from the gate's input side
+                    if (toCell.Type == CellType.SignalGate && toCell.SignalDirection != dir)
                         continue;
 
-                    // If the TO cell is a pipe, allow passage freely
-                    if (toCell.Type == CellType.Pipe || toCell.Type == CellType.Target || toCell.Type == CellType.FlowGate)
+                    // If the TO cell is a trace, allow passage freely
+                    if (toCell.Type == CellType.Trace || toCell.Type == CellType.Target || toCell.Type == CellType.SignalGate)
                         queue.Enqueue((nx, ny));
                 }
             }

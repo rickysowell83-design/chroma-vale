@@ -1,6 +1,6 @@
 namespace ChromaVale.Core.GameLogic
 {
-    public interface IPipeRouter
+    public interface ITraceRouter
     {
         bool CanPlace(int x, int y, int colorIndex);
         void Place(int x, int y, int colorIndex);

@@ -1,25 +1,25 @@
 namespace ChromaVale.Core.GameLogic
 {
-    public enum OverloadState
+    public enum CircuitState
     {
-        Normal,        // Flow ≤ capacity
-        Overloading,   // Flow > capacity — flashing warning for 1 tick
-        Burst          // Pipe destroyed — cell is permanent obstacle
+        Normal,        // Signal ≤ capacity
+        Overloading,   // Signal > capacity — flashing warning for 1 tick
+        Shorted        // Trace destroyed — cell is permanent obstacle (was Burst)
     }
 
     /// <summary>
-    /// Per-cell runtime state during flow simulation.
-    /// Tracks how much flow is in each cell, whether it's overloaded, and
+    /// Per-cell runtime state during signal propagation.
+    /// Tracks how much signal is in each cell, whether it's overloaded, and
     /// what color(s) are present.
     /// Class (not struct) so mutations persist when accessed from arrays.
     /// </summary>
-    public class PipeCellState
+    public class TraceCellState
     {
-        public int CurrentFlow;       // Units of flow currently in this cell
-        public int Capacity;          // Max capacity before burst
-        public int ColorIndex;        // Color of flow in pipe (-1 = none)
-        public OverloadState State;   // Normal, Overloading, or Burst
-        public int OverloadTicks;     // Consecutive ticks in overload state (burst at 1)
+        public int CurrentSignal;       // Units of signal currently in this cell
+        public int Capacity;          // Max capacity before short circuit
+        public int ColorIndex;        // Color of signal in trace (-1 = none)
+        public CircuitState State;    // Normal, Overloading, or Shorted
+        public int OverloadTicks;     // Consecutive ticks in overload state (short at 1)
 
         // For color mixing: track what colors have passed through
         public int MixedColorA = -1;
@@ -27,24 +27,24 @@ namespace ChromaVale.Core.GameLogic
         public int MixedColorCount;
         public int ResultColor = -1;
 
-        public PipeCellState() { }
+        public TraceCellState() { }
 
-        public PipeCellState(int capacity)
+        public TraceCellState(int capacity)
         {
             Capacity = capacity;
             ColorIndex = -1;
         }
 
-        public static PipeCellState CreateEmpty() => new() { Capacity = 0, ColorIndex = -1 };
-        public static PipeCellState CreatePipe(int capacity) => new(capacity);
+        public static TraceCellState CreateEmpty() => new() { Capacity = 0, ColorIndex = -1 };
+        public static TraceCellState CreateTrace(int capacity) => new(capacity);
 
         /// <summary>
-        /// Add flow to this cell. Returns true if still stable, false if burst.
+        /// Add signal to this cell. Returns true if still stable, false if shorted.
         /// Mutations persist because this is a class.
         /// </summary>
-        public bool AddFlow(int amount, int colorIndex)
+        public bool AddSignal(int amount, int colorIndex)
         {
-            CurrentFlow += amount;
+            CurrentSignal += amount;
 
             // Track color mixing
             if (colorIndex != -1)
@@ -69,22 +69,22 @@ namespace ChromaVale.Core.GameLogic
                 ColorIndex = ResultColor;
             }
 
-            // Check overflow
-            if (CurrentFlow > Capacity)
+            // Check overload
+            if (CurrentSignal > Capacity)
             {
                 OverloadTicks++;
-                State = OverloadState.Overloading;
+                State = CircuitState.Overloading;
                 if (OverloadTicks >= 1)
                 {
-                    State = OverloadState.Burst;
-                    return false; // Burst!
+                    State = CircuitState.Shorted;
+                    return false; // Short circuit!
                 }
             }
 
             return true; // Still stable
         }
 
-        public bool IsStable => State != OverloadState.Burst;
-        public bool IsOverloading => State == OverloadState.Overloading;
+        public bool IsStable => State != CircuitState.Shorted;
+        public bool IsOverloading => State == CircuitState.Overloading;
     }
 }

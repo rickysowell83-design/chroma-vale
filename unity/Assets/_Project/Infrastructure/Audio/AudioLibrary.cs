@@ -10,7 +10,7 @@ namespace ChromaVale.Infrastructure.Audio
     ///
     /// Sound names (used by IAudioService.PlaySound):
     ///   pipe_place     — player places a pipe piece on the grid
-    ///   flow_tick      — flow advances into a pipe cell
+    ///   flow_tick      — flow advances into a trace cell
     ///   pipe_burst     — a pipe bursts from overload
     ///   target_reached — flow reaches a target
     ///   win_fanfare    — level complete fanfare

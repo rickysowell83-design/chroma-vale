@@ -25,19 +25,19 @@ namespace ChromaVale.Tests
             { "cyan", 0 }, { "magenta", 1 }, { "yellow", 2 }
         };
 
-        private static readonly Dictionary<string, (PieceShape shape, int capacity)> InventoryMap = new()
+        private static readonly Dictionary<string, (SegmentShape shape, int capacity)> InventoryMap = new()
         {
-            { "straight_1",   (PieceShape.Straight, 1) },
-            { "straight_2",   (PieceShape.Straight, 2) },
-            { "straight_3",   (PieceShape.Straight, 3) },
-            { "elbow_1",      (PieceShape.Elbow, 1) },
-            { "elbow_2",      (PieceShape.Elbow, 2) },
-            { "tjunction_2",  (PieceShape.TJunction, 2) },
-            { "cross_2",      (PieceShape.Cross, 2) },
-            { "valve_2",      (PieceShape.Valve, 2) },
-            { "amplifier",    (PieceShape.Amplifier, 0) },
-            { "mixer",        (PieceShape.Mixer, 0) },
-            { "blocker",      (PieceShape.Blocker, 0) },
+            { "straight_1",   (SegmentShape.Straight, 1) },
+            { "straight_2",   (SegmentShape.Straight, 2) },
+            { "straight_3",   (SegmentShape.Straight, 3) },
+            { "elbow_1",      (SegmentShape.Corner, 1) },
+            { "elbow_2",      (SegmentShape.Corner, 2) },
+            { "tjunction_2",  (SegmentShape.Splitter, 2) },
+            { "cross_2",      (SegmentShape.CrossJunction, 2) },
+            { "valve_2",      (SegmentShape.Diode, 2) },
+            { "amplifier",    (SegmentShape.Repeater, 0) },
+            { "mixer",        (SegmentShape.Combiner, 0) },
+            { "blocker",      (SegmentShape.Breaker, 0) },
         };
 
         public static ValidationResult ValidateLevel(string jsonLevel)
@@ -76,13 +76,13 @@ namespace ChromaVale.Tests
             var targets = ParseTargets(targetsJson);
             if (targets == null) { result.Error = "Invalid targets array"; return result; }
             var obstacles = ParseObstacles(root);
-            var flowGates = ParseFlowGates(root);
+            var signalGates = ParseSignalGates(root);
             var (inventoryPieces, invError) = ParseInventory(inventoryJson);
             if (invError != null) { result.Error = invError; return result; }
             int totalInventory = inventoryPieces.Count;
 
             // Step 2: Bounds check
-            var boundsError = CheckBounds(width, height, sources, targets, obstacles, flowGates);
+            var boundsError = CheckBounds(width, height, sources, targets, obstacles, signalGates);
             if (boundsError != null) { result.Error = boundsError; return result; }
 
             // Step 3: Color match
@@ -90,7 +90,7 @@ namespace ChromaVale.Tests
             if (colorError != null) { result.Error = colorError; return result; }
 
             // Step 4: No overlaps
-            var overlapError = CheckOverlaps(sources, targets, obstacles, flowGates);
+            var overlapError = CheckOverlaps(sources, targets, obstacles, signalGates);
             if (overlapError != null) { result.Error = overlapError; return result; }
 
             // Step 5: BFS reachability
@@ -98,7 +98,7 @@ namespace ChromaVale.Tests
             if (reachError != null) { result.Error = reachError; return result; }
 
             // Step 6 + 7: Solvability + 3-star
-            var solveResult = TrySolve(width, height, sources, targets, obstacles, flowGates,
+            var solveResult = TrySolve(width, height, sources, targets, obstacles, signalGates,
                 inventoryPieces, parTicks);
 
             if (!solveResult.solved)
@@ -162,19 +162,19 @@ namespace ChromaVale.Tests
             return result;
         }
 
-        private static List<(int x, int y, PipeDirection dir)> ParseFlowGates(JsonElement root)
+        private static List<(int x, int y, TraceDirection dir)> ParseSignalGates(JsonElement root)
         {
-            var result = new List<(int, int, PipeDirection)>();
-            if (root.TryGetProperty("flowGates", out var fgJson))
+            var result = new List<(int, int, TraceDirection)>();
+            if (root.TryGetProperty("signalGates", out var fgJson))
             {
                 foreach (var fg in fgJson.EnumerateArray())
                 {
                     string ds = fg.GetProperty("direction").GetString().ToLowerInvariant();
-                    PipeDirection dir = ds switch
+                    TraceDirection dir = ds switch
                     {
-                        "up" => PipeDirection.Up, "down" => PipeDirection.Down,
-                        "left" => PipeDirection.Left, "right" => PipeDirection.Right,
-                        _ => PipeDirection.None,
+                        "up" => TraceDirection.Up, "down" => TraceDirection.Down,
+                        "left" => TraceDirection.Left, "right" => TraceDirection.Right,
+                        _ => TraceDirection.None,
                     };
                     result.Add((fg.GetProperty("x").GetInt32(), fg.GetProperty("y").GetInt32(), dir));
                 }
@@ -182,9 +182,9 @@ namespace ChromaVale.Tests
             return result;
         }
 
-        private static (List<PipePiece> pieces, string error) ParseInventory(JsonElement inv)
+        private static (List<TraceSegment> pieces, string error) ParseInventory(JsonElement inv)
         {
-            var pieces = new List<PipePiece>();
+            var pieces = new List<TraceSegment>();
             foreach (var p in inv.EnumerateObject())
             {
                 if (!InventoryMap.TryGetValue(p.Name, out var m))
@@ -193,15 +193,15 @@ namespace ChromaVale.Tests
                 for (int i = 0; i < count; i++)
                     pieces.Add(m.shape switch
                     {
-                        PieceShape.Straight => PipePiece.Straight(m.capacity),
-                        PieceShape.Elbow => PipePiece.Elbow(m.capacity),
-                        PieceShape.TJunction => PipePiece.TJunction(m.capacity),
-                        PieceShape.Cross => PipePiece.Cross(m.capacity),
-                        PieceShape.Valve => PipePiece.Valve(m.capacity),
-                        PieceShape.Amplifier => PipePiece.Amplifier(),
-                        PieceShape.Mixer => PipePiece.Mixer(),
-                        PieceShape.Blocker => PipePiece.Blocker(),
-                        _ => PipePiece.Straight(m.capacity),
+                        SegmentShape.Straight => TraceSegment.Straight(m.capacity),
+                        SegmentShape.Corner => TraceSegment.Corner(m.capacity),
+                        SegmentShape.Splitter => TraceSegment.Splitter(m.capacity),
+                        SegmentShape.CrossJunction => TraceSegment.CrossJunction(m.capacity),
+                        SegmentShape.Diode => TraceSegment.Diode(m.capacity),
+                        SegmentShape.Repeater => TraceSegment.Repeater(),
+                        SegmentShape.Combiner => TraceSegment.Combiner(),
+                        SegmentShape.Breaker => TraceSegment.Breaker(),
+                        _ => TraceSegment.Straight(m.capacity),
                     });
             }
             return (pieces, null);
@@ -213,7 +213,7 @@ namespace ChromaVale.Tests
             List<(int x, int y, int color, int pressure)> sources,
             List<(int x, int y, int color)> targets,
             HashSet<(int, int)> obstacles,
-            List<(int x, int y, PipeDirection dir)> flowGates)
+            List<(int x, int y, TraceDirection dir)> signalGates)
         {
             foreach (var (x, y, _, _) in sources)
                 if (x < 0 || x >= w || y < 0 || y >= h)
@@ -224,7 +224,7 @@ namespace ChromaVale.Tests
             foreach (var (x, y) in obstacles)
                 if (x < 0 || x >= w || y < 0 || y >= h)
                     return $"Obstacle at ({x},{y}) is outside grid bounds ({w}x{h})";
-            foreach (var (x, y, _) in flowGates)
+            foreach (var (x, y, _) in signalGates)
                 if (x < 0 || x >= w || y < 0 || y >= h)
                     return $"FlowGate at ({x},{y}) is outside grid bounds ({w}x{h})";
             return null;
@@ -246,7 +246,7 @@ namespace ChromaVale.Tests
             List<(int x, int y, int color, int pressure)> sources,
             List<(int x, int y, int color)> targets,
             HashSet<(int, int)> obstacles,
-            List<(int x, int y, PipeDirection dir)> flowGates)
+            List<(int x, int y, TraceDirection dir)> signalGates)
         {
             var occ = new HashSet<(int, int)>();
             foreach (var (x, y, _, _) in sources)
@@ -255,7 +255,7 @@ namespace ChromaVale.Tests
                 if (!occ.Add((x, y))) return $"Overlap at ({x},{y}): target shares cell with another element";
             foreach (var (x, y) in obstacles)
                 if (!occ.Add((x, y))) return $"Overlap at ({x},{y}): obstacle shares cell with another element";
-            foreach (var (x, y, _) in flowGates)
+            foreach (var (x, y, _) in signalGates)
                 if (!occ.Add((x, y))) return $"Overlap at ({x},{y}): flowGate shares cell with another element";
             return null;
         }
@@ -308,12 +308,12 @@ namespace ChromaVale.Tests
             List<(int x, int y, int color, int pressure)> sources,
             List<(int x, int y, int color)> targets,
             HashSet<(int, int)> obstacles,
-            List<(int x, int y, PipeDirection dir)> flowGates,
-            List<PipePiece> inventory,
+            List<(int x, int y, TraceDirection dir)> signalGates,
+            List<TraceSegment> inventory,
             int parTicks)
         {
-            var level = BuildLevelData(width, height, sources, targets, obstacles, flowGates, inventory, parTicks);
-            var occupied = AllOccupied(sources, targets, obstacles, flowGates);
+            var level = BuildLevelData(width, height, sources, targets, obstacles, signalGates, inventory, parTicks);
+            var occupied = AllOccupied(sources, targets, obstacles, signalGates);
 
             // Path zone: cells within BFS corridor between sources and matching targets
             var pathZone = ComputePathZone(sources, targets, width, height, obstacles);
@@ -422,13 +422,13 @@ namespace ChromaVale.Tests
             List<(int x, int y, int color, int pressure)> sources,
             List<(int x, int y, int color)> targets,
             HashSet<(int, int)> obstacles,
-            List<(int x, int y, PipeDirection dir)> flowGates)
+            List<(int x, int y, TraceDirection dir)> signalGates)
         {
             var set = new HashSet<(int, int)>();
             foreach (var s in sources) set.Add((s.x, s.y));
             foreach (var t in targets) set.Add((t.x, t.y));
             foreach (var o in obstacles) set.Add(o);
-            foreach (var fg in flowGates) set.Add((fg.x, fg.y));
+            foreach (var fg in signalGates) set.Add((fg.x, fg.y));
             return set;
         }
 
@@ -471,8 +471,8 @@ namespace ChromaVale.Tests
             if (placements.Count == 0) return (false, 0);
             var board = new GridBoard(level);
             var pieces = level.Inventory.Select(ClonePiece).ToArray();
-            var inventory = new PipeInventory(pieces);
-            var sim = new FlowSimulator();
+            var inventory = new TraceInventory(pieces);
+            var sim = new SignalRouter();
 
             foreach (var (x, y, pieceIdx, rot) in placements)
                 if (!inventory.TryPlace(pieceIdx, board, x, y, sim, rot))
@@ -487,13 +487,13 @@ namespace ChromaVale.Tests
                 ? (true, sim.CurrentTick) : (false, sim.CurrentTick);
         }
 
-        private static int[] GetRotations(PieceShape shape) => shape switch
+        private static int[] GetRotations(SegmentShape shape) => shape switch
         {
-            PieceShape.Straight => new[] { 0, 90 },
-            PieceShape.Elbow => new[] { 0, 90, 180, 270 },
-            PieceShape.TJunction => new[] { 0, 90, 180, 270 },
-            PieceShape.Cross => new[] { 0 },
-            PieceShape.Valve => new[] { 0, 90, 180, 270 },
+            SegmentShape.Straight => new[] { 0, 90 },
+            SegmentShape.Corner => new[] { 0, 90, 180, 270 },
+            SegmentShape.Splitter => new[] { 0, 90, 180, 270 },
+            SegmentShape.CrossJunction => new[] { 0 },
+            SegmentShape.Diode => new[] { 0, 90, 180, 270 },
             _ => new[] { 0 },
         };
 
@@ -503,25 +503,25 @@ namespace ChromaVale.Tests
             List<(int x, int y, int color, int pressure)> sources,
             List<(int x, int y, int color)> targets,
             HashSet<(int, int)> obstacles,
-            List<(int x, int y, PipeDirection dir)> flowGates,
-            List<PipePiece> inventory, int parTicks) => new()
+            List<(int x, int y, TraceDirection dir)> signalGates,
+            List<TraceSegment> inventory, int parTicks) => new()
         {
             Width = w, Height = h,
             Sources = sources.Select(s => new LevelSource
-            { X = s.x, Y = s.y, ColorIndex = s.color, FlowPressure = s.pressure }).ToArray(),
+            { X = s.x, Y = s.y, ColorIndex = s.color, SignalStrength = s.pressure }).ToArray(),
             Targets = targets.Select(t => new LevelTarget
             { X = t.x, Y = t.y, ColorIndex = t.color }).ToArray(),
             Obstacles = obstacles.Select(o => new LevelObstacle { X = o.Item1, Y = o.Item2 }).ToArray(),
-            FlowGates = flowGates.Select(fg => new LevelFlowGate
+            SignalGates = signalGates.Select(fg => new LevelSignalGate
             { X = fg.x, Y = fg.y, Direction = fg.dir }).ToArray(),
             Inventory = inventory.ToArray(),
             ParTicks = parTicks,
         };
 
-        private static PipePiece ClonePiece(PipePiece p) => new()
+        private static TraceSegment ClonePiece(TraceSegment p) => new()
         {
             Shape = p.Shape, Capacity = p.Capacity,
-            ColorAffinity = p.ColorAffinity, State = PieceState.InHand,
+            ColorAffinity = p.ColorAffinity, State = SegmentState.InHand,
             Rotation = 0, Direction = p.Direction,
         };
 

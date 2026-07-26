@@ -11,7 +11,7 @@ namespace ChromaVale.Presentation.Views.Components
 {
     public class InventoryPanel : MonoBehaviour
     {
-        private PipeInventory _inventory;
+        private TraceInventory _inventory;
         private List<GameObject> _inventorySlots = new();
         private int _selectedPieceIndex = -1;
         private CanvasGroup _canvasGroup;
@@ -28,7 +28,7 @@ namespace ChromaVale.Presentation.Views.Components
 
         public int SelectedPieceIndex => _selectedPieceIndex;
         public int PendingRotation { get; private set; } = 0;
-        public event Action<PieceShape> OnPieceSelected;
+        public event Action<SegmentShape> OnPieceSelected;
 
         private void Awake()
         {
@@ -120,7 +120,7 @@ namespace ChromaVale.Presentation.Views.Components
             scanImg.type = Image.Type.Tiled;
         }
 
-        public void Bind(PipeInventory inventory)
+        public void Bind(TraceInventory inventory)
         {
             _inventory = inventory;
             Refresh();
@@ -228,7 +228,7 @@ namespace ChromaVale.Presentation.Views.Components
             if (_selectedPieceIndex >= 0 && _inventory != null)
             {
                 var piece = _inventory.Pieces[_selectedPieceIndex];
-                if (piece.State == PieceState.InHand)
+                if (piece.State == SegmentState.InHand)
                 {
                     var slot = _inventorySlots.Find(s => s != null && s.name == "Slot_" + piece.Shape);
                     ApplyHighlight(slot);
@@ -247,13 +247,13 @@ namespace ChromaVale.Presentation.Views.Components
             _inventorySlots.Clear();
         }
 
-        private void SelectInventoryPiece(PieceShape shape)
+        private void SelectInventoryPiece(SegmentShape shape)
         {
             if (_inventory == null) return;
 
             for (int i = 0; i < _inventory.Pieces.Count; i++)
             {
-                if (_inventory.Pieces[i].State == PieceState.InHand &&
+                if (_inventory.Pieces[i].State == SegmentState.InHand &&
                     _inventory.Pieces[i].Shape == shape)
                 {
                     _selectedPieceIndex = i;
@@ -337,29 +337,29 @@ namespace ChromaVale.Presentation.Views.Components
             if (t != null) t.localScale = orig;
         }
 
-        private static Color GetShapeColor(PieceShape shape) => shape switch
+        private static Color GetShapeColor(SegmentShape shape) => shape switch
         {
-            PieceShape.Straight => new Color(0.2f, 0.3f, 0.5f, 0.8f),
-            PieceShape.Elbow => new Color(0.2f, 0.5f, 0.3f, 0.8f),
-            PieceShape.TJunction => new Color(0.5f, 0.3f, 0.2f, 0.8f),
-            PieceShape.Cross => new Color(0.5f, 0.2f, 0.5f, 0.8f),
-            PieceShape.Valve => new Color(0.3f, 0.5f, 0.5f, 0.8f),
-            PieceShape.Amplifier => new Color(0.6f, 0.5f, 0.1f, 0.8f),
-            PieceShape.Mixer => new Color(0.5f, 0.1f, 0.5f, 0.8f),
-            PieceShape.Blocker => new Color(0.5f, 0.1f, 0.1f, 0.8f),
+            SegmentShape.Straight => new Color(0.2f, 0.3f, 0.5f, 0.8f),
+            SegmentShape.Corner => new Color(0.2f, 0.5f, 0.3f, 0.8f),
+            SegmentShape.Splitter => new Color(0.5f, 0.3f, 0.2f, 0.8f),
+            SegmentShape.CrossJunction => new Color(0.5f, 0.2f, 0.5f, 0.8f),
+            SegmentShape.Diode => new Color(0.3f, 0.5f, 0.5f, 0.8f),
+            SegmentShape.Repeater => new Color(0.6f, 0.5f, 0.1f, 0.8f),
+            SegmentShape.Combiner => new Color(0.5f, 0.1f, 0.5f, 0.8f),
+            SegmentShape.Breaker => new Color(0.5f, 0.1f, 0.1f, 0.8f),
             _ => new Color(0.3f, 0.3f, 0.4f, 0.8f)
         };
 
-        public static string ShapeSymbol(PieceShape shape) => shape switch
+        public static string ShapeSymbol(SegmentShape shape) => shape switch
         {
-            PieceShape.Straight => "STR",
-            PieceShape.Elbow => "ELB",
-            PieceShape.TJunction => "TEE",
-            PieceShape.Cross => "CRS",
-            PieceShape.Valve => "VLV",
-            PieceShape.Amplifier => "AMP",
-            PieceShape.Mixer => "MIX",
-            PieceShape.Blocker => "BLK",
+            SegmentShape.Straight => "STR",
+            SegmentShape.Corner => "ELB",
+            SegmentShape.Splitter => "TEE",
+            SegmentShape.CrossJunction => "CRS",
+            SegmentShape.Diode => "VLV",
+            SegmentShape.Repeater => "AMP",
+            SegmentShape.Combiner => "MIX",
+            SegmentShape.Breaker => "BLK",
             _ => "?"
         };
     }

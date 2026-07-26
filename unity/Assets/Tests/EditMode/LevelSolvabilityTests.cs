@@ -9,14 +9,14 @@ namespace ChromaVale.Tests
     /// <summary>
     /// Regression suite: prove every Chroma Flow level (Level1–Level20) is solvable.
     /// For each level we place a known-good sequence of inventory pieces using the
-    /// RunToCompletion / TryPlace pattern from FlowSimulatorTests.cs, run the
+    /// RunToCompletion / TryPlace pattern from SignalRouterTests.cs, run the
     /// simulation, and assert SimulationResult.AllTargetsReached.
     ///
     /// Each test has an explicit flow-trace comment showing the source→target
     /// path with piece indices, coordinates, rotations, and connection-map
     /// verification.
     ///
-    /// SHAPE-AWARE CONNECTION SUMMARY (from FlowSimulator.cs):
+    /// SHAPE-AWARE CONNECTION SUMMARY (from SignalRouter.cs):
     ///   Straight(rot=0):  Input=Left|Right  Output=Left|Right        (horizontal)
     ///   Straight(rot=90): Input=Up|Down    Output=Up|Down            (vertical)
     ///   Elbow(rot=0):     Input=Up|Left    Output=Down|Right
@@ -34,20 +34,20 @@ namespace ChromaVale.Tests
     /// </summary>
     public class LevelSolvabilityTests
     {
-        // ── Helper: RunToCompletion (replicated from FlowSimulatorTests.cs) ──
+        // ── Helper: RunToCompletion (replicated from SignalRouterTests.cs) ──
 
         private SimulationResult RunToCompletion(
             LevelData level,
-            Action<PipeInventory, GridBoard, FlowSimulator> placementAction,
+            Action<TraceInventory, GridBoard, SignalRouter> placementAction,
             int maxTicks = 100)
         {
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
 
             // Track burst events (for diagnostics)
             var burstEvents = new List<(int x, int y)>();
-            simulator.OnPipeBurst += (x, y) => burstEvents.Add((x, y));
+            simulator.OnTraceShort += (x, y) => burstEvents.Add((x, y));
 
             // Place pieces via the caller's placement logic
             placementAction(inventory, board, simulator);
@@ -70,7 +70,7 @@ namespace ChromaVale.Tests
         /// <summary>
         /// Level 1 — "First Light"
         /// Src(0,1,C0) → (1,1)Str(rot=0) → (2,1)Str(rot=0) → Tgt(3,1,C0)
-        /// Flow trace:
+        /// Signal trace:
         ///   Tick 0: Source(0,1) emits Right→(1,1). Entry from Left.
         ///     CanEnterCell(1,1, Left): Straight rot=0, Input=Left|Right, LeftFlag(4) ∈ Left|Right ✓
         ///   Tick 1: (1,1) exits Right→(2,1). CanExitCell: Output=Left|Right, Right ✓.
@@ -88,8 +88,9 @@ namespace ChromaVale.Tests
             var level = LevelData.Level1;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 1, 1, sim, 0); // Str rot=0 (horizontal)
-                inv.TryPlace(1, board, 2, 1, sim, 0); // Str rot=0
+                inv.TryPlace(0, board, 2, 1, sim, 0); // Str down col 2: (2,1)
+                inv.TryPlace(1, board, 2, 2, sim, 0); // Str down col 2: (2,2)
+                inv.TryPlace(2, board, 2, 3, sim, 0); // Str down col 2: (2,3)
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
@@ -102,7 +103,7 @@ namespace ChromaVale.Tests
         /// C1(0,3) → (1,3)Str → (2,3)Str → Tgt(3,3,C1)
         ///
         /// Obstacles at (2,1) and (2,2) block the middle rows — no interference.
-        /// Flow trace (C0):
+        /// Signal trace (C0):
         ///   Tick 0: Src(0,0) emits Right→(1,0). Entry from Left.
         ///     Straight rot=0: Input=Left|Right ✓.
         ///   Tick 1: (1,0) exits Right→(2,0). Entry from Left ✓.
@@ -139,7 +140,7 @@ namespace ChromaVale.Tests
         ///   (0,2)Src → Right→(1,2)[Elb 270] → Up→(1,1)[Str 90] → Up→(1,0)[Elb 270]
         ///   → Right→(2,0)[Str 0] → Right→(3,0)[Elb 270] → Right→(4,0)=Tgt(C0)
         ///
-        /// Flow trace:
+        /// Signal trace:
         ///   Src emits Right→(1,2). Elb 270: Input=Left|Down. Enter from Left=4. (4&6)≠0 ✓.
         ///     Output=Right|Up. Exit Up→(1,1). ✓
         ///   (1,1) Str 90: Input=Up|Down. Enter from Down=Opposite(Up... hmm)
@@ -287,7 +288,7 @@ namespace ChromaVale.Tests
         /// BUT: pressure=2 → each source emission puts 2 flow units.
         /// (1,2): must be cap-2. only one cap-2 in inventory. ✓
         /// (2,2): cap-1. Flow enters at p(2). AddFlow(1,0) → flow=1. Next tick, another +1 → flow=2.
-        /// CurrentFlow(2) > Capacity(1) → BURST! ❌
+        /// CurrentFlow(2) > Capacity(1) → SHORT! ❌
         ///
         /// Actually, tracing Tick more carefully:
         /// StartSimulation: Source emits to (1,2). 2 waves of color 0 (pressure 2).
@@ -301,7 +302,7 @@ namespace ChromaVale.Tests
         /// With cap-1 at (2,2): 2 units enter. If AddFlow is called once with 1, flow=1 ≤ 1 ✓.
         /// But pressure=2 means the source emits 2 waves. Each wave produces its own wave in (1,2).
         /// Then Tick 1: both waves at (1,2) try to exit Right→(2,2). First wave: AddFlow(1,0), flow=1≤1 ✓.
-        /// Second wave: AddFlow(1,0), flow=2 > 1 → BURST!
+        /// Second wave: AddFlow(1,0), flow=2 > 1 → SHORT!
         ///
         /// So cap-1 at (2,2) bursts. Need ALL cap≥2 on the main line.
         /// Inventory: [Str(1), Str(1), Str(2), Elb(1), Elb(1)]
@@ -490,15 +491,15 @@ namespace ChromaVale.Tests
 
         /// <summary>
         /// Level 8 — "One-Way Maze"
-        /// Src(0,2,C0)→Tgt(4,2,C0). FlowGates at (2,1,R) and (2,3,U) enforce direction.
-        /// No obstacles — the flow gates are the puzzle.
+        /// Src(0,2,C0)→Tgt(4,2,C0). SignalGates at (2,1,R) and (2,3,U) enforce direction.
+        /// No obstacles — the signal gates are the puzzle.
         ///
-        /// FlowGate(2,1,R): points Right, flow must enter from Left (dx=-1).
-        /// FlowGate(2,3,U): points Up, flow must enter from Bottom (dy=1).
+        /// SignalGate(2,1,R): points Right, flow must enter from Left (dx=-1).
+        /// SignalGate(2,3,U): points Up, flow must enter from Bottom (dy=1).
         ///
         /// Direct route: (0,2)→(1,2)[Str]→(2,2)[Str]→(3,2)[Str]→(4,2)=Tgt.
-        /// The FlowGates at (2,1) and (2,3) are ABOVE and BELOW the main path — irrelevant
-        /// if we stay on row 2! The flow gates don't block the direct route.
+        /// The SignalGates at (2,1) and (2,3) are ABOVE and BELOW the main path — irrelevant
+        /// if we stay on row 2! The signal gates don't block the direct route.
         ///
         /// Inventory: [Str(2), Str(2), Str(2), Elb(2), Elb(2)]
         ///   idx 0: Str at (1,2) rot=0
@@ -897,7 +898,7 @@ namespace ChromaVale.Tests
         /// C1: (0,4)→(0,3)[Str 90→↑→(0,2)]→(0,2)[Str 90→↑→(0,1)]→... but (0,1)=Src(C0).
         /// Can't place pipe at (0,1). 
         ///
-        /// Actually Source cells are CellType.Source, not Empty. board.PlacePipe checks cell.Type==Empty.
+        /// Actually Source cells are CellType.Source, not Empty. board.PlaceTrace checks cell.Type==Empty.
         /// So we can't place pipes on source cells. The source at (0,1) is in the way.
         ///
         /// C1: (0,4)→(0,3)→(1,3)→(2,3)... is (2,3) obstacle? No, obstacles are (2,0),(2,5),(3,2),(3,3).
@@ -1114,12 +1115,12 @@ namespace ChromaVale.Tests
 
         /// <summary>
         /// Level 13 — "Turnstile"
-        /// Spiral path through FlowGates. Src(2,0,C0)→Tgt(2,4,C0).
-        /// FlowGates: (2,1,R), (2,3,U), (0,2,U), (4,2,D).
+        /// Spiral path through SignalGates. Src(2,0,C0)→Tgt(2,4,C0).
+        /// SignalGates: (2,1,R), (2,3,U), (0,2,U), (4,2,D).
         ///
         /// From // Solution: spiral path around the perimeter.
-        /// Entry: (2,0)Src→(2,1)FlowGate→... must go through flow gates in correct direction.
-        /// FlowGate(2,1,R): flow must enter from Left (dx=-1), which is from (1,1) ← coming from west.
+        /// Entry: (2,0)Src→(2,1)FlowGate→... must go through signal gates in correct direction.
+        /// SignalGate(2,1,R): flow must enter from Left (dx=-1), which is from (1,1) ← coming from west.
         ///
         /// The spiral solution from the comment suggests going RIGHT, DOWN, LEFT, then back to center column.
         /// (2,0)Src→Right→(3,0)[Elb 270→enter←, exit→? No, exit↑]. 
@@ -1131,10 +1132,10 @@ namespace ChromaVale.Tests
         ///
         /// OK actually 5×5 grid. FlowGate(4,2,D) at x=4,y=2. Flow enters from top (dy=1) → from (4,1).
         /// After gate: flow is at (4,2) and on the next tick tries to exit all directions.
-        /// FlowGate cells are CellType.FlowGate, not Pipe. The Tick() code for FlowGate:
+        /// SignalGate cells are CellType.SignalGate, not Pipe. The Tick() code for FlowGate:
         ///   _visited.Add(visitKey); nextWaves.Add(new Wave { X = nx, Y = ny, ... });
         /// It adds the gate cell itself as a wave. On the next tick, flow exits the gate cell in all directions.
-        /// But CanExitCell on a flow gate... does it have shape info? No, shape info only comes from placed pipes.
+        /// But CanExitCell on a signal gate... does it have shape info? No, shape info only comes from placed traces.
         /// So CanExitCell returns true (default) for gates without shape info. Flow can exit in any direction.
         ///
         /// The spiral: (2,0)→right→(3,0)→(4,0)→down→(4,1)→(4,2)[FG(D)]→... continue spiral.
@@ -1228,7 +1229,7 @@ namespace ChromaVale.Tests
         ///
         /// The cap-1 pipes are burst-bait traps.
         ///
-        /// Flow trace:
+        /// Signal trace:
         ///   Tick 0: Src emits Right→(1,3). Str(2) Input=Left|Right ✓.
         ///   Tick 1: (1,3) exits Right→(2,3). ✓
         ///   Tick 2: (2,3) exits Right→(3,3). ✓
@@ -1262,14 +1263,14 @@ namespace ChromaVale.Tests
         ///
         /// Direct route: (1,3)Str(2)→(2,3)Str(2)→(3,3)Str(2)→(4,3)Str(2)→(5,3)=Tgt.
         /// Pressure 3 means source emits 3 pressure units, each trying different directions.
-        /// Only Right→(1,3) is valid (pipe cell). So only 1 flow unit enters (1,3) per tick.
+        /// Only Right→(1,3) is valid (trace cell). So only 1 flow unit enters (1,3) per tick.
         /// Wait, re-reading EmitFromSource: it loops p times, each checking all 4 dirs.
         /// For each p, it checks all 4 directions and only adds one wave per unique (nx,ny,color).
         /// So pressure=3 with only 1 valid neighbor = 1 wave with 1 flow unit.
         /// Cap-2 handles flow=1 easily.
         /// 
         /// But on subsequent ticks, more flow enters. At Tick 1: wave at (1,3) exits Right→(2,3).
-        /// Flow in (2,3): 1 unit. Tick 2: more flow from (1,3)→(2,3). (2,3) now has 2 units.
+        /// Signal in (2,3): 1 unit. Tick 2: more flow from (1,3)→(2,3). (2,3) now has 2 units.
         /// Cap=2 handles 2 units ✓. But pressure=3... the SOURCE emits 3 units per tick,
         /// with one wave per tick per direction. So (1,3) gets 1 new unit per tick.
         /// Over 4 ticks: (4,3) gets flow=1. Under cap=2 for all. No burst!
@@ -1422,7 +1423,7 @@ namespace ChromaVale.Tests
         /// <summary>
         /// Level 20 — "Pressure Final"
         /// The final boss. Two crossing colors C0(0,1,p2)→(6,5) and C1(0,5,p2)→(6,1).
-        /// Flow gates at (3,1,D) and (3,5,U) guide the crossing.
+        /// Signal gates at (3,1,D) and (3,5,U) guide the crossing.
         /// Obstacles at (3,3), (2,0), (2,6), (4,0), (4,6).
         ///
         /// C0 must go from (0,1) to (6,5). FlowGate(3,1,D) forces entry from top (dy=1).
@@ -1439,7 +1440,7 @@ namespace ChromaVale.Tests
         ///   After FG(3,5,U), flow can go Up→(3,4).
         ///   Then continue.
         ///
-        /// Both routes must not touch. With obstacles at (3,3) and flow gates creating
+        /// Both routes must not touch. With obstacles at (3,3) and signal gates creating
         /// a barrier at column 3 rows 1 and 5, the two colors are separated by column 3.
         ///
         /// Inventory: Str(2)×4, Elb(2)×4, Valve(2)×2, Amp×1, Blocker×1 = 12 pieces.

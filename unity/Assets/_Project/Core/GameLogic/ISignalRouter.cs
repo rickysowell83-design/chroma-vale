@@ -5,13 +5,13 @@ namespace ChromaVale.Core.GameLogic
     public enum SimulationResult
     {
         InProgress,         // Simulation still running
-        AllTargetsReached,  // WIN — every target has been reached by matching flow
-        FlowStopped,        // LOSE — no more flow can advance; some targets unreached
+        AllTargetsReached,  // WIN — every target has been reached by matching signal
+        SignalStuck,        // STUCK — no more signal can advance; some targets unreached
         PlayerStopped       // Player manually stopped simulation
     }
 
     /// <summary>
-    /// Turn-based flow simulation engine interface.
+    /// Turn-based signal propagation engine interface.
     /// Pure C# — no Unity dependencies. Fully unit-testable.
     ///
     /// Usage:
@@ -20,18 +20,18 @@ namespace ChromaVale.Core.GameLogic
     ///   3. Subscribe to events for visual updates
     ///   4. Check GetResult() for termination state
     /// </summary>
-    public interface IFlowSimulator
+    public interface ISignalRouter
     {
-        /// <summary>Raised each tick when flow advances into a cell.</summary>
-        event Action<int, int, int> OnFlowAdvance;
+        /// <summary>Raised each tick when signal advances into a cell.</summary>
+        event Action<int, int, int> OnSignalAdvance;
 
-        /// <summary>Raised when a pipe bursts (overloaded). That cell is now impassable.</summary>
-        event Action<int, int> OnPipeBurst;
+        /// <summary>Raised when a trace short circuits (overloaded). That cell is now impassable.</summary>
+        event Action<int, int> OnTraceShort;
 
         /// <summary>Raised when two colors mix at a cell. (x, y, colorA, colorB)</summary>
         event Action<int, int, int, int> OnColorMix;
 
-        /// <summary>Raised when flow reaches a target and activates it.</summary>
+        /// <summary>Raised when signal reaches a target and activates it.</summary>
         event Action<int, int, int> OnTargetReached;
 
         /// <summary>Whether simulation is actively running.</summary>
@@ -47,8 +47,8 @@ namespace ChromaVale.Core.GameLogic
         void StartSimulation(IBoardState board, LevelData level);
 
         /// <summary>
-        /// Advance flow by one tick. Flow propagates from each source
-        /// outward through pipes. Fires events for each change.
+        /// Advance signal by one tick. Signal propagates from each source
+        /// outward through traces. Fires events for each change.
         /// </summary>
         void Tick();
 
@@ -63,12 +63,12 @@ namespace ChromaVale.Core.GameLogic
         SimulationResult GetResult();
 
         /// <summary>
-        /// Get the current PipeCellState for a position (for UI inspection).
+        /// Get the current TraceCellState for a position (for UI inspection).
         /// </summary>
-        PipeCellState GetCellState(int x, int y);
+        TraceCellState GetCellState(int x, int y);
 
         /// <summary>
-        /// Get whether a specific target has been reached by matching flow.
+        /// Get whether a specific target has been reached by matching signal.
         /// </summary>
         bool IsTargetReached(int targetX, int targetY);
 

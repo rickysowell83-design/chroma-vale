@@ -7,7 +7,7 @@ using TMPro;
 
 namespace ChromaVale.Presentation.Views.Components
 {
-    public class FlowButton : MonoBehaviour
+    public class RouteButton : MonoBehaviour
     {
         private Button _button;
         private TextMeshProUGUI _label;
@@ -40,7 +40,7 @@ namespace ChromaVale.Presentation.Views.Components
 
         private void CreateUI()
         {
-            // FlowButton canvas
+            // RouteButton canvas
             var canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 60;

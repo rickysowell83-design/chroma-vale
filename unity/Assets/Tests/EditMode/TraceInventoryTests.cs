@@ -5,13 +5,13 @@ using ChromaVale.Domain.PuzzleBoard;
 namespace ChromaVale.Tests
 {
     /// <summary>
-    /// Edit-mode tests for PipeInventory — engine-free placement/undo/burst tracking.
-    /// Tests: TryPlace, TryUndo (3-undo cap), MarkBurst, GetEfficiency, ResetAll.
+    /// Edit-mode tests for TraceInventory — engine-free placement/undo/burst tracking.
+    /// Tests: TryPlace, TryUndo (3-undo cap), MarkShorted, GetEfficiency, ResetAll.
     /// C# 9.0 compatible (no file-scoped namespaces).
     /// </summary>
-    public class PipeInventoryTests
+    public class TraceInventoryTests
     {
-        private PipePiece[] _threeStraights;
+        private TraceSegment[] _threeStraights;
         private GridBoard _board3x1;
         private LevelData _simpleLevel;
 
@@ -20,19 +20,19 @@ namespace ChromaVale.Tests
         {
             _threeStraights = new[]
             {
-                PipePiece.Straight(2),
-                PipePiece.Straight(2),
-                PipePiece.Straight(2),
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(2),
             };
 
             _simpleLevel = new LevelData
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
                 Inventory = _threeStraights,
             };
 
@@ -44,12 +44,12 @@ namespace ChromaVale.Tests
         [Test]
         public void TryPlace_ValidPlacement_ReturnsTrueAndUpdatesState()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
 
             bool result = inventory.TryPlace(0, _board3x1, 1, 0);
 
             Assert.IsTrue(result);
-            Assert.AreEqual(PieceState.Placed, _threeStraights[0].State);
+            Assert.AreEqual(SegmentState.Placed, _threeStraights[0].State);
             Assert.AreEqual(1, inventory.PlacedCount);
             Assert.AreEqual(2, inventory.AvailableCount);
         }
@@ -57,21 +57,21 @@ namespace ChromaVale.Tests
         [Test]
         public void TryPlace_OnOccupiedCell_ReturnsFalse()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0); // Place piece 0 at (1,0)
 
             // Try to place piece 1 at the same cell
             bool result = inventory.TryPlace(1, _board3x1, 1, 0);
 
             Assert.IsFalse(result);
-            Assert.AreEqual(PieceState.InHand, _threeStraights[1].State);
+            Assert.AreEqual(SegmentState.InHand, _threeStraights[1].State);
             Assert.AreEqual(1, inventory.PlacedCount);
         }
 
         [Test]
         public void TryPlace_AlreadyPlacedPiece_ReturnsFalse()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0);
 
             // Try to place same piece again at a different cell
@@ -87,14 +87,14 @@ namespace ChromaVale.Tests
         [Test]
         public void TryUndo_ReturnsPieceToHandAndDecrementsUndos()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0);
             Assert.AreEqual(1, inventory.PlacedCount);
 
             bool undoResult = inventory.TryUndo(_board3x1);
 
             Assert.IsTrue(undoResult);
-            Assert.AreEqual(PieceState.InHand, _threeStraights[0].State);
+            Assert.AreEqual(SegmentState.InHand, _threeStraights[0].State);
             Assert.AreEqual(2, inventory.UndosRemaining); // Started with 3, used 1
             Assert.AreEqual(0, inventory.PlacedCount);
             Assert.AreEqual(3, inventory.AvailableCount);
@@ -107,18 +107,18 @@ namespace ChromaVale.Tests
             {
                 Width = 6,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 5, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
                 Inventory = new[]
                 {
-                    PipePiece.Straight(2), PipePiece.Straight(2),
-                    PipePiece.Straight(2), PipePiece.Straight(2),
+                    TraceSegment.Straight(2), TraceSegment.Straight(2),
+                    TraceSegment.Straight(2), TraceSegment.Straight(2),
                 },
             };
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory, maxUndos: 3);
+            var inventory = new TraceInventory(level.Inventory, maxUndos: 3);
 
             Assert.IsTrue(inventory.TryPlace(0, board, 1, 0));
             Assert.IsTrue(inventory.TryPlace(1, board, 2, 0));
@@ -133,35 +133,35 @@ namespace ChromaVale.Tests
             Assert.IsFalse(inventory.TryUndo(board));
         }
 
-        // ── MarkBurst ──
+        // ── MarkShorted ──
 
         [Test]
-        public void MarkBurst_SetsBurstStateAndIncrementsBurstCount()
+        public void MarkShorted_SetsBurstStateAndIncrementsShortedCount()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0);
 
-            bool marked = inventory.MarkBurst(1, 0);
+            bool marked = inventory.MarkShorted(1, 0);
 
             Assert.IsTrue(marked);
-            Assert.AreEqual(1, inventory.BurstCount);
-            Assert.AreEqual(PieceState.Burst, _threeStraights[0].State);
+            Assert.AreEqual(1, inventory.ShortedCount);
+            Assert.AreEqual(SegmentState.Shorted, _threeStraights[0].State);
 
             // Burst pieces should not be restorable via undo
             // (TryUndo only undoes the last _placementMap entry, which is still there
             //  since burst doesn't remove from placement map — but the piece state is Burst)
-            Assert.AreEqual(PieceState.Burst, _threeStraights[0].State);
+            Assert.AreEqual(SegmentState.Shorted, _threeStraights[0].State);
         }
 
         [Test]
-        public void MarkBurst_OnEmptyCell_ReturnsFalse()
+        public void MarkShorted_OnEmptyCell_ReturnsFalse()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
 
-            bool marked = inventory.MarkBurst(5, 5);
+            bool marked = inventory.MarkShorted(5, 5);
 
             Assert.IsFalse(marked);
-            Assert.AreEqual(0, inventory.BurstCount);
+            Assert.AreEqual(0, inventory.ShortedCount);
         }
 
         // ── GetEfficiency ──
@@ -169,9 +169,9 @@ namespace ChromaVale.Tests
         [Test]
         public void GetEfficiency_ReturnsUnusedRatio()
         {
-            // PipeInventory.GetEfficiency() = AvailableCount / total = unused / total
+            // TraceInventory.GetEfficiency() = AvailableCount / total = unused / total
             // 0 = all used, 1 = none used
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
 
             // All 3 in hand: efficiency = 3/3 = 1.0
             Assert.AreEqual(1.0f, inventory.GetEfficiency());
@@ -186,7 +186,7 @@ namespace ChromaVale.Tests
         [Test]
         public void GetEfficiency_EmptyInventory_ReturnsOne()
         {
-            var inventory = new PipeInventory(System.Array.Empty<PipePiece>());
+            var inventory = new TraceInventory(System.Array.Empty<TraceSegment>());
             Assert.AreEqual(1.0f, inventory.GetEfficiency());
         }
 
@@ -195,11 +195,11 @@ namespace ChromaVale.Tests
         [Test]
         public void ResetAll_RestoresAllPiecesAndUndos()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0);
             inventory.TryUndo(_board3x1);
             inventory.TryPlace(1, _board3x1, 1, 0);
-            inventory.MarkBurst(1, 0);
+            inventory.MarkShorted(1, 0);
 
             inventory.ResetAll();
 
@@ -216,28 +216,28 @@ namespace ChromaVale.Tests
         [Test]
         public void GetAvailablePieces_ReturnsOnlyInHand()
         {
-            var inventory = new PipeInventory(_threeStraights);
+            var inventory = new TraceInventory(_threeStraights);
             inventory.TryPlace(0, _board3x1, 1, 0);
 
             var available = inventory.GetAvailablePieces();
 
             Assert.AreEqual(2, available.Length);
-            Assert.AreEqual(PieceState.InHand, available[0].State);
-            Assert.AreEqual(PieceState.InHand, available[1].State);
+            Assert.AreEqual(SegmentState.InHand, available[0].State);
+            Assert.AreEqual(SegmentState.InHand, available[1].State);
         }
 
         [Test]
         public void GetCount_FiltersByShape()
         {
-            var pieces = new PipePiece[]
+            var pieces = new TraceSegment[]
             {
-                PipePiece.Straight(2),
-                PipePiece.Straight(2),
-                PipePiece.Elbow(2),
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(2),
+                TraceSegment.Corner(2),
             };
-            var inventory = new PipeInventory(pieces);
+            var inventory = new TraceInventory(pieces);
 
-            int count = inventory.GetCount(PieceShape.Straight);
+            int count = inventory.GetCount(SegmentShape.Straight);
             Assert.AreEqual(2, count);
         }
     }

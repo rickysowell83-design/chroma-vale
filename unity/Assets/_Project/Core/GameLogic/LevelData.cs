@@ -5,12 +5,20 @@ namespace ChromaVale.Core.GameLogic
     public struct LevelSource
     {
         public int X, Y, ColorIndex;
-        public int FlowPressure; // Units of flow emitted per tick (default 1)
+        public int SignalStrength; // Units of signal emitted per tick (default 1)
     }
 
     public struct LevelTarget
     {
         public int X, Y, ColorIndex;
+        /// <summary>Optional timing window — signal must arrive within [MinTick, MaxTick]. Null = any tick.</summary>
+        public AcceptWindow? AcceptWindow;
+    }
+
+    public struct AcceptWindow
+    {
+        public int MinTick;  // Signal must arrive at or after this tick
+        public int MaxTick;  // Signal must arrive at or before this tick
     }
 
     public struct LevelObstacle
@@ -18,10 +26,24 @@ namespace ChromaVale.Core.GameLogic
         public int X, Y;
     }
 
-    public struct LevelFlowGate
+    public struct LevelSignalGate
     {
         public int X, Y;
-        public PipeDirection Direction;
+        public TraceDirection Direction;
+    }
+
+    public struct GhostTrace
+    {
+        public int X, Y;              // Cell position
+        public SegmentShape Shape;    // Straight, Corner, Splitter, CrossJunction
+        public int Rotation;          // 0, 90, 180, 270
+        public int Capacity;          // How much signal it can carry (1-3)
+    }
+
+    public struct ImpedanceCell
+    {
+        public int X, Y;              // Cell position
+        public int ResistanceCost;    // Signal strength cost to pass (default 1)
     }
 
     public class LevelData
@@ -31,38 +53,42 @@ namespace ChromaVale.Core.GameLogic
         public LevelSource[] Sources;
         public LevelTarget[] Targets;
         public LevelObstacle[] Obstacles;
-        public LevelFlowGate[] FlowGates;
-        public PipePiece[] Inventory;    // Available pieces for this level
+        public LevelSignalGate[] SignalGates;
+        public GhostTrace[] GhostTraces;          // Pre-existing traces on the board
+        public ImpedanceCell[] ImpedanceCells;    // Signal-weakening zones
+        public int SignalStrength = 3;            // Default signal strength from sources (replaces per-source pressure)
+        public TraceSegment[] Inventory;    // Available pieces for this level
         public int ParTicks = 20;        // Par completion time in ticks (for 3-star)
         public string DisplayName;       // Human-readable level name for HUD
 
         // ═══════════════════════════════════════════════════════════════
-        // WORLD 1: "First Light" — Learning to Flow (Levels 1-5)
+        // WORLD 1: "First Light" — Learning to Route (Levels 1-5)
         // ═══════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Level 1: "First Light"
-        /// 5×5 tutorial grid — no obstacles. Source pressure 1.
-        /// Straight line from source to target. Simplest possible puzzle.
-        /// Teaches: Basic routing — connect source to target with pipes.
-        /// Grid: 5×5 | Par: 8 ticks
-        ///
-        /// Solution: 3×Straight(2) at (1,2), (2,2), (3,2). 3 ticks.
-        /// 3-star: 3/10 pieces = 30% inventory (well within 60% threshold).
+        /// Level 1: "First Contact" (v3 — Option A+)
+        /// 5×5 tutorial grid — no obstacles, no ghost traces, no impedance.
+        /// Source at (2,0) top-center, target at (2,4) bottom-center.
+        /// Vertical straight-line path: 4 cells. Impossible to fail.
+        /// Teaches: Select trace from tray, place on board, press ROUTE, watch signal.
+        /// Grid: 5×5 | Par: 6 ticks
+        /// Solution: 4×Straight(2) down column 2. 4 ticks.
         /// </summary>
         public static LevelData Level1 => new()
         {
-            Width = 5, Height = 5, ParTicks = 8,
-            DisplayName = "First Light",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
-            Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
+            Width = 5, Height = 5, ParTicks = 6,
+            DisplayName = "First Contact",
+            Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+            Targets = new[] { new LevelTarget { X = 2, Y = 4, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = System.Array.Empty<GhostTrace>(),
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
+            SignalStrength = 3,
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
         };
         /// <summary>
@@ -77,8 +103,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Two Streams",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 1 },
             },
             Targets = new[]
             {
@@ -86,12 +112,12 @@ namespace ChromaVale.Core.GameLogic
                 new LevelTarget { X = 3, Y = 3, ColorIndex = 1 },
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 2 } },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
         };
 
@@ -105,18 +131,18 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 6,
             DisplayName = "The Turn",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 1 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 0, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 2 } },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
                 // FIX 2026-07-23: shortest legal route is 5 cells — (1,2)↑(1,1)↑(1,0)→(2,0)→(3,0):
                 // 2 elbows + 3 straights. Old inventory (2S+3E) was UNSOLVABLE since
                 // shape-aware flow landed (elbows can't substitute for straights).
                 // 6 pieces so a 5-piece solve still leaves 1 unused (star scoring).
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
         };
 
@@ -133,8 +159,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Tight Budget",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 1, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 1, SignalStrength = 1 },
             },
             Targets = new[]
             {
@@ -146,36 +172,36 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 1, Y = 2 }, new LevelObstacle { X = 2, Y = 1 },
                 new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 3, Y = 2 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Cross(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.CrossJunction(2),
             }
         };
 
         /// <summary>
-        /// Level 5: "First Burst"
-        /// Source pressure 3 — short path (4 cells) bursts cap-1 pipes instantly.
+        /// Level 5: "First Short"
+        /// Source pressure 3 — short path (4 cells) shorts cap-1 traces instantly.
         /// Player must use the Amplifier to boost adjacent cells to cap-2,
-        /// or route the long way (6 cells) to spread flow thinner.
-        /// Teaches: Amplifier piece, burst mitigation via capacity boost.
+        /// or route the long way (6 cells) to spread signal thinner.
+        /// Teaches: Repeater piece, short mitigation via capacity boost.
         /// Grid: 5×5 | Par: 7 ticks
         /// </summary>
         public static LevelData Level5 => new()
         {
             Width = 5, Height = 5, ParTicks = 7,
-            DisplayName = "First Burst",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 3 } },
+            DisplayName = "First Short",
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 3 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 2, Y = 1 } },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Amplifier(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Repeater(),
             }
         };
 
@@ -197,8 +223,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Color Crossing",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
-                new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 2 },
             },
             Targets = new[]
             {
@@ -206,21 +232,21 @@ namespace ChromaVale.Core.GameLogic
                 new LevelTarget { X = 4, Y = 3, ColorIndex = 1 },
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 2 } },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(1), PipePiece.Elbow(1),
-                PipePiece.Cross(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.CrossJunction(2),
             }
         };
 
         /// <summary>
         /// Level 7: "Valve Control"
-        /// Source pressure 3 through a narrow channel. Environmental FlowGates
+        /// Source pressure 3 through a narrow channel. Environmental SignalGates
         /// force specific routing. The Valve MUST be placed at the bottleneck
-        /// to prevent backflow; Amplifier boosts bottleneck cell capacity.
+        /// to prevent backflow; Repeater boosts bottleneck cell capacity.
         /// Teaches: Valve + Amplifier combo for high-pressure bottlenecks.
         /// Grid: 5×5 | Par: 8 ticks
         /// </summary>
@@ -228,7 +254,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 8,
             DisplayName = "Valve Control",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 3 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 3 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[]
             {
@@ -236,25 +262,25 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 1, Y = 3 }, new LevelObstacle { X = 1, Y = 4 },
                 new LevelObstacle { X = 3, Y = 0 }, new LevelObstacle { X = 3, Y = 4 },
             },
-            FlowGates = new[]
+            SignalGates = new[]
             {
-                new LevelFlowGate { X = 2, Y = 1, Direction = PipeDirection.Right },
-                new LevelFlowGate { X = 2, Y = 3, Direction = PipeDirection.Right },
+                new LevelSignalGate { X = 2, Y = 1, Direction = TraceDirection.Right },
+                new LevelSignalGate { X = 2, Y = 3, Direction = TraceDirection.Right },
             },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1),
-                PipePiece.Elbow(1), PipePiece.Elbow(1),
-                PipePiece.Valve(2, PipeDirection.Right),
-                PipePiece.Amplifier(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.Diode(2, TraceDirection.Right),
+                TraceSegment.Repeater(),
             }
         };
 
         /// <summary>
         /// Level 8: "One-Way Maze"
-        /// Source pressure 2 forces cap-1 sections to risk burst.
-        /// Environmental flow gates at (2,1,Right) and (2,3,Up) force
+        /// Source pressure 2 forces cap-1 sections to risk short.
+        /// Environmental signal gates at (2,1,Right) and (2,3,Up) force
         /// a specific winding route. Cap-1 pipes on the short path
         /// will struggle at p=2 unless routed around.
         /// Teaches: Pressure + gate routing puzzle.
@@ -264,19 +290,19 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 9,
             DisplayName = "One-Way Maze",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 2 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 2 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
-            FlowGates = new[]
+            SignalGates = new[]
             {
-                new LevelFlowGate { X = 2, Y = 1, Direction = PipeDirection.Right },
-                new LevelFlowGate { X = 2, Y = 3, Direction = PipeDirection.Up },
+                new LevelSignalGate { X = 2, Y = 1, Direction = TraceDirection.Right },
+                new LevelSignalGate { X = 2, Y = 3, Direction = TraceDirection.Up },
             },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(1), PipePiece.Elbow(1),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1),
             }
         };
 
@@ -294,22 +320,22 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Double Pressure",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 2 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 0, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 0, SignalStrength = 2 },
             },
             Targets = new[]
             {
                 new LevelTarget { X = 4, Y = 2, ColorIndex = 0 },
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 3 } },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.TJunction(2),
-                PipePiece.Amplifier(), PipePiece.Amplifier(),
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Splitter(2),
+                TraceSegment.Repeater(), TraceSegment.Repeater(),
             }
         };
 
@@ -327,8 +353,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Crossfire",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 1, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 1, SignalStrength = 2 },
             },
             Targets = new[]
             {
@@ -340,14 +366,14 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 0 }, new LevelObstacle { X = 2, Y = 5 },
                 new LevelObstacle { X = 3, Y = 2 }, new LevelObstacle { X = 3, Y = 3 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(1), PipePiece.Elbow(1),
-                PipePiece.Cross(2),
-                PipePiece.Amplifier(), PipePiece.Amplifier(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.CrossJunction(2),
+                TraceSegment.Repeater(), TraceSegment.Repeater(),
             }
         };
 
@@ -370,7 +396,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 7,
             DisplayName = "Valve Gate",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 1 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[]
             {
@@ -379,12 +405,12 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 3, Y = 0 }, new LevelObstacle { X = 3, Y = 1 },
                 new LevelObstacle { X = 3, Y = 3 }, new LevelObstacle { X = 3, Y = 4 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Valve(2, PipeDirection.Right),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Diode(2, TraceDirection.Right),
             }
         };
 
@@ -409,8 +435,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "No Return",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 1, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 1, SignalStrength = 1 },
             },
             Targets = new[]
             {
@@ -422,47 +448,47 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 2 },
                 new LevelObstacle { X = 2, Y = 3 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Valve(2), PipePiece.Valve(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Diode(2), TraceSegment.Diode(2),
             }
         };
 
         /// <summary>
         /// Level 13: "Turnstile"
-        /// Spiral path through environmental FlowGates forces a full loop.
-        /// Teaches: Environmental flow gate direction enforcement.
+        /// Spiral path through environmental SignalGates forces a full loop.
+        /// Teaches: Environmental signal gate direction enforcement.
         /// Grid: 5×5 | Par: 10 ticks
         /// </summary>
         // Solution: Spiral: Elbow(2, rot=270, RIGHT from UP) at (3,0); Straight(2, rot=90)
         //   at (4,1),(4,2),(4,3),(4,4); Elbow(2, rot=0, DOWN from RIGHT) at (3,4);
         //   Straight(2, rot=90) at (3,3),(3,2); Valve(2, Up) at (2,2)[enters from below,
         //   exits Up]; Straight(2, rot=0) at (2,1)→Source(2,0) completes loop.
-        //   FlowGates at (2,1,R) enforces entry from LEFT; (2,3,U) enforces UP.
+        //   SignalGates at (2,1,R) enforces entry from LEFT; (2,3,U) enforces UP.
         //   Uses 2×Straight + 4×Elbow + 1×Valve = 7 pieces (no spares for 3-star at 100%;
         //   but with 2 spare straights from extra routing, 4/7=57% ≤60% for 3-star).
         public static LevelData Level13 => new()
         {
             Width = 5, Height = 5, ParTicks = 10,
             DisplayName = "Turnstile",
-            Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+            Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
             Targets = new[] { new LevelTarget { X = 2, Y = 4, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
-            FlowGates = new[]
+            SignalGates = new[]
             {
-                new LevelFlowGate { X = 2, Y = 1, Direction = PipeDirection.Right },
-                new LevelFlowGate { X = 2, Y = 3, Direction = PipeDirection.Up },
-                new LevelFlowGate { X = 0, Y = 2, Direction = PipeDirection.Up },
-                new LevelFlowGate { X = 4, Y = 2, Direction = PipeDirection.Down },
+                new LevelSignalGate { X = 2, Y = 1, Direction = TraceDirection.Right },
+                new LevelSignalGate { X = 2, Y = 3, Direction = TraceDirection.Up },
+                new LevelSignalGate { X = 0, Y = 2, Direction = TraceDirection.Up },
+                new LevelSignalGate { X = 4, Y = 2, Direction = TraceDirection.Down },
             },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Valve(2, PipeDirection.Up),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Diode(2, TraceDirection.Up),
             }
         };
 
@@ -484,7 +510,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 6, Height = 6, ParTicks = 9,
             DisplayName = "Split Decision",
-            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 0, FlowPressure = 2 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 0, SignalStrength = 2 } },
             Targets = new[]
             {
                 new LevelTarget { X = 5, Y = 1, ColorIndex = 0 },
@@ -495,13 +521,13 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 2 }, new LevelObstacle { X = 3, Y = 2 },
                 new LevelObstacle { X = 2, Y = 4 }, new LevelObstacle { X = 3, Y = 4 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.TJunction(2),
-                PipePiece.Valve(2, PipeDirection.Right),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Splitter(2),
+                TraceSegment.Diode(2, TraceDirection.Right),
             }
         };
 
@@ -555,8 +581,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Checkpoint",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 },
-                new LevelSource { X = 0, Y = 5, ColorIndex = 2, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 5, ColorIndex = 2, SignalStrength = 1 },
             },
             Targets = new[]
             {
@@ -568,12 +594,12 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 2 }, new LevelObstacle { X = 2, Y = 3 },
                 new LevelObstacle { X = 3, Y = 2 }, new LevelObstacle { X = 3, Y = 3 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(1), PipePiece.Straight(1), PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(1), PipePiece.Elbow(1), PipePiece.Elbow(1),
-                PipePiece.Valve(1), PipePiece.Valve(1),
+                TraceSegment.Straight(1), TraceSegment.Straight(1), TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.Diode(1), TraceSegment.Diode(1),
             }
         };
 
@@ -596,7 +622,7 @@ namespace ChromaVale.Core.GameLogic
         // With 3×Str(2): (1,3),(2,3),(3,3) as cap-2. Then (4,3) must be either Elb(2) or... 
         //   but Target is at (5,3), so flow from (4,3) goes RIGHT to (5,3)=Target.
         //   (4,3) is the last cell before target. Use Elb(2) at (4,3)? No, that would turn flow.
-        //   Use Str(1) at (4,3): flow enters from LEFT, exits RIGHT. But pressure=2 in a cap-1 pipe → BURST!
+        //   Use Str(1) at (4,3): flow enters from LEFT, exits RIGHT. But pressure=2 in a cap-1 pipe → SHORT!
         //   Aha! That's the burst-bait! The player can't use cap-1 at all.
         //   Solution: (1,3)Str(2), (2,3)Str(2), (3,3)Str(2), Elb(2) at (3,4)→(3,5)→(4,5)→(5,5) then up to (5,3)?
         //   Target is at (5,3). From (3,5)→(4,5)→(5,5)→Elb(5,4)→(5,3)=Target. 
@@ -627,19 +653,19 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 6, Height = 6, ParTicks = 7,
             DisplayName = "Thin Ice",
-            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 0, FlowPressure = 2 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 0, SignalStrength = 2 } },
             Targets = new[] { new LevelTarget { X = 5, Y = 3, ColorIndex = 0 } },
             Obstacles = new[]
             {
                 new LevelObstacle { X = 3, Y = 1 }, new LevelObstacle { X = 3, Y = 5 },
                 new LevelObstacle { X = 4, Y = 1 }, new LevelObstacle { X = 4, Y = 5 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Straight(1), PipePiece.Straight(1),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
         };
 
@@ -661,7 +687,7 @@ namespace ChromaVale.Core.GameLogic
         // 3-star: 4 pieces / 7 = 57% ≤ 60%. ✓
         // 
         // Path: Source(0,3) → Str(2) at (1,3) → Str(2) at (2,3) → Str(2) at (3,3) → Target(5,3).
-        // Need 4 pipe cells between source and target. Use 4×Str(2).
+        // Need 4 trace cells between source and target. Use 4×Str(2).
         // Place Amplifier at (1,2) or (2,2) or (3,2) — adjacent to the bottleneck.
         // Actually, Amplifier must be adjacent to the pipe it boosts. If Amp is at (2,2), it boosts (2,3)'s capacity
         // to 3. The flow through (2,3) at p3 won't burst.
@@ -670,7 +696,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 6, Height = 6, ParTicks = 8,
             DisplayName = "Boost Line",
-            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 3 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 3 } },
             Targets = new[] { new LevelTarget { X = 5, Y = 3, ColorIndex = 1 } },
             Obstacles = new[]
             {
@@ -678,15 +704,15 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 5 },
                 new LevelObstacle { X = 4, Y = 1 }, new LevelObstacle { X = 4, Y = 5 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                // FIX 2026-07-23: pressure=3 bursts cap-2 pipes instantly (AddFlow(3,...) > cap=2).
+                // FIX 2026-07-23: pressure=3 shorts cap-2 traces instantly (AddSignal(3,...) > cap=2).
                 // Changed all 4 straights to cap-3 so the direct route handles p3 flow.
                 // Amp remains as 3-star enabler (use 3 pipes instead of 4 for ≤60% efficiency).
-                PipePiece.Straight(3), PipePiece.Straight(3), PipePiece.Straight(3), PipePiece.Straight(3),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Amplifier(),
+                TraceSegment.Straight(3), TraceSegment.Straight(3), TraceSegment.Straight(3), TraceSegment.Straight(3),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Repeater(),
             }
         };
 
@@ -732,8 +758,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Twin Load",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
-                new LevelSource { X = 0, Y = 5, ColorIndex = 0, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 5, ColorIndex = 0, SignalStrength = 1 },
             },
             Targets = new[] { new LevelTarget { X = 5, Y = 3, ColorIndex = 0 } },
             Obstacles = new[]
@@ -742,13 +768,13 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 4 },
                 new LevelObstacle { X = 4, Y = 2 }, new LevelObstacle { X = 4, Y = 4 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.TJunction(3),
-                PipePiece.Amplifier(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Splitter(3),
+                TraceSegment.Repeater(),
             }
         };
 
@@ -776,8 +802,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Emergency",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 3, ColorIndex = 1, FlowPressure = 2 },
-                new LevelSource { X = 3, Y = 0, ColorIndex = 2, FlowPressure = 1 },
+                new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 2 },
+                new LevelSource { X = 3, Y = 0, ColorIndex = 2, SignalStrength = 1 },
             },
             Targets = new[] { new LevelTarget { X = 5, Y = 3, ColorIndex = 1 } },
             Obstacles = new[]
@@ -786,12 +812,12 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 5, Y = 0 }, new LevelObstacle { X = 5, Y = 1 },
                 new LevelObstacle { X = 2, Y = 4 }, new LevelObstacle { X = 4, Y = 4 },
             },
-            FlowGates = System.Array.Empty<LevelFlowGate>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Blocker(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Breaker(),
             }
         };
 
@@ -817,8 +843,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Pressure Final",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, FlowPressure = 2 },
-                new LevelSource { X = 0, Y = 5, ColorIndex = 1, FlowPressure = 2 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 5, ColorIndex = 1, SignalStrength = 2 },
             },
             Targets = new[]
             {
@@ -831,18 +857,18 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 0 }, new LevelObstacle { X = 2, Y = 6 },
                 new LevelObstacle { X = 4, Y = 0 }, new LevelObstacle { X = 4, Y = 6 },
             },
-            FlowGates = new[]
+            SignalGates = new[]
             {
-                new LevelFlowGate { X = 3, Y = 1, Direction = PipeDirection.Down },
-                new LevelFlowGate { X = 3, Y = 5, Direction = PipeDirection.Up },
+                new LevelSignalGate { X = 3, Y = 1, Direction = TraceDirection.Down },
+                new LevelSignalGate { X = 3, Y = 5, Direction = TraceDirection.Up },
             },
             Inventory = new[]
             {
-                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
-                PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
-                PipePiece.Valve(2), PipePiece.Valve(2),
-                PipePiece.Amplifier(),
-                PipePiece.Blocker(),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Diode(2), TraceSegment.Diode(2),
+                TraceSegment.Repeater(),
+                TraceSegment.Breaker(),
             }
         };
 

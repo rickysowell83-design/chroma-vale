@@ -9,24 +9,20 @@ namespace ChromaVale.Presentation.Views.Components
     {
         private bool _built;
 
-        // Shared building body materials (one per depth tier)
         private Material _bodyMatFar;
         private Material _bodyMatMid;
         private Material _bodyMatNear;
         private Material _bodyMatForeground;
 
-        // Shared neon emissive materials (one per color)
         private Material _neonCyanMat;
         private Material _neonMagentaMat;
         private Material _neonPurpleMat;
 
         private static readonly int _emissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        // Window tracking for blinking effect
         private readonly List<GameObject> _litWindows = new List<GameObject>();
         private Coroutine _blinkCoroutine;
 
-        // Depth-based emission multipliers
         private static readonly (float z, float emissionMul, string label)[] _rowConfig = new[]
         {
             (5f,  1.0f, "Foreground"),
@@ -35,14 +31,12 @@ namespace ChromaVale.Presentation.Views.Components
             (30f, 0.4f,  "Far"),
         };
 
-        /// <summary>
-        /// Builds the 3D cyberpunk skyline behind the puzzle grid.
-        /// Four parallax layers with depth-based emission falloff,
-        /// blinking windows, skybridges, mega-structures, antenna spires,
-        /// and a volumetric fog plane.
-        /// Idempotent: calling twice destroys previous children first.
-        /// </summary>
-        public void Build()
+                private void Start()
+        {
+            Build();
+        }
+
+public void Build()
         {
             if (_built)
             {
@@ -56,21 +50,15 @@ namespace ChromaVale.Presentation.Views.Components
 
             CreateSharedMaterials();
 
-            // ── Four parallax building rows ────────────────────────────
-            // Foreground: z=5,  tall dark silhouettes, minimal detail, heights 2-5
             BuildBuildingRow(z: 5,  count: 6,  minH: 2f,  maxH: 5f,  minW: 1.5f, maxW: 3f,  minD: 1f,   maxD: 2f,
                 bodyMat: _bodyMatForeground, isForeground: true);
-            // Near row:   z=9,  tallest detail, heights 3-8
             BuildBuildingRow(z: 9,  count: 10, minH: 3f,  maxH: 8f,  minW: 1.5f, maxW: 4f,  minD: 1.2f, maxD: 2f,
                 bodyMat: _bodyMatNear);
-            // Mid row:    z=18, medium scale, heights 5-14
             BuildBuildingRow(z: 18, count: 14, minH: 5f,  maxH: 14f, minW: 1.5f, maxW: 5f,  minD: 0.8f, maxD: 1.5f,
                 bodyMat: _bodyMatMid);
-            // Far row:    z=30, silhouettes, heights 10-25
             BuildBuildingRow(z: 30, count: 18, minH: 10f, maxH: 25f, minW: 2f,  maxW: 6f,  minD: 0.5f, maxD: 1f,
                 bodyMat: _bodyMatFar);
 
-            // ── Neon windows with depth-based emission falloff (~55% lit) ─
             BuildNeonWindows(z: 5,  rowCount: 6,  minWindows: 1, maxWindows: 3,
                 emissionMul: _rowConfig[0].emissionMul);
             BuildNeonWindows(z: 9,  rowCount: 10, minWindows: 2, maxWindows: 5,
@@ -80,7 +68,6 @@ namespace ChromaVale.Presentation.Views.Components
             BuildNeonWindows(z: 30, rowCount: 18, minWindows: 0, maxWindows: 3,
                 emissionMul: _rowConfig[3].emissionMul);
 
-            // ── Neon accents ───────────────────────────────────────────
             BuildAntennaSpires(z: 9,  rowCount: 10);
             BuildAntennaSpires(z: 18, rowCount: 14);
             BuildAntennaSpires(z: 30, rowCount: 18);
@@ -89,18 +76,14 @@ namespace ChromaVale.Presentation.Views.Components
             BuildHorizonStrip();
             BuildFogPlane();
 
-            // ── Billboard ──────────────────────────────────────────────
             CreateBillboard(z: 9, rowCount: 10);
 
-            // ── Start window blinking coroutine ────────────────────────
             if (Application.isPlaying && _litWindows.Count > 0)
                 _blinkCoroutine = StartCoroutine(BlinkWindowsCoroutine());
 
             Random.state = prevState;
             _built = true;
         }
-
-        // ── Cleanup ────────────────────────────────────────────────────────
 
         private void ClearChildren()
         {
@@ -122,8 +105,6 @@ namespace ChromaVale.Presentation.Views.Components
                 _blinkCoroutine = null;
             }
         }
-
-        // ── Material helpers ───────────────────────────────────────────────
 
         private static Shader FindLitShader()
         {
@@ -162,17 +143,11 @@ namespace ChromaVale.Presentation.Views.Components
 
         private void CreateSharedMaterials()
         {
-            // Building bodies: progressively darker/less saturated with distance
-            // Foreground (z=5):  most saturated, lightest
             _bodyMatForeground = CreateLitMaterial(new Color(0.12f, 0.06f, 0.20f), 0.7f, 0.5f);
-            // Near row (z=9):    rich purple
             _bodyMatNear       = CreateLitMaterial(new Color(0.08f, 0.04f, 0.14f), 0.6f, 0.4f);
-            // Mid row (z=18):    medium saturation
             _bodyMatMid        = CreateLitMaterial(new Color(0.05f, 0.03f, 0.10f), 0.5f, 0.35f);
-            // Far row (z=30):    darkest, least saturated
             _bodyMatFar        = CreateLitMaterial(new Color(0.02f, 0.015f, 0.05f), 0.4f, 0.3f);
 
-            // Neon emissive (base: 3x palette values for bloom)
             _neonCyanMat = CreateEmissiveMaterial(
                 new Color(0.02f, 0.02f, 0.04f),
                 ChromaPalette.NeonCyan * 3f);
@@ -183,8 +158,6 @@ namespace ChromaVale.Presentation.Views.Components
                 new Color(0.03f, 0.01f, 0.04f),
                 ChromaPalette.NeonPurple * 3f);
         }
-
-        // ── Building row construction ──────────────────────────────────────
 
         private void BuildBuildingRow(float z, int count, float minH, float maxH,
             float minW, float maxW, float minD, float maxD, Material bodyMat,
@@ -201,7 +174,6 @@ namespace ChromaVale.Presentation.Views.Components
                 float h = Random.Range(minH, maxH);
                 float w = Random.Range(minW, maxW);
 
-                // ── Mega-structure: 3-4x wider, taller, ~10% chance ──
                 bool isMega = !isForeground && Random.value < 0.1f;
                 if (isMega)
                 {
@@ -221,8 +193,6 @@ namespace ChromaVale.Presentation.Views.Components
             }
         }
 
-        // ── Neon windows with depth-based emission falloff ─────────────────
-
         private void BuildNeonWindows(float z, int rowCount, int minWindows,
             int maxWindows, float emissionMul)
         {
@@ -235,7 +205,6 @@ namespace ChromaVale.Presentation.Views.Components
                 var bldg = transform.Find(prefix);
                 if (bldg == null) continue;
 
-                // Mega-structures get bonus windows
                 bool isMega = bldg.name.Contains("_MEGA");
                 int baseWindowCount = Random.Range(minWindows, maxWindows + 1);
                 if (isMega)
@@ -265,9 +234,8 @@ namespace ChromaVale.Presentation.Views.Components
 
                     if (lit)
                     {
-                        // Apply depth-based emission falloff
-                                                mat.EnableKeyword("_EMISSION");
-var mat = new Material(PickRandomNeonMat());
+                        var mat = new Material(PickRandomNeonMat());
+                        mat.EnableKeyword("_EMISSION");
                         if (!Mathf.Approximately(emissionMul, 1f))
                         {
                             Color em = mat.GetColor(_emissionColorId);
@@ -294,8 +262,6 @@ var mat = new Material(PickRandomNeonMat());
             return _neonPurpleMat;
         }
 
-        // ── Antenna spires ─────────────────────────────────────────────────
-
         private void BuildAntennaSpires(float z, int rowCount)
         {
             for (int i = 0; i < rowCount; i++)
@@ -308,7 +274,6 @@ var mat = new Material(PickRandomNeonMat());
 
                 float halfH = bldg.localScale.y / 2f;
 
-                // Tall thin spire (cylinder)
                 var spire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 spire.name = "Spire_Z" + z + "_" + i;
                 spire.transform.SetParent(bldg);
@@ -318,7 +283,6 @@ var mat = new Material(PickRandomNeonMat());
                 Destroy(spire.GetComponent<Collider>());
                 spire.GetComponent<MeshRenderer>().material = _bodyMatMid;
 
-                // Beacon sphere on top
                 var beacon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 beacon.name = "Beacon_Z" + z + "_" + i;
                 beacon.transform.SetParent(spire.transform);
@@ -330,8 +294,6 @@ var mat = new Material(PickRandomNeonMat());
                 beacon.GetComponent<MeshRenderer>().material = beaconMat;
             }
         }
-
-        // ── Skybridges ─────────────────────────────────────────────────────
 
         private void BuildSkybridges(float z, int rowCount)
         {
@@ -351,7 +313,6 @@ var mat = new Material(PickRandomNeonMat());
                 float midX = (ax + bx) / 2f;
                 float span = Mathf.Abs(bx - ax);
 
-                // Horizontal bridge as a thin, wide cube
                 var bridge = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 bridge.name = "Skybridge_" + z + "_" + i;
                 bridge.transform.SetParent(transform);
@@ -364,8 +325,6 @@ var mat = new Material(PickRandomNeonMat());
                 bridge.GetComponent<MeshRenderer>().material = PickRandomNeonMat();
             }
         }
-
-        // ── Neon sign frame ───────────────────────────────────────────────
 
         private void BuildNeonSignFrame(float z, int rowCount)
         {
@@ -399,7 +358,6 @@ var mat = new Material(PickRandomNeonMat());
                     new Vector3(signW / 2f + borderThick / 2f, signY, faceZ),
                     new Vector3(borderThick, signH + borderThick, borderThick), _neonMagentaMat);
 
-                // Fill with dark emissive quad so the frame stands out
                 var fill = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 fill.name = "SignFrame_Fill";
                 fill.transform.SetParent(bldg);
@@ -409,7 +367,7 @@ var mat = new Material(PickRandomNeonMat());
                 fill.GetComponent<MeshRenderer>().material = _bodyMatFar;
                 fill.GetComponent<MeshRenderer>().material.color = new Color(0.01f, 0.005f, 0.03f);
 
-                break; // Only one sign frame
+                break;
             }
         }
 
@@ -425,27 +383,21 @@ var mat = new Material(PickRandomNeonMat());
             strip.GetComponent<MeshRenderer>().material = mat;
         }
 
-        // ── Horizon glow strip ────────────────────────────────────────────
-
         private void BuildHorizonStrip()
         {
             var horizon = GameObject.CreatePrimitive(PrimitiveType.Cube);
             horizon.name = "HorizonStrip";
             horizon.transform.SetParent(transform);
-            // Positioned past the far row for visible glow
             horizon.transform.localPosition = new Vector3(0f, -3f, 32f);
-            // Wider (40 units) and slightly taller for more visible glow
             horizon.transform.localScale = new Vector3(40f, 0.08f, 1f);
             Destroy(horizon.GetComponent<Collider>());
 
-            // 5x emission for dramatic bloom — up from 3x base
             var horizonMat = new Material(_neonCyanMat);
+            horizonMat.EnableKeyword("_EMISSION");
             Color em = horizonMat.GetColor(_emissionColorId);
             horizonMat.SetColor(_emissionColorId, em * (5f / 3f));
             horizon.GetComponent<MeshRenderer>().material = horizonMat;
         }
-
-        // ── Volumetric fog plane ──────────────────────────────────────────
 
         private void BuildFogPlane()
         {
@@ -466,7 +418,6 @@ var mat = new Material(PickRandomNeonMat());
                 fogMat.SetFloat("_Metallic", 0f);
                 fogMat.SetFloat("_Smoothness", 0f);
 
-                // Transparent rendering
                 fogMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
                 fogMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
                 fogMat.SetInt("_ZWrite", 0);
@@ -476,8 +427,6 @@ var mat = new Material(PickRandomNeonMat());
             }
             fog.GetComponent<MeshRenderer>().material = fogMat;
         }
-
-        // ── Billboard ─────────────────────────────────────────────────────
 
         private void CreateBillboard(float z, int rowCount)
         {
@@ -503,7 +452,6 @@ var mat = new Material(PickRandomNeonMat());
             float billboardZ = halfD + 0.05f;
             float bbYoffset = halfH * 0.1f;
 
-            // Background quad (load texture if available, else solid dark)
             var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
             bg.name = "BillboardBG";
             bg.transform.SetParent(targetBldg);
@@ -524,7 +472,6 @@ var mat = new Material(PickRandomNeonMat());
             }
             bg.GetComponent<MeshRenderer>().material = bgMat;
 
-            // Neon border frame (thin cyan glow around billboard)
             float borderThick = 0.04f;
             CreateBorderStrip("BBTop", targetBldg,
                 new Vector3(0f, bbYoffset + bbH / 2f, billboardZ),
@@ -539,7 +486,6 @@ var mat = new Material(PickRandomNeonMat());
                 new Vector3(bbW / 2f, bbYoffset, billboardZ),
                 new Vector3(borderThick, bbH + borderThick, borderThick), _neonCyanMat);
 
-            // WorldSpace Canvas for scrolling TMP text
             var canvasGO = new GameObject("BillboardCanvas");
             canvasGO.transform.SetParent(targetBldg);
             canvasGO.transform.localPosition = new Vector3(0f, bbYoffset, billboardZ - 0.005f);
@@ -578,22 +524,14 @@ var mat = new Material(PickRandomNeonMat());
             }
         }
 
-        // ── Blinking windows coroutine ────────────────────────────────────
-
-        /// <summary>
-        /// Periodically flickers random lit windows off then back on,
-        /// creating a lived-in, animated city feel.
-        /// </summary>
         private IEnumerator BlinkWindowsCoroutine()
         {
             while (true)
             {
-                // Wait 2-3 seconds between flicker batches
                 yield return new WaitForSeconds(Random.Range(2f, 3f));
 
                 if (_litWindows.Count == 0) continue;
 
-                // Pick 2-5 random lit windows to flicker
                 int batchSize = Mathf.Min(Random.Range(2, 6), _litWindows.Count);
                 var toFlicker = new List<GameObject>(batchSize);
 
@@ -611,11 +549,9 @@ var mat = new Material(PickRandomNeonMat());
                     var r = w.GetComponent<MeshRenderer>();
                     if (r == null) continue;
 
-                    // Turn window off
                     r.sharedMaterial = _bodyMatFar;
                     _litWindows.Remove(w);
 
-                    // Re-light after a short random delay (100-500ms)
                     StartCoroutine(RestoreWindow(w, Random.Range(0.1f, 0.5f)));
                 }
             }
@@ -629,11 +565,9 @@ var mat = new Material(PickRandomNeonMat());
             var r = w.GetComponent<MeshRenderer>();
             if (r == null) yield break;
 
-            // Restore a neon material (any random color)
-                        var restoredMat = new Material(PickRandomNeonMat());
+            var restoredMat = new Material(PickRandomNeonMat());
             restoredMat.EnableKeyword("_EMISSION");
             r.sharedMaterial = restoredMat;
-r.sharedMaterial = new Material(PickRandomNeonMat());
             _litWindows.Add(w);
         }
     }

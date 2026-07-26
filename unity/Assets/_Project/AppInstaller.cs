@@ -26,11 +26,11 @@ namespace ChromaVale
             builder.RegisterInstance<IBoardState>(board);
             builder.RegisterInstance<ILevelRepository>(repo);
 
-            // Flow simulation
-            builder.Register<IFlowSimulator>(_ => new FlowSimulator(), Lifetime.Singleton);
+            // Signal simulation
+            builder.Register<ISignalRouter>(_ => new SignalRouter(), Lifetime.Singleton);
 
-            // Pipe inventory
-            builder.RegisterInstance(new PipeInventory(level.Inventory));
+            // Trace inventory
+            builder.RegisterInstance(new TraceInventory(level.Inventory));
 
             // ─────────────────────────────────────────────────────────
             //  Persistence

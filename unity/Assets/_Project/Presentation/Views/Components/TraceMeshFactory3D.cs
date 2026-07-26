@@ -10,20 +10,20 @@ namespace ChromaVale.Presentation.Views.Components
     /// Joints now include glow-ring occlusion rings, and cross/elbow/T-junction have
     /// fillet-sphere chamfers for a smooth PCB trace appearance.
     /// </summary>
-    public static class PipeMeshFactory3D
+    public static class TraceMeshFactory3D
     {
-        private static Material _pipeMaterial;
+        private static Material _traceMaterial;
         private static Material _occlusionRingMaterial;
 
         /// <summary>
-        /// Radius of pipe cylinders — thin like PCB traces.
+        /// Radius of pipe cylinders — chunky copper like mockup, not thin PCB trace.
         /// </summary>
-        private const float PipeRadius = 0.08f;
+        private const float PipeRadius = 0.14f;
 
         /// <summary>
         /// Radius of joint spheres, slightly larger to cover cylinder seams.
         /// </summary>
-        private const float JointRadius = 0.16f;
+        private const float JointRadius = 0.22f;
 
         /// <summary>
         /// Z-offset to sit pipes slightly in front of the tile slab.
@@ -76,26 +76,26 @@ namespace ChromaVale.Presentation.Views.Components
         {
             get
             {
-                if (_pipeMaterial == null)
+                if (_traceMaterial == null)
                 {
                     Shader shader = Shader.Find("Universal Render Pipeline/Lit");
                     if (shader == null) shader = Shader.Find("Standard");
                     if (shader == null) shader = Shader.Find("Sprites/Default");
 
-                    _pipeMaterial = new Material(shader)
+                    _traceMaterial = new Material(shader)
                     {
                         color = new Color(0.06f, 0.07f, 0.10f) // Very dark brushed metal core
                     };
-                    _pipeMaterial.SetFloat("_Metallic", 1.0f);       // Fully metallic — AAA copper trace
-                    _pipeMaterial.SetFloat("_Smoothness", 0.85f);    // Glossy glass/neon tube surface
-                    _pipeMaterial.EnableKeyword("_EMISSION");
+                    _traceMaterial.SetFloat("_Metallic", 1.0f);       // Fully metallic — AAA copper trace
+                    _traceMaterial.SetFloat("_Smoothness", 0.85f);    // Glossy glass/neon tube surface
+                    _traceMaterial.EnableKeyword("_EMISSION");
                     // DEFAULT DEAD — TileVisual's MaterialPropertyBlock overrides during flow animation
-                    _pipeMaterial.SetColor("_EmissionColor", Color.black);
-                    _pipeMaterial.SetFloat("_CoatMask", 0.25f);      // Clear-coat amount
-                    _pipeMaterial.EnableKeyword("_CLEARCOAT");        // Clear-coat layer enabled
-                    _pipeMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    _traceMaterial.SetColor("_EmissionColor", Color.black);
+                    _traceMaterial.SetFloat("_CoatMask", 0.25f);      // Clear-coat amount
+                    _traceMaterial.EnableKeyword("_CLEARCOAT");        // Clear-coat layer enabled
+                    _traceMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
-                return _pipeMaterial;
+                return _traceMaterial;
             }
         }
 
@@ -117,13 +117,13 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _copperPipeMaterial = new Material(shader)
                     {
-                        color = new Color(0.75f, 0.48f, 0.2f) // Brighter copper tone
+                        color = new Color(0.78f, 0.50f, 0.22f) // Brighter warm copper with specular highlights
                     };
                     _copperPipeMaterial.SetFloat("_Metallic", 1.0f);
-                    _copperPipeMaterial.SetFloat("_Smoothness", 0.6f);
+                    _copperPipeMaterial.SetFloat("_Smoothness", 0.85f); // High gloss for specular highlights
                     _copperPipeMaterial.EnableKeyword("_EMISSION");
-                    _copperPipeMaterial.SetColor("_EmissionColor", new Color(0.2f, 0.1f, 0.03f)); // Subtle warm idle glow
-                    _copperPipeMaterial.SetFloat("_CoatMask", 0.2f);
+                    _copperPipeMaterial.SetColor("_EmissionColor", new Color(0.3f, 0.15f, 0.04f)); // Visible warm idle glow
+                    _copperPipeMaterial.SetFloat("_CoatMask", 0.3f);
                     _copperPipeMaterial.EnableKeyword("_CLEARCOAT");
                     _copperPipeMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
@@ -213,11 +213,11 @@ namespace ChromaVale.Presentation.Views.Components
         /// <summary>
         /// Build a 3D pipe mesh as a child of the given transform.
         /// </summary>
-        /// <param name="shape">The pipe shape to build.</param>
+        /// <param name="shape">The trace shape to build.</param>
         /// <param name="rotationDeg">Z-axis rotation in degrees.</param>
         /// <param name="parent">Parent transform for the pipe group.</param>
         /// <returns>The root GameObject of the pipe group (rotated by rotationDeg).</returns>
-        public static GameObject BuildPipe(PieceShape shape, int rotationDeg, Transform parent)
+        public static GameObject BuildPipe(SegmentShape shape, int rotationDeg, Transform parent)
         {
             var root = new GameObject("Pipe_" + shape);
             root.transform.SetParent(parent, false);
@@ -226,35 +226,35 @@ namespace ChromaVale.Presentation.Views.Components
 
             switch (shape)
             {
-                case PieceShape.Straight:
+                case SegmentShape.Straight:
                     BuildStraight(root.transform);
                     break;
 
-                case PieceShape.Elbow:
+                case SegmentShape.Corner:
                     BuildElbow(root.transform);
                     break;
 
-                case PieceShape.TJunction:
+                case SegmentShape.Splitter:
                     BuildTJunction(root.transform);
                     break;
 
-                case PieceShape.Cross:
+                case SegmentShape.CrossJunction:
                     BuildCross(root.transform);
                     break;
 
-                case PieceShape.Valve:
+                case SegmentShape.Diode:
                     BuildValve(root.transform);
                     break;
 
-                case PieceShape.Amplifier:
+                case SegmentShape.Repeater:
                     BuildAmplifier(root.transform);
                     break;
 
-                case PieceShape.Mixer:
+                case SegmentShape.Combiner:
                     BuildMixer(root.transform);
                     break;
 
-                case PieceShape.Blocker:
+                case SegmentShape.Breaker:
                     BuildBlocker(root.transform);
                     break;
 
@@ -282,7 +282,7 @@ namespace ChromaVale.Presentation.Views.Components
             cyl.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
             cyl.transform.localRotation = Quaternion.Euler(0f, 0f, zRot);
             // Flat wide cross-section like a PCB trace (wider than tall)
-            cyl.transform.localScale = new Vector3(radius * 2.5f, height / 2f, radius * 1.2f);
+            cyl.transform.localScale = new Vector3(radius * 2.0f, height / 2f, radius * 1.5f);
 
             var renderer = cyl.GetComponent<MeshRenderer>();
             if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;

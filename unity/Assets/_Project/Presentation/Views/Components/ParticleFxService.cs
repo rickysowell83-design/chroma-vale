@@ -6,8 +6,8 @@ namespace ChromaVale.Presentation.Views.Components
     public class ParticleFxService : MonoBehaviour
     {
         private ParticleSystem _snapImpact;
-        private ParticleSystem _pipeBurst;
-        private ParticleSystem _pipeBurstRing;
+        private ParticleSystem _traceShortFx;
+        private ParticleSystem _traceShortRingFx;
         private ParticleSystem _colorFusionVortex;
         private ParticleSystem _cascadingBloom;
         private ParticleSystem _cascadingBloomBurst;
@@ -108,8 +108,8 @@ namespace ChromaVale.Presentation.Views.Components
 
         private void BuildPipeBurst()
         {
-            _pipeBurst = BuildPooledSystem("PipeBurst", 64);
-            var main = _pipeBurst.main;
+            _traceShortFx = BuildPooledSystem("TraceShort", 64);
+            var main = _traceShortFx.main;
             main.startLifetime = 0.8f;
             main.startSpeed = 4.0f;
             main.startSize = 0.22f;
@@ -117,7 +117,7 @@ namespace ChromaVale.Presentation.Views.Components
             main.loop = false;
             main.playOnAwake = false;
 
-            var colorOverLifetime = _pipeBurst.colorOverLifetime;
+            var colorOverLifetime = _traceShortFx.colorOverLifetime;
             colorOverLifetime.enabled = true;
             var gradient = new Gradient();
             gradient.SetKeys(
@@ -134,18 +134,18 @@ namespace ChromaVale.Presentation.Views.Components
             );
             colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
 
-            var emission = _pipeBurst.emission;
+            var emission = _traceShortFx.emission;
             emission.SetBursts(new ParticleSystem.Burst[]
             {
                 new ParticleSystem.Burst(0f, 50)
             });
 
-            var shape = _pipeBurst.shape;
+            var shape = _traceShortFx.shape;
             shape.enabled = false;
 
             // Sub-emitter ring
-            _pipeBurstRing = BuildPooledSystem("PipeBurstRing", 32);
-            var ringMain = _pipeBurstRing.main;
+            _traceShortRingFx = BuildPooledSystem("TraceShortRing", 32);
+            var ringMain = _traceShortRingFx.main;
             ringMain.startLifetime = 0.4f;
             ringMain.startSpeed = 2.0f;
             ringMain.startSize = 0.15f;
@@ -154,18 +154,18 @@ namespace ChromaVale.Presentation.Views.Components
             ringMain.playOnAwake = false;
             ringMain.startDelay = 0.15f;
 
-            var ringEmission = _pipeBurstRing.emission;
+            var ringEmission = _traceShortRingFx.emission;
             ringEmission.SetBursts(new ParticleSystem.Burst[]
             {
                 new ParticleSystem.Burst(0f, 12)
             });
 
-            var ringShape = _pipeBurstRing.shape;
+            var ringShape = _traceShortRingFx.shape;
             ringShape.enabled = true;
             ringShape.shapeType = ParticleSystemShapeType.Sphere;
             ringShape.radius = 0.3f;
 
-            var ringSizeOLT = _pipeBurstRing.sizeOverLifetime;
+            var ringSizeOLT = _traceShortRingFx.sizeOverLifetime;
             ringSizeOLT.enabled = true;
             var ringCurve = new AnimationCurve();
             ringCurve.AddKey(0f, 0.5f);
@@ -173,19 +173,19 @@ namespace ChromaVale.Presentation.Views.Components
             ringSizeOLT.size = new ParticleSystem.MinMaxCurve(1f, ringCurve);
 
             // Link sub-emitter
-            var subEmitters = _pipeBurst.subEmitters;
+            var subEmitters = _traceShortFx.subEmitters;
             subEmitters.enabled = true;
-            subEmitters.AddSubEmitter(_pipeBurstRing, ParticleSystemSubEmitterType.Birth, ParticleSystemSubEmitterProperties.InheritEverything);
+            subEmitters.AddSubEmitter(_traceShortRingFx, ParticleSystemSubEmitterType.Birth, ParticleSystemSubEmitterProperties.InheritEverything);
 
             // Noise module
-            var noise = _pipeBurst.noise;
+            var noise = _traceShortFx.noise;
             noise.enabled = true;
             noise.strength = new ParticleSystem.MinMaxCurve(0.5f);
             noise.frequency = 0.3f;
             noise.scrollSpeed = 0.1f;
 
             // Trails module
-            var trails = _pipeBurst.trails;
+            var trails = _traceShortFx.trails;
             trails.enabled = true;
             trails.ratio = 0.3f;
             trails.lifetime = new ParticleSystem.MinMaxCurve(0.15f);
@@ -194,8 +194,8 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void BurstExplosion(Vector3 position)
         {
-            _pipeBurst.transform.position = position;
-            _pipeBurst.Play();
+            _traceShortFx.transform.position = position;
+            _traceShortFx.Play();
         }
 
         private void BuildColorFusionVortex()

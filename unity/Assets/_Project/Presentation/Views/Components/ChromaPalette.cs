@@ -18,10 +18,10 @@ namespace ChromaVale.Presentation.Views.Components
         public static readonly Color YellowHint = new(0.14f, 0.14f, 0.06f);
         public static readonly Color PurpleHint = new(0.1f, 0.05f, 0.15f);
         public static readonly Color ObstacleCol = new(0.18f, 0.07f, 0.07f);
-        public static readonly Color FlowGateUp = new(0.15f, 0.25f, 0.10f);
-        public static readonly Color FlowGateDown = new(0.25f, 0.15f, 0.10f);
-        public static readonly Color FlowGateRight = new(0.10f, 0.15f, 0.25f);
-        public static readonly Color FlowGateLeft = new(0.20f, 0.10f, 0.15f);
+        public static readonly Color SignalGateUp = new(0.15f, 0.25f, 0.10f);
+        public static readonly Color SignalGateDown = new(0.25f, 0.15f, 0.10f);
+        public static readonly Color SignalGateRight = new(0.10f, 0.15f, 0.25f);
+        public static readonly Color SignalGateLeft = new(0.20f, 0.10f, 0.15f);
 
         // ── PCB / cyberpunk circuit-board palette ─────────────────────────
 
@@ -33,5 +33,11 @@ namespace ChromaVale.Presentation.Views.Components
 
         /// <summary>Dead-dark unpowered pipe colour.</summary>
         public static readonly Color DeadPipe = new(0.04f, 0.05f, 0.06f);
+
+        /// <summary>Copper idle pipe colour — warm metallic bronze for placed traces.</summary>
+        public static readonly Color CopperIdle = new(0.72f, 0.42f, 0.18f);
+
+        /// <summary>Darker copper for rotation preview state.</summary>
+        public static readonly Color CopperDark = new(0.55f, 0.32f, 0.12f);
     }
 }

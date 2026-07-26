@@ -7,7 +7,7 @@ using ChromaVale.Domain.PuzzleBoard;
 namespace ChromaVale.Tests
 {
     /// <summary>
-    /// Edit-mode tests for FlowSimulator — the crown jewel of the regression suite.
+    /// Edit-mode tests for SignalRouter — the crown jewel of the regression suite.
     /// Tests shape-aware flow propagation, capacity/burst, valve direction,
     /// elbow rotation, T-Junction splitting, mixer cell color mixing,
     /// amplifier boost, and blocker halting.
@@ -19,27 +19,27 @@ namespace ChromaVale.Tests
     ///
     /// C# 9.0 compatible (no file-scoped namespaces).
     /// </summary>
-    public class FlowSimulatorTests
+    public class SignalRouterTests
     {
         /// <summary>
         /// Helper: run a flow simulation to completion or maxTicks.
-        /// Builds GridBoard from LevelData, creates PipeInventory from level.Inventory,
-        /// places pieces via TryPlace (passing FlowSimulator for shape/capacity registration),
+        /// Builds GridBoard from LevelData, creates TraceInventory from level.Inventory,
+        /// places pieces via TryPlace (passing SignalRouter for shape/capacity registration),
         /// calls StartSimulation, then loops Tick() up to maxTicks.
         /// Returns the final SimulationResult.
         /// </summary>
         private SimulationResult RunToCompletion(
             LevelData level,
-            Action<PipeInventory, GridBoard, FlowSimulator> placementAction,
+            Action<TraceInventory, GridBoard, SignalRouter> placementAction,
             int maxTicks = 100)
         {
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
 
             // Track burst events
             var burstEvents = new List<(int x, int y)>();
-            simulator.OnPipeBurst += (x, y) => burstEvents.Add((x, y));
+            simulator.OnTraceShort += (x, y) => burstEvents.Add((x, y));
 
             // Place pieces via the caller's placement logic
             placementAction(inventory, board, simulator);
@@ -63,11 +63,12 @@ namespace ChromaVale.Tests
         public void Level1_StraightPath_AllTargetsReached()
         {
             var level = LevelData.Level1;
-            // Level 1: Source(0,1,C) → Target(3,1,C). Place straights at (1,1),(2,1).
+            // Level 1 v3: Source(2,0,C) → Target(2,4,C). Place straights at (2,1),(2,2),(2,3).
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 1, 1, sim, 0);
-                inv.TryPlace(1, board, 2, 1, sim, 0);
+                inv.TryPlace(0, board, 2, 1, sim, 0);
+                inv.TryPlace(1, board, 2, 2, sim, 0);
+                inv.TryPlace(2, board, 2, 3, sim, 0);
             });
 
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
@@ -76,15 +77,17 @@ namespace ChromaVale.Tests
         [Test]
         public void Level1_StraightPath_FinishesWithinParTicks()
         {
-            // After StartSimulation, wave is at (1,1).
-            // Tick 1: (1,1)→(2,1). Tick 2: (2,1)→(3,1)=Target.
+            // Level 1 v3: Source(2,0,C) → straights at (2,1),(2,2),(2,3) → Target(2,4,C)
+            // After StartSimulation, wave is at (2,1).
+            // Tick 1: (2,1)→(2,2). Tick 2: (2,2)→(2,3). Tick 3: (2,3)→(2,4)=Target.
             var level = LevelData.Level1;
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
 
-            inventory.TryPlace(0, board, 1, 1, simulator, 0);
-            inventory.TryPlace(1, board, 2, 1, simulator, 0);
+            inventory.TryPlace(0, board, 2, 1, simulator, 0);
+            inventory.TryPlace(1, board, 2, 2, simulator, 0);
+            inventory.TryPlace(2, board, 2, 3, simulator, 0);
 
             simulator.StartSimulation(board, level, inventory);
 
@@ -102,11 +105,11 @@ namespace ChromaVale.Tests
         }
 
         // ────────────────────────────────────────────────────────────────
-        // 2. LOSE — disconnected pipe => FlowStopped
+        // 2. LOSE — disconnected pipe => SignalStuck
         // ────────────────────────────────────────────────────────────────
 
         [Test]
-        public void DisconnectedPipe_FlowStopped()
+        public void DisconnectedPipe_SignalStuck()
         {
             var level = LevelData.Level1;
             // Place only one straight — flow reaches it but can't reach the target
@@ -116,7 +119,7 @@ namespace ChromaVale.Tests
                 // (2,1) is empty — flow stops at (1,1)
             });
 
-            Assert.AreEqual(SimulationResult.FlowStopped, result);
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
         }
 
         // ────────────────────────────────────────────────────────────────
@@ -131,18 +134,18 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 2 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 2 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Straight(1) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Straight(1) },
             };
 
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
             var burstCells = new List<(int x, int y)>();
-            simulator.OnPipeBurst += (x, y) => burstCells.Add((x, y));
+            simulator.OnTraceShort += (x, y) => burstCells.Add((x, y));
 
             inventory.TryPlace(0, board, 1, 0, simulator, 0);
 
@@ -158,7 +161,7 @@ namespace ChromaVale.Tests
             Assert.AreEqual((1, 0), burstCells[0]);
             // Cell should be in Burst state
             var cellState = simulator.GetCellState(1, 0);
-            Assert.AreEqual(OverloadState.Burst, cellState.State);
+            Assert.AreEqual(CircuitState.Shorted, cellState.State);
         }
 
         // ────────────────────────────────────────────────────────────────
@@ -172,18 +175,18 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 2 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 2 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Straight(2) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Straight(2) },
             };
 
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
             var burstCells = new List<(int x, int y)>();
-            simulator.OnPipeBurst += (x, y) => burstCells.Add((x, y));
+            simulator.OnTraceShort += (x, y) => burstCells.Add((x, y));
 
             inventory.TryPlace(0, board, 1, 0, simulator, 0);
 
@@ -212,16 +215,16 @@ namespace ChromaVale.Tests
             // Source at (2,0) emits Left (dx=-1) to (1,0). 
             // CanEnterCell(1,0, Right): GetInputFlags(Valve,Left) = Opposite(Left)=Right. RightFlag→OK.
             // On next tick, CanExitCell(1,0, Left): GetOutputFlags(Valve,Left)=LeftFlag→OK.
-            // Flow goes to (0,0) target.
+            // Signal goes to (0,0) target.
             var level = new LevelData
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 0, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Valve(2, PipeDirection.Left) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Diode(2, TraceDirection.Left) },
             };
 
             var result = RunToCompletion(level, (inv, board, sim) =>
@@ -244,7 +247,7 @@ namespace ChromaVale.Tests
             // Source at (0,0) emits Right (dx=1) to (1,0).
             // CanEnterCell(1,0, Left): GetInputFlags(Valve,Right) = Opposite(Right)=Left. LeftFlag→OK.
             // So it DOES enter.
-            // Hmm, the test case from PipePiece.cs says:
+            // Hmm, the test case from TraceSegment.cs says:
             // "Board: 3×1, Src(0,0) → Valve(Right,1,0) → Tgt(2,0)."
             // "GetInputFlags(Valve, Right) → DirectionToFlag(Opposite(Right)) = LeftFlag"
             // "Flow entering from Right (dx=1)? DirectionToFlag(Right) & LeftFlag → 0 → blocked."
@@ -256,7 +259,7 @@ namespace ChromaVale.Tests
             // CanEnterCell(1,0, Left): GetInputFlags(Valve, Right) → DirectionToFlag(Opposite(Right)) = LeftFlag.
             // DirectionToFlag(Left) = 4 (LeftFlag). (LeftFlag & LeftFlag) != 0 → YES, allowed!
             //
-            // Wait, that means it DOES pass. The comment in PipePiece.cs says the REVERSE
+            // Wait, that means it DOES pass. The comment in TraceSegment.cs says the REVERSE
             // case is Src(0,0) → Valve(Right) → Tgt(2,0) and it says flow entering from 
             // Right (dx=1) is blocked. But DirectionFromDelta(1,0) = Right, and 
             // OppositeDirection(Right) = Left. So CanEnterCell checks Left flag.
@@ -272,7 +275,7 @@ namespace ChromaVale.Tests
             //
             // So flow enters the valve but can't exit toward the target at (0,0) because
             // output is Right and target is to the Left. The flow is trapped in the valve.
-            // Result: FlowStopped.
+            // Result: SignalStuck.
             //
             // For true REVERSE (flow entering from the output side):
             // Src(2,0) emitting Left into Valve(Right,1,0). 
@@ -287,11 +290,11 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 0, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Valve(2, PipeDirection.Right) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Diode(2, TraceDirection.Right) },
             };
 
             // Source at (2,0) emits Left toward valve at (1,0) which outputs Right.
@@ -301,7 +304,7 @@ namespace ChromaVale.Tests
                 inv.TryPlace(0, board, 1, 0, sim, 0);
             });
 
-            Assert.AreEqual(SimulationResult.FlowStopped, result);
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
         }
 
         // ────────────────────────────────────────────────────────────────
@@ -318,11 +321,11 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Elbow(2) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Corner(2) },
             };
 
             // Rot=0: Input=Up|Left, enter from Left ✓. Output=Down|Right, exit Right ✓.
@@ -344,11 +347,11 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Elbow(2) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Corner(2) },
             };
 
             // Rot=90: Input=Right|Up, enter from Left → Left not in [Right,Up] → BLOCKED
@@ -357,7 +360,7 @@ namespace ChromaVale.Tests
                 inv.TryPlace(0, board, 1, 0, sim, 90);
             });
 
-            Assert.AreEqual(SimulationResult.FlowStopped, result);
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
         }
 
         // ────────────────────────────────────────────────────────────────
@@ -378,26 +381,26 @@ namespace ChromaVale.Tests
             {
                 Width = 5,
                 Height = 3,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[]
                 {
                     new LevelTarget { X = 4, Y = 0, ColorIndex = 0 },
                     new LevelTarget { X = 1, Y = 2, ColorIndex = 0 },
                 },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
                 Inventory = new[]
                 {
-                    PipePiece.TJunction(2), // index 0
-                    PipePiece.Straight(2), // index 1
-                    PipePiece.Straight(2), // index 2
-                    PipePiece.Straight(2), // index 3 — (1,1) going down
+                    TraceSegment.Splitter(2), // index 0
+                    TraceSegment.Straight(2), // index 1
+                    TraceSegment.Straight(2), // index 2
+                    TraceSegment.Straight(2), // index 3 — (1,1) going down
                 },
             };
 
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
             var targetsReached = new List<(int x, int y)>();
             simulator.OnTargetReached += (x, y, c) => targetsReached.Add((x, y));
 
@@ -465,22 +468,22 @@ namespace ChromaVale.Tests
                 Height = 3,
                 Sources = new[]
                 {
-                    new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 }, // Cyan
-                    new LevelSource { X = 2, Y = 0, ColorIndex = 1, FlowPressure = 1 }, // Magenta
+                    new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 }, // Cyan
+                    new LevelSource { X = 2, Y = 0, ColorIndex = 1, SignalStrength = 1 }, // Magenta
                 },
                 Targets = new[] { new LevelTarget { X = 1, Y = 2, ColorIndex = 6 } }, // Purple
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
                 Inventory = new[]
                 {
-                    PipePiece.Mixer(),      // index 0: at (1,0) — capacity 0
-                    PipePiece.Straight(2),  // index 1: at (1,1) — rot=90 (Up|Down)
+                    TraceSegment.Combiner(),      // index 0: at (1,0) — capacity 0
+                    TraceSegment.Straight(2),  // index 1: at (1,1) — rot=90 (Up|Down)
                 },
             };
 
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
             var mixEvents = new List<(int x, int y, int a, int b)>();
             simulator.OnColorMix += (x, y, a, b) => mixEvents.Add((x, y, a, b));
 
@@ -521,22 +524,22 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 2,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 3 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 3 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
                 Inventory = new[]
                 {
-                    PipePiece.Straight(2), // index 0: at (1,0) — cap 2
-                    PipePiece.Amplifier(), // index 1: at (1,1) — boosts (1,0)
+                    TraceSegment.Straight(2), // index 0: at (1,0) — cap 2
+                    TraceSegment.Repeater(), // index 1: at (1,1) — boosts (1,0)
                 },
             };
 
             var board = new GridBoard(level);
-            var inventory = new PipeInventory(level.Inventory);
-            var simulator = new FlowSimulator();
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
             var burstCells = new List<(int x, int y)>();
-            simulator.OnPipeBurst += (x, y) => burstCells.Add((x, y));
+            simulator.OnTraceShort += (x, y) => burstCells.Add((x, y));
 
             // Place amplifier first so its boost is registered before the pipe
             // Actually, SetPipeShape on amplifier calls ApplyAmplifierBoost at placement time.
@@ -594,11 +597,11 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Blocker() },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Breaker() },
             };
 
             var result = RunToCompletion(level, (inv, board, sim) =>
@@ -606,7 +609,7 @@ namespace ChromaVale.Tests
                 inv.TryPlace(0, board, 1, 0, sim, 0);
             });
 
-            Assert.AreEqual(SimulationResult.FlowStopped, result);
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
         }
 
         // ────────────────────────────────────────────────────────────────
@@ -623,11 +626,11 @@ namespace ChromaVale.Tests
             {
                 Width = 3,
                 Height = 1,
-                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, FlowPressure = 1 } },
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
                 Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
                 Obstacles = System.Array.Empty<LevelObstacle>(),
-                FlowGates = System.Array.Empty<LevelFlowGate>(),
-                Inventory = new[] { PipePiece.Straight(2) },
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Straight(2) },
             };
 
             var result = RunToCompletion(level, (inv, board, sim) =>
@@ -635,7 +638,7 @@ namespace ChromaVale.Tests
                 inv.TryPlace(0, board, 1, 0, sim, 90);
             });
 
-            Assert.AreEqual(SimulationResult.FlowStopped, result);
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
         }
     }
 }

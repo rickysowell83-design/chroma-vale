@@ -31,13 +31,31 @@ namespace ChromaVale.Domain.PuzzleBoard
             foreach (var o in level.Obstacles)
                 _cells[o.X, o.Y] = GridCell.Obstacle;
 
-            foreach (var fg in level.FlowGates)
-                _cells[fg.X, fg.Y] = GridCell.FlowGate(fg.Direction);
+            foreach (var fg in level.SignalGates)
+                _cells[fg.X, fg.Y] = GridCell.SignalGate(fg.Direction);
+
+            // Pre-populate ghost traces (pre-existing copper on the board)
+            if (level.GhostTraces != null)
+            {
+                foreach (var gt in level.GhostTraces)
+                {
+                    if (IsValidPosition(gt.X, gt.Y))
+                    {
+                        _cells[gt.X, gt.Y] = new GridCell
+                        {
+                            Type = CellType.Trace,
+                            ColorIndex = -1,
+                            IsOccupied = true,
+                            SignalDirection = TraceDirection.None
+                        };
+                    }
+                }
+            }
         }
 
         public GridCell GetCell(int x, int y) => _cells[x, y];
 
-        public void PlacePipe(int x, int y)
+        public void PlaceTrace(int x, int y)
         {
             if (!IsValidPosition(x, y)) return;
             var cell = _cells[x, y];
@@ -47,10 +65,10 @@ namespace ChromaVale.Domain.PuzzleBoard
             _history.Push((x, y, cell));
             _cells[x, y] = new GridCell
             {
-                Type = CellType.Pipe,
+                Type = CellType.Trace,
                 ColorIndex = -1, // -1 = uncolored (color assigned by flow)
                 IsOccupied = true,
-                FlowDirection = PipeDirection.None
+                SignalDirection = TraceDirection.None
             };
         }
 

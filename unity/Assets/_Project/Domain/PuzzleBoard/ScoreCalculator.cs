@@ -9,7 +9,7 @@ namespace ChromaVale.Domain.PuzzleBoard
     /// </summary>
     public static class ScoreCalculator
     {
-        public static int Calculate(PipeInventory inventory, FlowSimulator simulator, LevelData level)
+        public static int Calculate(TraceInventory inventory, SignalRouter simulator, LevelData level)
         {
             int stars = 1; // Base: completed the level
             int unused = inventory.AvailableCount;

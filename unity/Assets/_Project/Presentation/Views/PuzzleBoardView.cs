@@ -22,8 +22,8 @@ namespace ChromaVale.Presentation.Views
         [SerializeField] private float _flowTickInterval = 0.3f;
 
         private GridBoard _board;
-        private FlowSimulator _flowSim;
-        private PipeInventory _inventory;
+        private SignalRouter _flowSim;
+        private TraceInventory _inventory;
         private TileVisual[,] _renderers;
         private Coroutine[,] _cellLerps;
         private LevelData _level;
@@ -41,7 +41,7 @@ namespace ChromaVale.Presentation.Views
         // Component references
         private GridBuilder _gridBuilder;
         private HudPanel _hudPanel;
-        private FlowButton _flowButtonComponent;
+        private RouteButton _flowButtonComponent;
         private InventoryPanel _inventoryPanelComponent;
         private WinPopup _winPopupComponent;
         private EnvironmentBackdrop _envBackdrop;
@@ -72,8 +72,8 @@ namespace ChromaVale.Presentation.Views
             _levelNumber = 1;
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
-            _flowSim = new FlowSimulator();
-            _inventory = new PipeInventory(_level.Inventory);
+            _flowSim = new SignalRouter();
+            _inventory = new TraceInventory(_level.Inventory);
 
             EnsureEventSystem();
             CreateComponents();
@@ -124,7 +124,7 @@ namespace ChromaVale.Presentation.Views
         {
             _gridBuilder = CreateChildComponent<GridBuilder>("GridBuilder");
             _hudPanel = CreateChildComponent<HudPanel>("HudPanel");
-            _flowButtonComponent = CreateChildComponent<FlowButton>("FlowButton");
+            _flowButtonComponent = CreateChildComponent<RouteButton>("RouteButton");
             _inventoryPanelComponent = CreateChildComponent<InventoryPanel>("InventoryPanel");
             _winPopupComponent = CreateChildComponent<WinPopup>("WinPopup");
             // STRIPPED for pipeline test
@@ -138,7 +138,7 @@ namespace ChromaVale.Presentation.Views
         {
             _winPopupComponent.OnNextLevel += AdvanceLevel;
             _winPopupComponent.OnReplay += ResetPuzzle;
-            _flowButtonComponent.OnFlowRequested += OnFlowButtonPressed;
+            _flowButtonComponent.OnFlowRequested += OnRouteButtonPressed;
             _hudPanel.OnResetRequested += ResetPuzzle;
             _inventoryPanelComponent.OnPieceSelected += _ => { _pendingRotation = 0; _inventoryPanelComponent.SetPendingRotation(0); };
         }
@@ -169,7 +169,7 @@ namespace ChromaVale.Presentation.Views
 
             string hintText = step switch
             {
-                0 => "Drag pipes to connect source to target",
+                0 => "Drag traces to connect source to target",
                 1 => "Good. Now press FLOW to test the circuit.",
                 _ => ""
             };
@@ -331,7 +331,7 @@ namespace ChromaVale.Presentation.Views
             var cell = _board.GetCell(x, y);
 
             int existingIdx = _inventory.GetPieceIndexAt(x, y);
-            if (existingIdx >= 0 && cell.Type == CellType.Pipe)
+            if (existingIdx >= 0 && cell.Type == CellType.Trace)
             {
                 RotatePlacement(x, y, existingIdx);
                 return;
@@ -422,15 +422,12 @@ namespace ChromaVale.Presentation.Views
             piece.Rotate();
 
             _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
-
-            if (!_flowSim.IsRunning)
-            {
-                _renderers[x, y].Color = GetPipeColor(0);
-            }
+            // Show copper idle (no glow) between rotations
+            _renderers[x, y].Color = ChromaPalette.CopperDark;
 
             if (_flowSim != null)
             {
-                _flowSim.SetPipeShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
+                _flowSim.SetTraceShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
             }
 
             StartCoroutine(PopAnim(_renderers[x, y].transform));
@@ -447,7 +444,7 @@ namespace ChromaVale.Presentation.Views
                 _undoStack.Push((x, y, selIdx));
                 _moveCount++;
                 _hudPanel.SetMoves(_moveCount);
-                _renderers[x, y].Color = GetPipeColor(0);
+                _renderers[x, y].Color = ChromaPalette.CopperDark; // Copper idle — neon flows later
                 var piece = _inventory.GetPieceAt(x, y);
                 if (piece != null) _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
                 StartCoroutine(PopAnim(_renderers[x, y].transform));
@@ -489,7 +486,7 @@ namespace ChromaVale.Presentation.Views
         private bool CheckAllConnected()
         {
             if (_inventory.PlacedCount == 0) return false;
-            var router = new PipeRouter(_board);
+            var router = new TraceRouter(_board);
             foreach (var src in _level.Sources)
             {
                 int srcX = src.X, srcY = src.Y;
@@ -543,7 +540,7 @@ namespace ChromaVale.Presentation.Views
         // FLOW SIMULATION
         // ═══════════════════════════════════════════════════════════════
 
-        public void OnFlowButtonPressed()
+        public void OnRouteButtonPressed()
         {
             if (_solved || _flowSim.IsRunning) return;
             if (_inventory.PlacedCount == 0) return;
@@ -556,8 +553,8 @@ namespace ChromaVale.Presentation.Views
             _flowButtonComponent.SetInteractable(false);
             _inventoryPanelComponent.SetLocked(true);
 
-            _flowSim.OnFlowAdvance += HandleFlowAdvance;
-            _flowSim.OnPipeBurst += HandlePipeBurst;
+            _flowSim.OnSignalAdvance += HandleFlowAdvance;
+            _flowSim.OnTraceShort += HandlePipeBurst;
             _flowSim.OnColorMix += HandleColorMix;
             _flowSim.OnTargetReached += HandleTargetReached;
 
@@ -576,8 +573,8 @@ namespace ChromaVale.Presentation.Views
                 _flowSim.Tick();
             }
 
-            _flowSim.OnFlowAdvance -= HandleFlowAdvance;
-            _flowSim.OnPipeBurst -= HandlePipeBurst;
+            _flowSim.OnSignalAdvance -= HandleFlowAdvance;
+            _flowSim.OnTraceShort -= HandlePipeBurst;
             _flowSim.OnColorMix -= HandleColorMix;
             _flowSim.OnTargetReached -= HandleTargetReached;
 
@@ -637,7 +634,7 @@ namespace ChromaVale.Presentation.Views
                 if (_particleFx != null)
                     _particleFx.BurstExplosion(_renderers[x, y].transform.position);
             }
-            _inventory.MarkBurst(x, y);
+            _inventory.MarkShorted(x, y);
             if (_audioService != null) _audioService.PlaySound("pipe_burst");
             if (_cameraShake != null) _cameraShake.Shake(0.25f, 0.30f);
         }
@@ -701,8 +698,8 @@ namespace ChromaVale.Presentation.Views
             _level = _levelRepo.GetLevel(_levelNumber);
 
             _board = new GridBoard(_level);
-            _flowSim = new FlowSimulator();
-            _inventory = new PipeInventory(_level.Inventory);
+            _flowSim = new SignalRouter();
+            _inventory = new TraceInventory(_level.Inventory);
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
             _cellLerps = new Coroutine[_board.Width, _board.Height];
@@ -851,7 +848,7 @@ namespace ChromaVale.Presentation.Views
                         CellType.Target when cell.ColorIndex == 0 => CyanHint,
                         CellType.Target when cell.ColorIndex == 1 => MagentaHint,
                         CellType.Obstacle => ObstacleCol,
-                        CellType.FlowGate => DarkTile,
+                        CellType.SignalGate => DarkTile,
                         _ => DarkTile
                     };
                 }

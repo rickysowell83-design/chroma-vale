@@ -126,13 +126,13 @@ namespace ChromaVale.Presentation.Views.Components
             // Now shows available inventory pieces, not move count.
             // Called as SetPieceCount from PuzzleBoardView.
             if (_moveText != null)
-                _moveText.text = "PIECES: " + count;
+                _moveText.text = "TRACES: " + count;
         }
 
         public void SetPieceCount(int total)
         {
             if (_moveText != null)
-                _moveText.text = "PIECES: " + total;
+                _moveText.text = "TRACES: " + total;
         }
 
         public void SetLevel(int current, int max)
