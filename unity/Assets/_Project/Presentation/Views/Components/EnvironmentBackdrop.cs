@@ -266,7 +266,8 @@ namespace ChromaVale.Presentation.Views.Components
                     if (lit)
                     {
                         // Apply depth-based emission falloff
-                        var mat = new Material(PickRandomNeonMat());
+                                                mat.EnableKeyword("_EMISSION");
+var mat = new Material(PickRandomNeonMat());
                         if (!Mathf.Approximately(emissionMul, 1f))
                         {
                             Color em = mat.GetColor(_emissionColorId);
@@ -629,7 +630,10 @@ namespace ChromaVale.Presentation.Views.Components
             if (r == null) yield break;
 
             // Restore a neon material (any random color)
-            r.sharedMaterial = new Material(PickRandomNeonMat());
+                        var restoredMat = new Material(PickRandomNeonMat());
+            restoredMat.EnableKeyword("_EMISSION");
+            r.sharedMaterial = restoredMat;
+r.sharedMaterial = new Material(PickRandomNeonMat());
             _litWindows.Add(w);
         }
     }
