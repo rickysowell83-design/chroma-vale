@@ -41,40 +41,30 @@ namespace ChromaVale.Core.GameLogic
         // ═══════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Level 1: "Security Override"
-        /// 5×5 grid with two center obstacles blocking the direct path.
-        /// Source pressure 2 forces strategic cap-2 usage. Cap-1 pipes burst at this pressure.
-        /// Teaches: Pressure/capacity mechanic, routing around obstacles.
+        /// Level 1: "First Light"
+        /// 5×5 tutorial grid — no obstacles. Source pressure 1.
+        /// Straight line from source to target. Simplest possible puzzle.
+        /// Teaches: Basic routing — connect source to target with pipes.
         /// Grid: 5×5 | Par: 8 ticks
         ///
-        /// Solution path (BELOW, 7 cells):
-        ///   Source(0,2)→Straight(1,2)→Elb(DOWN)→(1,3)→Elb(DOWN)→(1,4)→
-        ///   Elb(RIGHT)→(2,4)→Str(RIGHT)→(3,4)→Elb(UP)→(3,3)→Str(UP)→(3,2)→
-        ///   Elb(RIGHT)→Target(4,2)
-        ///   Uses: 4×Elbow(2) + 3×Straight(2) = 7 pieces. Cap-1 pieces are burst bait.
+        /// Solution: 3×Straight(2) at (1,2), (2,2), (3,2). 3 ticks.
+        /// 3-star: 3/10 pieces = 30% inventory (well within 60% threshold).
         /// </summary>
         public static LevelData Level1 => new()
         {
             Width = 5, Height = 5, ParTicks = 8,
-            DisplayName = "Security Override",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 2 } },
+            DisplayName = "First Light",
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, FlowPressure = 1 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
-            Obstacles = new[]
-            {
-                new LevelObstacle { X = 2, Y = 1 },
-                new LevelObstacle { X = 2, Y = 2 },
-            },
+            Obstacles = System.Array.Empty<LevelObstacle>(),
             FlowGates = System.Array.Empty<LevelFlowGate>(),
             Inventory = new[]
             {
-                // Cap-2 pipes (safe under pressure 2)
+                PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
                 PipePiece.Straight(2), PipePiece.Straight(2), PipePiece.Straight(2),
                 PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2), PipePiece.Elbow(2),
-                // Cap-1 pipes (burst-bait — pressure 2 exceeds capacity 1)
-                PipePiece.Straight(1), PipePiece.Straight(1),
             }
         };
-
         /// <summary>
         /// Level 2: "Two Streams"
         /// Two colors, two routes. Can't cross — must route separately.

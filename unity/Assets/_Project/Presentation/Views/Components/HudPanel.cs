@@ -107,9 +107,10 @@ namespace ChromaVale.Presentation.Views.Components
             var textGo = new GameObject("HintText");
             textGo.transform.SetParent(_hintRoot.transform, false);
             _hintText = textGo.AddComponent<TextMeshProUGUI>();
-            _hintText.fontSize = 18;
+            _hintText.fontSize = 22;
+            _hintText.fontStyle = FontStyles.Bold;
             _hintText.alignment = TextAlignmentOptions.Center;
-            _hintText.color = Color.white;
+            _hintText.color = ChromaPalette.NeonCyan;
             _hintText.raycastTarget = false;
             var thr = _hintText.GetComponent<RectTransform>();
             thr.anchorMin = new Vector2(0.05f, 0.12f);
@@ -122,14 +123,22 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void SetMoves(int count)
         {
+            // Now shows available inventory pieces, not move count.
+            // Called as SetPieceCount from PuzzleBoardView.
             if (_moveText != null)
                 _moveText.text = "PIECES: " + count;
+        }
+
+        public void SetPieceCount(int total)
+        {
+            if (_moveText != null)
+                _moveText.text = "PIECES: " + total;
         }
 
         public void SetLevel(int current, int max)
         {
             if (_levelText != null)
-                _levelText.text = "LEVEL " + current + "-" + max;
+                _levelText.text = "LEVEL " + current;
         }
 
         public void ShowHint(string text)

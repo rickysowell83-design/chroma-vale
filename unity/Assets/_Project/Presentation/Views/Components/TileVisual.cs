@@ -33,6 +33,7 @@ namespace ChromaVale.Presentation.Views.Components
         private GameObject _pipeRoot;
         private GameObject _indicatorRoot;
         private GameObject _previewRoot;
+        private Color _indicatorColor; // Stored for source pulse coroutine
         private float _tileSize = 1f;
         private Color _color;
         private Color _darkColor = new Color(0.04f, 0.05f, 0.06f);
@@ -108,7 +109,7 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _baseMaterial = new Material(shader)
                     {
-                        color = new Color(0.03f, 0.06f, 0.03f) // Dark green PCB
+                        color = new Color(0.10f, 0.18f, 0.10f) // Dark green PCB
                     };
                     _baseMaterial.SetFloat("_Metallic", 0.15f);
                     _baseMaterial.SetFloat("_Smoothness", 0.5f);
@@ -377,6 +378,7 @@ namespace ChromaVale.Presentation.Views.Components
         public void SetIndicator(TileIndicator kind, Color color)
         {
             ClearIndicator();
+            _indicatorColor = color;
 
             if (kind == TileIndicator.None) return;
 
@@ -557,6 +559,53 @@ namespace ChromaVale.Presentation.Views.Components
             for (int i = 0; i < root.childCount; i++)
             {
                 ApplyMpbToTree(root.GetChild(i), mpb);
+            }
+        }
+
+        /// <summary>
+        /// Start a continuous emission pulse on the source indicator (dot + halo).
+        /// Only call on tiles that have a SourceDot indicator.
+        /// Stops automatically when a new indicator is set or the tile is destroyed.
+        /// </summary>
+        public void StartSourcePulse()
+        {
+            if (_indicatorRoot == null) return;
+            StartCoroutine(SourcePulseCoroutine());
+        }
+
+        private IEnumerator SourcePulseCoroutine()
+        {
+            var dot = _indicatorRoot.transform.Find("SourceDot");
+            var halo = _indicatorRoot.transform.Find("SourceHalo");
+            if (dot == null || halo == null) yield break;
+
+            var dotRend = dot.GetComponent<MeshRenderer>();
+            var haloRend = halo.GetComponent<MeshRenderer>();
+            if (dotRend == null || haloRend == null) yield break;
+
+            Color pulseColor = _indicatorColor;
+            float baseDotIntensity = 15f;
+            float baseHaloIntensity = 4f;
+
+            while (_indicatorRoot != null && dot != null && halo != null)
+            {
+                // Sine wave 0→1→0 every ~2.1 seconds (3 rad/s)
+                float t = (Mathf.Sin(Time.time * 3f) + 1f) * 0.5f;
+
+                float dotIntensity = Mathf.Lerp(baseDotIntensity * 0.4f, baseDotIntensity * 1.6f, t);
+                float haloIntensity = Mathf.Lerp(baseHaloIntensity * 0.2f, baseHaloIntensity * 2.0f, t);
+
+                var dotMpb = new MaterialPropertyBlock();
+                dotMpb.SetColor("_EmissionColor", pulseColor * dotIntensity);
+                dotMpb.SetColor("_BaseColor", pulseColor * 0.7f);
+                if (dotRend != null) dotRend.SetPropertyBlock(dotMpb);
+
+                var haloMpb = new MaterialPropertyBlock();
+                haloMpb.SetColor("_EmissionColor", pulseColor * haloIntensity);
+                haloMpb.SetColor("_BaseColor", pulseColor * 0.0f);
+                if (haloRend != null) haloRend.SetPropertyBlock(haloMpb);
+
+                yield return null;
             }
         }
 

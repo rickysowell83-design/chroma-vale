@@ -34,6 +34,9 @@ namespace ChromaVale.Presentation.Views
         private int _tutorialStep;
         private Coroutine _typewriterCoroutine;
         private bool _hasPlacedFirstPiece;
+        // Tutorial guide arrow
+        private LineRenderer _tutorialGuideArrow;
+
 
         // Component references
         private GridBuilder _gridBuilder;
@@ -65,7 +68,8 @@ namespace ChromaVale.Presentation.Views
 
             _audioService = AudioServiceInstaller.Instance;
 
-                        _levelNumber = SaveGameManager.Instance != null ? SaveGameManager.Instance.CurrentLevel : 1;
+                        // HARD-LOCKED to Level 1 for pipeline test — ignore save data
+            _levelNumber = 1;
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
             _flowSim = new FlowSimulator();
@@ -76,20 +80,34 @@ namespace ChromaVale.Presentation.Views
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
             _cellLerps = new Coroutine[_board.Width, _board.Height];
-            _envBackdrop.Build();
-            _musicDirector.StartMusic();
+            // STRIPPED for pipeline test — _envBackdrop.Build();
+            // STRIPPED for pipeline test — _musicDirector.StartMusic();
 
             WireEvents();
 
             _hudPanel.SetMoves(0);
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
+            _hudPanel.SetPieceCount(_inventory.AvailableCount);
             _inventoryPanelComponent.Bind(_inventory);
 
-            _musicDirector.PlayBeep(440f, 0.15f);
+            // FLOW button dimmed until at least one pipe is placed
+            _flowButtonComponent.SetInteractable(false);
+
+            // STRIPPED — _musicDirector.PlayBeep(440f, 0.15f);
 
             if (_audioService != null) _audioService.PlaySound("level_start");
 
             StartCoroutine(PulseSources());
+
+            // Level 1 tutorial: pulse the source indicator emission
+            if (_levelNumber == 1)
+            {
+                foreach (var src in _level.Sources)
+                {
+                    if (_renderers[src.X, src.Y] != null)
+                        _renderers[src.X, src.Y].StartSourcePulse();
+                }
+            }
 
             // Show initial tutorial hint for Level 1
             ShowTutorialStep(0);
@@ -109,10 +127,11 @@ namespace ChromaVale.Presentation.Views
             _flowButtonComponent = CreateChildComponent<FlowButton>("FlowButton");
             _inventoryPanelComponent = CreateChildComponent<InventoryPanel>("InventoryPanel");
             _winPopupComponent = CreateChildComponent<WinPopup>("WinPopup");
-            _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
-            _musicDirector = CreateChildComponent<MusicDirector>("MusicDirector");
-            _cameraShake = Camera.main.gameObject.AddComponent<CameraShake>();
-            _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
+            // STRIPPED for pipeline test
+            // _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
+            // _musicDirector = CreateChildComponent<MusicDirector>("MusicDirector");
+            // _cameraShake = Camera.main.gameObject.AddComponent<CameraShake>();
+            // _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
         }
 
         private void WireEvents()
@@ -150,9 +169,8 @@ namespace ChromaVale.Presentation.Views
 
             string hintText = step switch
             {
-                0 => _level.DisplayName + " v1.0\u2014Route the flow past the firewalls.\n" +
-                     "TAP a pipe below \u2192 TAP a dark cell to place it.",
-                1 => "Good. Now complete the circuit to the target.",
+                0 => "Drag pipes to connect source to target",
+                1 => "Good. Now press FLOW to test the circuit.",
                 _ => ""
             };
 
@@ -160,7 +178,88 @@ namespace ChromaVale.Presentation.Views
             {
                 StartTypewriterHint(hintText);
             }
+
+            // Show guide arrow when tutorial first appears
+            if (step == 0)
+            {
+                ShowTutorialGuideArrow();
+            }
         }
+
+        /// <summary>
+        /// Show a dashed cyan guide arrow from source to target for tutorial.
+        /// Uses a world-space LineRenderer with animated dash offset.
+        /// </summary>
+        private void ShowTutorialGuideArrow()
+        {
+            if (_tutorialGuideArrow != null) return;
+            if (_level.Sources.Length == 0 || _level.Targets.Length == 0) return;
+
+            var src = _level.Sources[0];
+            var tgt = _level.Targets[0];
+            if (_renderers[src.X, src.Y] == null || _renderers[tgt.X, tgt.Y] == null) return;
+
+            var arrowGo = new GameObject("TutorialGuideArrow");
+            arrowGo.transform.SetParent(transform);
+            _tutorialGuideArrow = arrowGo.AddComponent<LineRenderer>();
+
+            // Use URP-compatible material
+            var mat = new Material(Shader.Find("Sprites/Default"));
+            mat.color = ChromaPalette.NeonCyan;
+            _tutorialGuideArrow.material = mat;
+            _tutorialGuideArrow.startWidth = 0.06f;
+            _tutorialGuideArrow.endWidth = 0.06f;
+            _tutorialGuideArrow.textureMode = LineTextureMode.Tile;
+            _tutorialGuideArrow.startColor = ChromaPalette.NeonCyan;
+            _tutorialGuideArrow.endColor = ChromaPalette.NeonCyan;
+
+            var srcPos = _renderers[src.X, src.Y].transform.position;
+            var tgtPos = _renderers[tgt.X, tgt.Y].transform.position;
+            // Offset Z slightly above the board
+            srcPos.z -= 0.3f;
+            tgtPos.z -= 0.3f;
+
+            _tutorialGuideArrow.positionCount = 2;
+            _tutorialGuideArrow.SetPosition(0, srcPos);
+            _tutorialGuideArrow.SetPosition(1, tgtPos);
+
+            // Start dash animation coroutine
+            StartCoroutine(AnimateGuideArrowDash());
+        }
+
+        /// <summary>
+        /// Animate the tutorial guide arrow with a moving dash pattern.
+        /// </summary>
+        private System.Collections.IEnumerator AnimateGuideArrowDash()
+        {
+            float dashSpeed = 1.5f;
+            float offset = 0f;
+            while (_tutorialGuideArrow != null && _tutorialGuideArrow.material != null)
+            {
+                offset += Time.deltaTime * dashSpeed;
+                _tutorialGuideArrow.material.mainTextureOffset = new Vector2(offset, 0);
+                // Pulse alpha for breathing effect
+                float alpha = 0.4f + 0.3f * Mathf.Sin(Time.time * 2f);
+                var c = _tutorialGuideArrow.startColor;
+                c.a = alpha;
+                _tutorialGuideArrow.startColor = c;
+                _tutorialGuideArrow.endColor = c;
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Hide and destroy the tutorial guide arrow.
+        /// </summary>
+        private void HideTutorialGuideArrow()
+        {
+            if (_tutorialGuideArrow != null)
+            {
+                Destroy(_tutorialGuideArrow.gameObject);
+                _tutorialGuideArrow = null;
+            }
+        }
+
 
         /// <summary>
         /// Display hint text with a typewriter character-reveal effect over ~1 second.
@@ -357,10 +456,16 @@ namespace ChromaVale.Presentation.Views
                 _pendingRotation = 0;
                 _inventoryPanelComponent.SetPendingRotation(0);
 
+                // Enable FLOW button now that at least one pipe is on the board
+                _flowButtonComponent.SetInteractable(true);
+                _hudPanel.SetPieceCount(_inventory.AvailableCount);
+
                 // Tutorial step advancement
                 if (!_hasPlacedFirstPiece && _levelNumber == 1)
                 {
                     _hasPlacedFirstPiece = true;
+                    HideTutorialGuideArrow();
+
                     ShowTutorialStep(1);
                 }
                 else
@@ -369,7 +474,7 @@ namespace ChromaVale.Presentation.Views
                 }
 
                 if (_audioService != null) _audioService.PlaySound("pipe_place");
-                _musicDirector.PlayBeep(660f, 0.08f);
+                // STRIPPED — _musicDirector.PlayBeep(660f, 0.08f);
                 if (_particleFx != null)
                     _particleFx.PlacementPuff(_renderers[x, y].transform.position, GetPipeColor(0));
                 if (_cameraShake != null) _cameraShake.Shake(0.06f, 0.05f);
@@ -416,6 +521,7 @@ namespace ChromaVale.Presentation.Views
                 _renderers[x, y].Color = DarkTile;
                 _moveCount = Mathf.Max(0, _moveCount - 1);
                 _hudPanel.SetMoves(_moveCount);
+                _hudPanel.SetPieceCount(_inventory.AvailableCount);
                 _inventoryPanelComponent.Refresh();
                 _undoStack.Pop();
                 if (_audioService != null) _audioService.PlaySound("undo");
@@ -426,6 +532,10 @@ namespace ChromaVale.Presentation.Views
                     _hasPlacedFirstPiece = false;
                     _tutorialStep = 0;
                 }
+
+                // Re-dim FLOW button if no pipes left on board
+                if (_undoStack.Count == 0)
+                    _flowButtonComponent.SetInteractable(false);
             }
         }
 
@@ -475,10 +585,11 @@ namespace ChromaVale.Presentation.Views
             if (result == SimulationResult.AllTargetsReached)
             {
                 _solved = true;
-                _musicDirector.PlayBeep(880f, 0.3f);
+                // STRIPPED — _musicDirector.PlayBeep(880f, 0.3f);
                 _starsEarned = ScoreCalculator.Calculate(_inventory, _flowSim, _level);
-                if (SaveGameManager.Instance != null)
-                    SaveGameManager.Instance.RecordLevelComplete(_levelNumber, _starsEarned);
+                // HARD-LOCKED: skip save for pipeline test
+                // if (SaveGameManager.Instance != null)
+                //     SaveGameManager.Instance.RecordLevelComplete(_levelNumber, _starsEarned);
                 if (_particleFx != null)
                 {
                     var positions = _level.Targets.Select(t => _renderers[t.X, t.Y].transform.position).ToArray();
@@ -564,10 +675,8 @@ namespace ChromaVale.Presentation.Views
 
         private void AdvanceLevel()
         {
-            int nextLevel = SaveGameManager.Instance != null ? SaveGameManager.Instance.CurrentLevel : _levelNumber + 1;
-            if (nextLevel <= _levelNumber) nextLevel = _levelNumber + 1;
-            if (nextLevel > _maxLevel) nextLevel = 1;
-            LoadLevel(nextLevel);
+            // HARD-LOCKED for pipeline test — always reload Level 1
+            LoadLevel(1);
         }
 
         private void LoadLevel(int levelNum)
@@ -579,6 +688,7 @@ namespace ChromaVale.Presentation.Views
             _tutorialStep = 0;
             _hasPlacedFirstPiece = false;
             _typewriterCoroutine = null;
+            HideTutorialGuideArrow();
 
             _solved = false;
             _moveCount = 0;
@@ -599,8 +709,9 @@ namespace ChromaVale.Presentation.Views
 
             _hudPanel.SetMoves(0);
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
+            _hudPanel.SetPieceCount(_inventory.AvailableCount);
             _inventoryPanelComponent.Bind(_inventory);
-            _flowButtonComponent.SetInteractable(true);
+            _flowButtonComponent.SetInteractable(false);  // Dimmed until first pipe placed
             _inventoryPanelComponent.SetLocked(false);
 
             // Show contextual tutorial for level 1 using the level's DisplayName
@@ -611,6 +722,16 @@ namespace ChromaVale.Presentation.Views
             else
             {
                 _hudPanel.HideHint();
+            }
+
+            // Level 1 tutorial: pulse the source indicator emission
+            if (_levelNumber == 1)
+            {
+                foreach (var src in _level.Sources)
+                {
+                    if (_renderers[src.X, src.Y] != null)
+                        _renderers[src.X, src.Y].StartSourcePulse();
+                }
             }
 
             StartCoroutine(PulseSources());
