@@ -100,8 +100,8 @@ namespace ChromaVale.Presentation.Views.Components
                 cam.backgroundColor = ChromaPalette.DarkBG;
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 if (cam.GetComponent<UnityEngine.EventSystems.PhysicsRaycaster>() == null)
-                                FitBackdrop();
-cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
+                    cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
+            FitBackdrop();
             }
         }
 
@@ -112,40 +112,55 @@ cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
             var cam = Camera.main;
             if (cam == null) return;
 
-            // Sample a few backdrop children to find the max viewport Y
-            float maxVpY = 0f;
-            float maxWorldY = float.MinValue;
-            Transform maxChild = null;
+            // Find world-space Y bounds of near-zone buildings (z <= 15)
+            float worldMinY = float.MaxValue;
+            float worldMaxY = float.MinValue;
             foreach (Transform child in backdrop.transform)
             {
-                var vp = cam.WorldToViewportPoint(child.position);
-                if (vp.z > 0 && vp.y > maxVpY)
+                if (child.position.z <= 15f)
                 {
-                    maxVpY = vp.y;
-                    maxWorldY = child.position.y;
-                    maxChild = child;
+                    float halfH = child.lossyScale.y * 0.5f;
+                    float top = child.position.y + halfH;
+                    float bottom = child.position.y - halfH;
+                    worldMinY = Mathf.Min(worldMinY, bottom);
+                    worldMaxY = Mathf.Max(worldMaxY, top);
                 }
             }
+            if (worldMinY > worldMaxY) return; // no near-zone buildings
 
-            // Target: place the highest building so its vpY is around 0.85
-            // Compute how much world-Y maps to one viewport-Y unit at this depth
-            if (maxChild == null || maxVpY <= 0.85f) return;
-            float targetVpY = 0.85f;
-            // Estimate: shift a small test amount to calibrate
-            float testOffsetY = -1f;
-            var testPos = maxChild.position + new Vector3(0, testOffsetY, 0);
-            var testVp = cam.WorldToViewportPoint(testPos);
-            if (testVp.z <= 0) return;
-            float vpDelta = maxVpY - testVp.y; // how much vpY changes per unit of world Y
-            if (Mathf.Abs(vpDelta) < 0.0001f) return;
-            float neededOffset = (maxVpY - targetVpY) / vpDelta;
+            // Compute the visible world-Y span at z=10 for the skyline region
+            float nearZ = 10f;
+            float distToNear = (nearZ - cam.transform.position.z) / cam.transform.forward.z;
+            float vpTop = 0.50f;
+            float vpBottom = 0.02f;
+            float targetTop = cam.ViewportToWorldPoint(new Vector3(0.5f, vpTop, distToNear)).y;
+            float targetBottom = cam.ViewportToWorldPoint(new Vector3(0.5f, vpBottom, distToNear)).y;
 
-            // Apply the offset to the entire backdrop
-            var pos = backdrop.transform.position;
-            backdrop.transform.position = new Vector3(pos.x, pos.y - neededOffset, pos.z);
+            float currentSpan = worldMaxY - worldMinY;
+            float currentCenter = (worldMaxY + worldMinY) * 0.5f;
+            float targetSpan = targetTop - targetBottom;
+            float targetCenter = (targetTop + targetBottom) * 0.5f;
 
-            Debug.Log($"[GridBuilder] FitBackdrop: shifted backdrop Y by {-neededOffset:F2} " +
-                      $"(max vpY {maxVpY:F2} -> target {targetVpY:F2})");
+            float scaleFactor = Mathf.Min(targetSpan / currentSpan, 1.0f);
+
+            // Capture old backdrop state
+            float oldScaleY = backdrop.transform.localScale.y;
+            float oldPosY = backdrop.transform.position.y;
+
+            // Compute local-space center (invariant under our scale change)
+            float localCenterY = (currentCenter - oldPosY) / oldScaleY;
+
+            // Apply Y-only scale to backdrop
+            var s = backdrop.transform.localScale;
+            float newScaleY = oldScaleY * scaleFactor;
+            backdrop.transform.localScale = new Vector3(s.x, newScaleY, s.z);
+
+            // Reposition so the scaled building center aligns with target center
+            float newPosY = targetCenter - localCenterY * newScaleY;
+            backdrop.transform.position = new Vector3(backdrop.transform.position.x, newPosY, backdrop.transform.position.z);
+
+            Debug.Log($"[GridBuilder] FitBackdrop: scaleY={scaleFactor:F3} newY={newPosY:F2} " +
+                      $"(span={currentSpan:F2}->{targetSpan:F2}, center={currentCenter:F2}->{targetCenter:F2})");
         }
 
 
