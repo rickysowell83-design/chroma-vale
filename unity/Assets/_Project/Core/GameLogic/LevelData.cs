@@ -70,18 +70,18 @@ namespace ChromaVale.Core.GameLogic
         /// <summary>
         /// Level 1: "First Contact" (v3 — Option A+)
         /// 5×5 tutorial grid — no obstacles, no ghost traces, no impedance.
-        /// Source at (2,0) top-center, target at (2,4) bottom-center.
-        /// Vertical straight-line path: 4 cells. Impossible to fail.
+        /// Source at (0,2) left-center, target at (4,2) right-center.
+        /// Horizontal straight-line path: 3 cells. Impossible to fail.
         /// Teaches: Select trace from tray, place on board, press ROUTE, watch signal.
         /// Grid: 5×5 | Par: 6 ticks
-        /// Solution: 4×Straight(2) down column 2. 4 ticks.
+        /// Solution: 3×Straight(2) across row 2. 3 ticks. 1 spare straight + 2 corners.
         /// </summary>
         public static LevelData Level1 => new()
         {
             Width = 5, Height = 5, ParTicks = 6,
             DisplayName = "First Contact",
-            Sources = new[] { new LevelSource { X = 2, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
-            Targets = new[] { new LevelTarget { X = 2, Y = 4, ColorIndex = 0 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 1 } },
+            Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
             SignalGates = System.Array.Empty<LevelSignalGate>(),
             GhostTraces = System.Array.Empty<GhostTrace>(),

@@ -130,7 +130,7 @@ namespace ChromaVale.Presentation.Views.Components
             var txtGo = new GameObject("FlowText");
             txtGo.transform.SetParent(btnGo.transform, false);
             _label = txtGo.AddComponent<TextMeshProUGUI>();
-            _label.text = "> FLOW";
+            _label.text = "> ROUTE";
             _label.fontSize = 22;
             _label.fontStyle = FontStyles.Bold;
             _label.alignment = TextAlignmentOptions.Center;

@@ -353,7 +353,7 @@ namespace ChromaVale.Presentation.Views.Components
         public static string ShapeSymbol(SegmentShape shape) => shape switch
         {
             SegmentShape.Straight => "STR",
-            SegmentShape.Corner => "ELB",
+            SegmentShape.Corner => "CRN",
             SegmentShape.Splitter => "TEE",
             SegmentShape.CrossJunction => "CRS",
             SegmentShape.Diode => "VLV",

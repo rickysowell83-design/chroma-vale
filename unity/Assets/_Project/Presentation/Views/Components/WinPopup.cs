@@ -49,7 +49,7 @@ namespace ChromaVale.Presentation.Views.Components
             var t1 = new GameObject("WinMain");
             t1.transform.SetParent(bg.transform, false);
             _titleText = t1.AddComponent<TextMeshProUGUI>();
-            _titleText.text = "PIPELINE ONLINE";
+            _titleText.text = "CIRCUIT RESTORED!";
             _titleText.fontSize = 32;
             _titleText.alignment = TextAlignmentOptions.Center;
             _titleText.color = ChromaPalette.NeonCyan;
@@ -144,7 +144,7 @@ namespace ChromaVale.Presentation.Views.Components
 
         public void Show(int starsEarned, int moveCount, bool isLastLevel)
         {
-            _titleText.text = "PIPELINE ONLINE";
+            _titleText.text = "CIRCUIT RESTORED!";
             _subtitleText.text = starsEarned >= 3
                 ? "All targets reached. Maximum efficiency."
                 : "Flow delivered successfully.";
