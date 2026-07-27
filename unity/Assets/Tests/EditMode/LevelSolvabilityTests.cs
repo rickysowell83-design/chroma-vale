@@ -88,9 +88,9 @@ namespace ChromaVale.Tests
             var level = LevelData.Level1;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 2, 1, sim, 90); // Str rot=90 (vertical: Up|Down)
-                inv.TryPlace(1, board, 2, 2, sim, 90); // Str rot=90
-                inv.TryPlace(2, board, 2, 3, sim, 90); // Str rot=90
+                inv.TryPlace(0, board, 1, 2, sim, 0); // Str rot=0 (horizontal: Left|Right)
+                inv.TryPlace(1, board, 2, 2, sim, 0); // Str rot=0
+                inv.TryPlace(2, board, 3, 2, sim, 0); // Str rot=0
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
@@ -393,9 +393,9 @@ namespace ChromaVale.Tests
             var level = LevelData.Level5;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 1, 2, sim, 0); // Str(1) at (1,2)
-                inv.TryPlace(1, board, 2, 2, sim, 0); // Str(1) at (2,2)
-                inv.TryPlace(2, board, 3, 2, sim, 0); // Str(2) at (3,2)
+                inv.TryPlace(0, board, 1, 2, sim, 0); // Str(2) at (1,2)
+                inv.TryPlace(4, board, 2, 2, sim, 0); // Repeater at (2,2) — boosts adjacent cells
+                inv.TryPlace(1, board, 3, 2, sim, 0); // Str(2) at (3,2) — boosted to cap 3 by Repeater
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
@@ -482,9 +482,9 @@ namespace ChromaVale.Tests
             var level = LevelData.Level7;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 1, 2, sim, 0); // Str
-                inv.TryPlace(1, board, 2, 2, sim, 0); // Str
-                inv.TryPlace(2, board, 3, 2, sim, 0); // Str
+                inv.TryPlace(0, board, 1, 2, sim, 0); // Str(2)
+                inv.TryPlace(1, board, 2, 2, sim, 0); // Str(2)
+                inv.TryPlace(5, board, 3, 2, sim, 0); // Diode(2,Right) at (3,2) — cap 2 handles pressure 2
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }

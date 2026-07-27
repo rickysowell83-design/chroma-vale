@@ -17,19 +17,19 @@ namespace ChromaVale.Presentation.Views.Components
         private Image _bgPanel;
         private bool _isInteractable = true;
 
-        // Neon glow colors
+        // v3: Inactive grey (#3A3A3A) → Active teal glow (#00E5FF) → Routing cyan pulse
         private static readonly Color BgPanelColor = new(0.02f, 0.02f, 0.04f, 0.85f);
-        private static readonly Color BgPanelBorder = new(0.08f, 0.12f, 0.18f, 0.9f);
-        private static readonly Color ButtonBodyDefault = new(0.10f, 0.12f, 0.16f, 0.95f);
-        private static readonly Color ButtonBodyHover = new(0.15f, 0.18f, 0.22f, 0.95f);
-        private static readonly Color ButtonBodyPressed = new(0.08f, 0.10f, 0.14f, 0.95f);
-        private static readonly Color ButtonBodyDisabled = new(0.04f, 0.05f, 0.06f, 0.50f);
-        private static readonly Color BorderCyanActive = new(0.0f, 0.85f, 1.0f, 1.0f);
+        private static readonly Color BgPanelBorder = ChromaPalette.ButtonActiveTeal * 0.4f; // Teal dim
+        private static readonly Color ButtonBodyDefault = ChromaPalette.ButtonInactive; // #3A3A3A
+        private static readonly Color ButtonBodyHover = ChromaPalette.ButtonActiveTeal * 0.25f; // Teal hint
+        private static readonly Color ButtonBodyPressed = new(0.15f, 0.15f, 0.15f, 0.95f);
+        private static readonly Color ButtonBodyDisabled = new(0.10f, 0.10f, 0.10f, 0.50f);
+        private static readonly Color BorderCyanActive = ChromaPalette.ButtonActiveTeal; // #00E5FF
         private static readonly Color BorderCyanHover = new(0.0f, 1.0f, 1.0f, 1.0f);
-        private static readonly Color BorderCyanDim = new(0.0f, 0.4f, 0.5f, 0.35f);
+        private static readonly Color BorderInactive = new(0.25f, 0.25f, 0.25f, 0.6f); // Grey border idle
         private static readonly Color BorderDisabled = new(0.18f, 0.20f, 0.22f, 0.40f);
         private static readonly Color LabelColor = new(0.85f, 0.95f, 1.0f);
-        private static readonly Color LabelColorPulse = new(0.0f, 0.85f, 1.0f);
+        private static readonly Color LabelColorPulse = ChromaPalette.ButtonActiveTeal;
 
         public event Action OnFlowRequested;
 
@@ -86,7 +86,7 @@ namespace ChromaVale.Presentation.Views.Components
             var borderGo = new GameObject("BtnBorder");
             borderGo.transform.SetParent(btnGo.transform, false);
             _borderImage = borderGo.AddComponent<Image>();
-            _borderImage.color = BorderCyanActive;
+            _borderImage.color = BorderInactive; // v3: grey idle until PlayMode active
             _borderImage.raycastTarget = false;
             var borderRt = borderGo.GetComponent<RectTransform>();
             borderRt.anchorMin = Vector2.zero;
@@ -262,7 +262,7 @@ namespace ChromaVale.Presentation.Views.Components
         {
             if (!_isInteractable) return;
             if (_borderImage != null)
-                _borderImage.color = BorderCyanActive;
+                _borderImage.color = BorderCyanActive; // Restore active teal
             if (_buttonImage != null)
                 _buttonImage.color = ButtonBodyDefault;
         }
@@ -280,5 +280,20 @@ namespace ChromaVale.Presentation.Views.Components
             if (_buttonImage != null)
                 _buttonImage.color = ButtonBodyHover;
         }
+
+        public void SetRouting(bool routing)
+        {
+            if (_button != null) _button.interactable = !routing;
+            if (_buttonImage != null)
+                _buttonImage.color = routing ? new Color(0.0f, 0.25f, 0.35f, 0.95f) : ButtonBodyDefault;
+            if (_borderImage != null)
+                _borderImage.color = routing ? new Color(0.0f, 0.8f, 1.0f, 0.6f) : BorderCyanActive;
+            if (_label != null)
+            {
+                _label.text = routing ? "SIMULATING..." : "> ROUTE";
+                _label.color = routing ? new Color(0.0f, 0.7f, 0.9f) : LabelColor;
+            }
+        }
+
     }
 }

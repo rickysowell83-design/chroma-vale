@@ -195,7 +195,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 7,
             DisplayName = "First Short",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 3 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 2 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 2, Y = 1 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
@@ -225,8 +225,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Color Crossing",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 2 },
-                new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 1, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 3, ColorIndex = 1, SignalStrength = 1 },
             },
             Targets = new[]
             {
@@ -256,7 +256,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 8,
             DisplayName = "Valve Control",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 3 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 2 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[]
             {
@@ -292,7 +292,7 @@ namespace ChromaVale.Core.GameLogic
         {
             Width = 5, Height = 5, ParTicks = 9,
             DisplayName = "One-Way Maze",
-            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 2 } },
+            Sources = new[] { new LevelSource { X = 0, Y = 2, ColorIndex = 0, SignalStrength = 1 } },
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = System.Array.Empty<LevelObstacle>(),
             SignalGates = new[]
@@ -322,8 +322,8 @@ namespace ChromaVale.Core.GameLogic
             DisplayName = "Double Pressure",
             Sources = new[]
             {
-                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 2 },
-                new LevelSource { X = 0, Y = 4, ColorIndex = 0, SignalStrength = 2 },
+                new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 },
+                new LevelSource { X = 0, Y = 4, ColorIndex = 0, SignalStrength = 1 },
             },
             Targets = new[]
             {

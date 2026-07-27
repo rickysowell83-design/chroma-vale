@@ -63,12 +63,12 @@ namespace ChromaVale.Tests
         public void Level1_StraightPath_AllTargetsReached()
         {
             var level = LevelData.Level1;
-            // Level 1 v3: Source(2,0,C) → Target(2,4,C). Place straights at (2,1),(2,2),(2,3) rot=90 (vertical).
+            // Level 1 v3: Source(0,2,C) → Target(4,2,C). Place straights at (1,2),(2,2),(3,2) rot=0 (horizontal).
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 2, 1, sim, 90);
-                inv.TryPlace(1, board, 2, 2, sim, 90);
-                inv.TryPlace(2, board, 2, 3, sim, 90);
+                inv.TryPlace(0, board, 1, 2, sim, 0);
+                inv.TryPlace(1, board, 2, 2, sim, 0);
+                inv.TryPlace(2, board, 3, 2, sim, 0);
             });
 
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
@@ -77,17 +77,17 @@ namespace ChromaVale.Tests
         [Test]
         public void Level1_StraightPath_FinishesWithinParTicks()
         {
-            // Level 1 v3: Source(2,0,C) → straights at (2,1),(2,2),(2,3) → Target(2,4,C)
-            // After StartSimulation, wave is at (2,1).
-            // Tick 1: (2,1)→(2,2). Tick 2: (2,2)→(2,3). Tick 3: (2,3)→(2,4)=Target.
+            // Level 1 v3: Source(0,2,C) → straights at (1,2),(2,2),(3,2) → Target(4,2,C)
+            // After StartSimulation, wave is at (1,2).
+            // Tick 1: (1,2)→(2,2). Tick 2: (2,2)→(3,2). Tick 3: (3,2)→(4,2)=Target.
             var level = LevelData.Level1;
             var board = new GridBoard(level);
             var inventory = new TraceInventory(level.Inventory);
             var simulator = new SignalRouter();
 
-            inventory.TryPlace(0, board, 2, 1, simulator, 90);
-            inventory.TryPlace(1, board, 2, 2, simulator, 90);
-            inventory.TryPlace(2, board, 2, 3, simulator, 90);
+            inventory.TryPlace(0, board, 1, 2, simulator, 0);
+            inventory.TryPlace(1, board, 2, 2, simulator, 0);
+            inventory.TryPlace(2, board, 3, 2, simulator, 0);
 
             simulator.StartSimulation(board, level, inventory);
 
@@ -100,7 +100,7 @@ namespace ChromaVale.Tests
             }
 
             Assert.AreEqual(SimulationResult.AllTargetsReached, simulator.GetResult());
-            // 2 ticks + 0 for initial placement. ParTicks is 4. +1 margin.
+            // 3 ticks + 0 for initial placement. ParTicks is 6. +1 margin.
             Assert.That(tickCount, Is.LessThanOrEqualTo(level.ParTicks + 1));
         }
 
