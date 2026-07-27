@@ -5,7 +5,9 @@ namespace ChromaVale.Core.GameLogic
     public struct LevelSource
     {
         public int X, Y, ColorIndex;
-        public int SignalStrength; // Units of signal emitted per tick (default 1)
+        /// <summary>Flow pressure — units emitted per tick for capacity checks (1 = normal). 
+        /// Separate from LevelData.SignalStrength (the impedance counter).</summary>
+        public int SignalStrength;
     }
 
     public struct LevelTarget
@@ -56,7 +58,7 @@ namespace ChromaVale.Core.GameLogic
         public LevelSignalGate[] SignalGates;
         public GhostTrace[] GhostTraces;          // Pre-existing traces on the board
         public ImpedanceCell[] ImpedanceCells;    // Signal-weakening zones
-        public int SignalStrength = 3;            // Default signal strength from sources (replaces per-source pressure)
+        public int SignalStrength = 3;            // Impedance counter — how many resistance points signal can survive (separate from flow pressure)
         public TraceSegment[] Inventory;    // Available pieces for this level
         public int ParTicks = 20;        // Par completion time in ticks (for 3-star)
         public string DisplayName;       // Human-readable level name for HUD
