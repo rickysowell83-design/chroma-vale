@@ -8,8 +8,8 @@ namespace ChromaVale.Presentation.Views.Components
     /// proper connection openings, and direction indicators.
     /// Replaces the old "child GameObject bars" approach.
     /// </summary>
-    [System.Obsolete("Replaced by PipeMeshFactory3D — 3D overhaul")]
-    public static class PipeTextureFactory
+    [System.Obsolete("Replaced by TraceMeshFactory3D — 3D overhaul")]
+    public static class TraceTextureFactory
     {
         private const int TexSize = 64;
         private const float PipeWidth = 0.28f;  // relative to texture
@@ -17,10 +17,10 @@ namespace ChromaVale.Presentation.Views.Components
         private const float CornerRadius = 0.15f;
 
         /// <summary>
-        /// Create a sprite for the given pipe shape + rotation.
+        /// Create a sprite for the given trace shape + rotation.
         /// Returns a Sprite that can be assigned to a SpriteRenderer.
         /// </summary>
-        public static Sprite CreatePipeSprite(PieceShape shape, int rotationDeg, Color pipeColor, Color glowColor)
+        public static Sprite CreatePipeSprite(SegmentShape shape, int rotationDeg, Color pipeColor, Color glowColor)
         {
             var tex = new Texture2D(TexSize, TexSize, TextureFormat.RGBA32, false);
             tex.filterMode = FilterMode.Bilinear;
@@ -40,7 +40,7 @@ namespace ChromaVale.Presentation.Views.Components
             }
 
             // Draw center hub (all shapes except Straight get a center)
-            if (shape != PieceShape.Straight || connections.Length > 0)
+            if (shape != SegmentShape.Straight || connections.Length > 0)
             {
                 DrawCenterHub(pixels, pipeColor, glowColor);
             }
@@ -51,19 +51,19 @@ namespace ChromaVale.Presentation.Views.Components
             return Sprite.Create(tex, new Rect(0, 0, TexSize, TexSize), new Vector2(0.5f, 0.5f), TexSize);
         }
 
-        private static Vector2[] GetConnections(PieceShape shape, int rotationDeg)
+        private static Vector2[] GetConnections(SegmentShape shape, int rotationDeg)
         {
             // Base connections (pointing OUT from center)
             Vector2[] baseConns = shape switch
             {
-                PieceShape.Straight => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
-                PieceShape.Elbow => new[] { new Vector2(1, 0), new Vector2(0, 1) },
-                PieceShape.TJunction => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1) },
-                PieceShape.Cross => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1), new Vector2(0, -1) },
-                PieceShape.Valve => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
-                PieceShape.Amplifier => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
-                PieceShape.Mixer => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1), new Vector2(0, -1) },
-                PieceShape.Blocker => new Vector2[0],
+                SegmentShape.Straight => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
+                SegmentShape.Corner => new[] { new Vector2(1, 0), new Vector2(0, 1) },
+                SegmentShape.Splitter => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1) },
+                SegmentShape.CrossJunction => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1), new Vector2(0, -1) },
+                SegmentShape.Diode => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
+                SegmentShape.Repeater => new[] { new Vector2(1, 0), new Vector2(-1, 0) },
+                SegmentShape.Combiner => new[] { new Vector2(1, 0), new Vector2(-1, 0), new Vector2(0, 1), new Vector2(0, -1) },
+                SegmentShape.Breaker => new Vector2[0],
                 _ => new[] { new Vector2(1, 0), new Vector2(-1, 0) }
             };
 

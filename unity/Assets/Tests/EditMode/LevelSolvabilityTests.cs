@@ -88,9 +88,9 @@ namespace ChromaVale.Tests
             var level = LevelData.Level1;
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 2, 1, sim, 0); // Str down col 2: (2,1)
-                inv.TryPlace(1, board, 2, 2, sim, 0); // Str down col 2: (2,2)
-                inv.TryPlace(2, board, 2, 3, sim, 0); // Str down col 2: (2,3)
+                inv.TryPlace(0, board, 2, 1, sim, 90); // Str rot=90 (vertical: Up|Down)
+                inv.TryPlace(1, board, 2, 2, sim, 90); // Str rot=90
+                inv.TryPlace(2, board, 2, 3, sim, 90); // Str rot=90
             });
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
         }
