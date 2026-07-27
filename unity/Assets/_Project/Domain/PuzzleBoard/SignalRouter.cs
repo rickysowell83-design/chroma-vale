@@ -184,12 +184,13 @@ namespace ChromaVale.Domain.PuzzleBoard
                 var src = _level.Sources[si];
                 int fx = src.X, fy = src.Y, color = src.ColorIndex;
                 int pressure = src.SignalStrength > 0 ? src.SignalStrength : 1;
+                int signalStrength = _level.SignalStrength > 0 ? _level.SignalStrength : pressure;
 
                 // Mark source cell as visited for this color
                 _visited.Add((fx, fy, color));
 
                 // Emit waves from source to adjacent pipe/target cells
-                EmitFromSource(si, fx, fy, color, pressure);
+                EmitFromSource(si, fx, fy, color, pressure, signalStrength);
             }
         }
 
@@ -197,7 +198,7 @@ namespace ChromaVale.Domain.PuzzleBoard
         /// Emit waves from a source cell into adjacent pipe/target/flowgate cells.
         /// Respects neighbor cell shape connections.
         /// </summary>
-        private void EmitFromSource(int sourceIndex, int sx, int sy, int color, int pressure)
+        private void EmitFromSource(int sourceIndex, int sx, int sy, int color, int pressure, int signalStrength)
         {
             foreach (var (dx, dy) in Directions)
             {
@@ -244,7 +245,7 @@ namespace ChromaVale.Domain.PuzzleBoard
                     {
                         X = nx, Y = ny, ColorIndex = color, SourceIndex = sourceIndex,
                         Pressure = pressure,
-                        SignalStrength = pressure, // Start with full signal strength
+                        SignalStrength = signalStrength, // Impedance counter (not pressure)
                         CameFrom = OppositeDirection(DirectionFromDelta(dx, dy))
                     });
                 }
@@ -349,6 +350,16 @@ namespace ChromaVale.Domain.PuzzleBoard
                         {
                             waveStrength -= resistCost;
                             if (waveStrength <= 0) continue; // Signal died — don't propagate
+                        }
+
+                        // ── Repeater: restore signal strength to full ──
+                        if (_traceShapeMap.TryGetValue((nx, ny), out var cellShape) && cellShape.shape == SegmentShape.Repeater)
+                        {
+                            waveStrength = GetSourceSignalStrength(wave.SourceIndex);
+                        }
+                        else if (_ghostShapeMap.TryGetValue((nx, ny), out var ghostShape) && ghostShape.shape == SegmentShape.Repeater)
+                        {
+                            waveStrength = GetSourceSignalStrength(wave.SourceIndex);
                         }
 
                         _visited.Add(visitKey);
@@ -594,6 +605,20 @@ namespace ChromaVale.Domain.PuzzleBoard
             cap = 2; // default capacity
             _traceCapacityMap[(x, y)] = cap;
             return cap;
+        }
+
+        /// <summary>
+        /// Get the original signal strength from the source that emitted this wave.
+        /// Used by Repeater pieces to restore signal strength to full.
+        /// </summary>
+        private int GetSourceSignalStrength(int sourceIndex)
+        {
+            if (_level != null)
+            {
+                int ss = _level.SignalStrength;
+                return ss > 0 ? ss : 1;
+            }
+            return 1;
         }
 
         /// <summary>

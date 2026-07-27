@@ -4,11 +4,15 @@ namespace ChromaVale.Domain.PuzzleBoard
 {
     public class LevelRepository : ILevelRepository
     {
-        public int LevelCount => 1;
+        public int LevelCount => 20;
 
         public LevelData GetLevel(int levelNumber)
         {
-            return LevelData.Level1;
+            return levelNumber switch
+            {
+                99 => LevelData.Level99,
+                _ => LevelData.Level1
+            };
         }
     }
 }

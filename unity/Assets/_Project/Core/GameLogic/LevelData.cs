@@ -872,6 +872,50 @@ namespace ChromaVale.Core.GameLogic
             }
         };
 
+        /// <summary>
+        /// Level 99: "Circuit Integrity Test"
+        /// Test level exercising Ghost Traces, Impedance Nodes, Timing Windows,
+        /// and Repeater signal strength restoration — all three Option A+ mechanics.
+        ///
+        /// Grid: 7×1 — single horizontal row.
+        /// Ghost trace (Straight) at (2,0) with Impedance cost 1.
+        /// Impedance cell at (4,0) with cost 2.
+        /// Target has AcceptWindow(5, 8) — signal must arrive in ticks 5-8.
+        ///
+        /// Path: S(0,0) → (1,0)Str → (2,0)Ghost(imp 1) → (3,0)Repeater → (4,0)Imp(2) → (5,0)Str → T(6,0)
+        ///
+        /// Without Repeater: signal dies at (4,0) — two impedance drains (1+2=3) exhaust SignalStrength=3.
+        /// With Repeater: restored to 3 at (3,0), survives second impedance (3-2=1), reaches target at tick 5.
+        /// Teaches: Ghost traces, impedance planning, Repeater signal restoration, timing windows.
+        /// Grid: 7×1 | Par: 7 ticks
+        /// </summary>
+        public static LevelData Level99 => new()
+        {
+            Width = 7, Height = 1, ParTicks = 7,
+            DisplayName = "Circuit Integrity Test",
+            SignalStrength = 3,
+            Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+            Targets = new[] { new LevelTarget { X = 6, Y = 0, ColorIndex = 0, AcceptWindow = new AcceptWindow { MinTick = 5, MaxTick = 8 } } },
+            Obstacles = System.Array.Empty<LevelObstacle>(),
+            SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 1 },
+                new ImpedanceCell { X = 4, Y = 0, ResistanceCost = 2 },
+            },
+            Inventory = new[]
+            {
+                TraceSegment.Straight(2),  // (1,0)
+                TraceSegment.Repeater(),   // (3,0)
+                TraceSegment.Straight(2),  // (5,0)
+            }
+        };
+
     }
 
     public interface ILevelRepository

@@ -63,12 +63,12 @@ namespace ChromaVale.Tests
         public void Level1_StraightPath_AllTargetsReached()
         {
             var level = LevelData.Level1;
-            // Level 1 v3: Source(2,0,C) → Target(2,4,C). Place straights at (2,1),(2,2),(2,3).
+            // Level 1 v3: Source(2,0,C) → Target(2,4,C). Place straights at (2,1),(2,2),(2,3) rot=90 (vertical).
             var result = RunToCompletion(level, (inv, board, sim) =>
             {
-                inv.TryPlace(0, board, 2, 1, sim, 0);
-                inv.TryPlace(1, board, 2, 2, sim, 0);
-                inv.TryPlace(2, board, 2, 3, sim, 0);
+                inv.TryPlace(0, board, 2, 1, sim, 90);
+                inv.TryPlace(1, board, 2, 2, sim, 90);
+                inv.TryPlace(2, board, 2, 3, sim, 90);
             });
 
             Assert.AreEqual(SimulationResult.AllTargetsReached, result);
@@ -85,9 +85,9 @@ namespace ChromaVale.Tests
             var inventory = new TraceInventory(level.Inventory);
             var simulator = new SignalRouter();
 
-            inventory.TryPlace(0, board, 2, 1, simulator, 0);
-            inventory.TryPlace(1, board, 2, 2, simulator, 0);
-            inventory.TryPlace(2, board, 2, 3, simulator, 0);
+            inventory.TryPlace(0, board, 2, 1, simulator, 90);
+            inventory.TryPlace(1, board, 2, 2, simulator, 90);
+            inventory.TryPlace(2, board, 2, 3, simulator, 90);
 
             simulator.StartSimulation(board, level, inventory);
 
@@ -639,6 +639,397 @@ namespace ChromaVale.Tests
             });
 
             Assert.AreEqual(SimulationResult.SignalStuck, result);
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 13. GHOST TRACE — signal propagates through pre-existing ghost trace
+        // ────────────────────────────────────────────────────────────────
+
+        [Test]
+        public void GhostTrace_PropagatesSignalToTarget()
+        {
+            // Source(0,0,C) → GhostTrace Straight at (1,0) → Target(2,0,C)
+            // Ghost trace is pre-existing on the board — player doesn't place it.
+            var level = new LevelData
+            {
+                Width = 3,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0 } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                GhostTraces = new[]
+                {
+                    new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 }
+                },
+                ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
+                Inventory = System.Array.Empty<TraceSegment>(),
+            };
+
+            var board = new GridBoard(level);
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
+
+            simulator.StartSimulation(board, level, inventory);
+
+            for (int i = 0; i < 10; i++)
+            {
+                if (!simulator.IsRunning) break;
+                simulator.Tick();
+            }
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, simulator.GetResult());
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 14. IMPEDANCE — signal weakens and dies when strength hits 0
+        // ────────────────────────────────────────────────────────────────
+
+        [Test]
+        public void Impedance_SignalDiesWhenStrengthExhausted()
+        {
+            // Source(0,0,C) SignalStrength=2 → Straight at (1,0) → GhostStraight+Impedance(2,0,cost=2) → Target(3,0,C)
+            // Signal strength 2, impedance cost 2 → dies at (2,0)
+            var level = new LevelData
+            {
+                Width = 4,
+                Height = 1,
+                SignalStrength = 2,  // Explicit: signal dies with strength 2 against cost 2
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 3, Y = 0, ColorIndex = 0 } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                GhostTraces = new[]
+                {
+                    new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 }
+                },
+                ImpedanceCells = new[]
+                {
+                    new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 2 }
+                },
+                Inventory = new[] { TraceSegment.Straight(2) },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
+        }
+
+        [Test]
+        public void Impedance_SignalSurvivesWithEnoughStrength()
+        {
+            // Source(0,0,C) SignalStrength=3 → Straight at (1,0) → GhostStraight+Impedance(2,0,cost=2) → Target(3,0,C)
+            // Signal strength 3, impedance cost 2 → survives with 1
+            var level = new LevelData
+            {
+                Width = 4,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 3, Y = 0, ColorIndex = 0 } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                GhostTraces = new[]
+                {
+                    new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 }
+                },
+                ImpedanceCells = new[]
+                {
+                    new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 2 }
+                },
+                Inventory = new[] { TraceSegment.Straight(2) },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, result);
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 15. TIMING WINDOW — target rejects signal outside accept window
+        // ────────────────────────────────────────────────────────────────
+
+        [Test]
+        public void TimingWindow_SignalTooEarly_Rejected()
+        {
+            // Source(0,0,C) → Target(1,0,C) with AcceptWindow(3, 5)
+            // Signal arrives at tick 1 (directly adjacent to source) → too early → rejected
+            // NOTE: EmitFromSource fires in StartSimulation before CurrentTick is incremented.
+            // However, ReachTarget is called from Tick (not from EmitFromSource) for target cells
+            // that are not adjacent to the source. For adjacent targets, EmitFromSource calls
+            // ReachTarget directly. CurrentTick is 0 at that point.
+            // So we need the target NOT adjacent so it goes through Tick path.
+            // Source(0,0,C) → Straight(1,0) → Target(2,0,C) with AcceptWindow(3,5)
+            // Tick 1: wave at (1,0). Tick 2: wave reaches (2,0) = Target. CurrentTick=2 < 3 → rejected.
+            var level = new LevelData
+            {
+                Width = 3,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0, AcceptWindow = new AcceptWindow { MinTick = 3, MaxTick = 5 } } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Straight(2) },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+            });
+
+            // Signal arrives too early → rejected → target not reached → SignalStuck
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
+        }
+
+        [Test]
+        public void TimingWindow_SignalWithinWindow_Accepted()
+        {
+            // Source(0,0,C) → Straight(1,0) → Target(2,0,C) with AcceptWindow(1, 5)
+            // Tick 1: wave at (1,0). Tick 2: wave reaches target. CurrentTick=2, window [1,5] → accepted!
+            var level = new LevelData
+            {
+                Width = 3,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 2, Y = 0, ColorIndex = 0, AcceptWindow = new AcceptWindow { MinTick = 1, MaxTick = 5 } } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[] { TraceSegment.Straight(2) },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, result);
+        }
+
+        [Test]
+        public void TimingWindow_SignalTooLate_Rejected()
+        {
+            // Source(0,0,C) → long path of 6 straights → Target(7,0,C) with AcceptWindow(1, 2)
+            // Signal takes 7 ticks to reach target. MaxTick=2 → too late → rejected.
+            var level = new LevelData
+            {
+                Width = 8,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 7, Y = 0, ColorIndex = 0, AcceptWindow = new AcceptWindow { MinTick = 1, MaxTick = 2 } } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[]
+                {
+                    TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                    TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+                inv.TryPlace(1, board, 2, 0, sim, 0);
+                inv.TryPlace(2, board, 3, 0, sim, 0);
+                inv.TryPlace(3, board, 4, 0, sim, 0);
+                inv.TryPlace(4, board, 5, 0, sim, 0);
+                inv.TryPlace(5, board, 6, 0, sim, 0);
+            });
+
+            // Signal takes 7 ticks but window closes at tick 2 → rejected → SignalStuck
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
+        }
+
+        [Test]
+        public void TimingWindow_NullWindow_AlwaysAccepts()
+        {
+            // Same as above but no AcceptWindow → always accepts
+            var level = new LevelData
+            {
+                Width = 8,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 7, Y = 0, ColorIndex = 0, AcceptWindow = null } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                Inventory = new[]
+                {
+                    TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                    TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+                inv.TryPlace(1, board, 2, 0, sim, 0);
+                inv.TryPlace(2, board, 3, 0, sim, 0);
+                inv.TryPlace(3, board, 4, 0, sim, 0);
+                inv.TryPlace(4, board, 5, 0, sim, 0);
+                inv.TryPlace(5, board, 6, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, result);
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 16. REPEATER — restores signal strength
+        // ────────────────────────────────────────────────────────────────
+
+        [Test]
+        public void Repeater_RestoresSignalStrength_AfterImpedance()
+        {
+            // Source(0,0,C,p=3) → Straight(1,0) → Ghost+Imp(2,0,cost=2) → Repeater(3,0) → Ghost+Imp(4,0,cost=2) → Straight(5,0) → Target(6,0,C)
+            // Without Repeater: 3-2-2 = -1 → dies at (4,0)
+            // With Repeater: 3-2=1 at (2,0) → restored to 3 at (3,0) → 3-2=1 at (4,0) → survives → reaches target
+            var level = new LevelData
+            {
+                Width = 7,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 6, Y = 0, ColorIndex = 0 } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                GhostTraces = new[]
+                {
+                    new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                    new GhostTrace { X = 4, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                },
+                ImpedanceCells = new[]
+                {
+                    new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 2 },
+                    new ImpedanceCell { X = 4, Y = 0, ResistanceCost = 2 },
+                },
+                Inventory = new[]
+                {
+                    TraceSegment.Straight(2),  // (1,0)
+                    TraceSegment.Repeater(),   // (3,0)
+                    TraceSegment.Straight(2),  // (5,0)
+                },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+                inv.TryPlace(1, board, 3, 0, sim, 0);
+                inv.TryPlace(2, board, 5, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, result);
+        }
+
+        [Test]
+        public void Repeater_WithoutRepeater_SignalDies()
+        {
+            // Same layout as above but Straight at (3,0) instead of Repeater
+            // Signal: 3-2=1 at (2,0) → 1 at (3,0) → 1-2=-1 at (4,0) → DEAD
+            var level = new LevelData
+            {
+                Width = 7,
+                Height = 1,
+                Sources = new[] { new LevelSource { X = 0, Y = 0, ColorIndex = 0, SignalStrength = 1 } },
+                Targets = new[] { new LevelTarget { X = 6, Y = 0, ColorIndex = 0 } },
+                Obstacles = System.Array.Empty<LevelObstacle>(),
+                SignalGates = System.Array.Empty<LevelSignalGate>(),
+                GhostTraces = new[]
+                {
+                    new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                    new GhostTrace { X = 4, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                },
+                ImpedanceCells = new[]
+                {
+                    new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 2 },
+                    new ImpedanceCell { X = 4, Y = 0, ResistanceCost = 2 },
+                },
+                Inventory = new[]
+                {
+                    TraceSegment.Straight(2),  // (1,0)
+                    TraceSegment.Straight(2),  // (3,0) — no Repeater!
+                    TraceSegment.Straight(2),  // (5,0)
+                },
+            };
+
+            var result = RunToCompletion(level, (inv, board, sim) =>
+            {
+                inv.TryPlace(0, board, 1, 0, sim, 0);
+                inv.TryPlace(1, board, 3, 0, sim, 0);
+                inv.TryPlace(2, board, 5, 0, sim, 0);
+            });
+
+            Assert.AreEqual(SimulationResult.SignalStuck, result);
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        // 17. LEVEL 99 — end-to-end integration test
+        // ────────────────────────────────────────────────────────────────
+
+        [Test]
+        public void Level99_AllMechanics_ReachesTarget()
+        {
+            // Level 99: ghost trace, impedance, timing window, Repeater
+            // Full trace: S(0,0) → Str(1,0) → GhostStr(2,0,imp1) → Repeater(3,0) → Imp(4,0,2) → Str(5,0) → T(6,0,window=5-8)
+            var level = LevelData.Level99;
+            var board = new GridBoard(level);
+            var inventory = new TraceInventory(level.Inventory);
+            var simulator = new SignalRouter();
+            var targetsReached = new List<(int x, int y)>();
+
+            simulator.OnTargetReached += (x, y, c) => targetsReached.Add((x, y));
+
+            // Place pieces: Straight at (1,0), Repeater at (3,0), Straight at (5,0)
+            // Ghost trace at (2,0) is pre-existing
+            inventory.TryPlace(0, board, 1, 0, simulator, 0); // index 0 = Straight(2) at (1,0)
+            inventory.TryPlace(1, board, 3, 0, simulator, 0); // index 1 = Repeater at (3,0)
+            inventory.TryPlace(2, board, 5, 0, simulator, 0); // index 2 = Straight(2) at (5,0)
+
+            simulator.StartSimulation(board, level, inventory);
+
+            for (int i = 0; i < 20; i++)
+            {
+                if (!simulator.IsRunning) break;
+                simulator.Tick();
+            }
+
+            Assert.AreEqual(SimulationResult.AllTargetsReached, simulator.GetResult(),
+                "Level 99: Repeater should restore signal strength after first impedance, " +
+                "survive second impedance, and reach target within timing window");
+            Assert.Contains((6, 0), targetsReached);
+        }
+
+        [Test]
+        public void Level99_WithoutRepeater_SignalDies()
+        {
+            // Same as Level99 but without placing the Repeater — just use a Straight instead
+            // This tests that the level truly requires the Repeater
+            var level = LevelData.Level99;
+            var board = new GridBoard(level);
+            // Use a custom inventory with 3 straights, no Repeater
+            var noRepeaterInventory = new TraceInventory(new[]
+            {
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(2),
+                TraceSegment.Straight(2),
+            });
+            var simulator = new SignalRouter();
+
+            noRepeaterInventory.TryPlace(0, board, 1, 0, simulator, 0);
+            noRepeaterInventory.TryPlace(1, board, 3, 0, simulator, 0); // Straight instead of Repeater
+            noRepeaterInventory.TryPlace(2, board, 5, 0, simulator, 0);
+
+            simulator.StartSimulation(board, level, noRepeaterInventory);
+
+            for (int i = 0; i < 20; i++)
+            {
+                if (!simulator.IsRunning) break;
+                simulator.Tick();
+            }
+
+            Assert.AreEqual(SimulationResult.SignalStuck, simulator.GetResult(),
+                "Without Repeater, signal should die at the second impedance (cost 2 with only 1 strength left)");
         }
     }
 }

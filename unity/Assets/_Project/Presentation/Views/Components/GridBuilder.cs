@@ -85,6 +85,21 @@ namespace ChromaVale.Presentation.Views.Components
                 }
             }
 
+            // ── Render ghost traces (pre-existing copper on the board) ──
+            if (level.GhostTraces != null)
+            {
+                foreach (var gt in level.GhostTraces)
+                {
+                    var tv = _renderers[gt.X, gt.Y];
+                    if (tv != null)
+                    {
+                        tv.SetShape(gt.Shape, gt.Rotation);
+                        tv.Color = new Color(0.23f, 0.16f, 0.10f); // Oxidized copper tint (#3A2A1A)
+                        tv.EmissionIntensity = 0.15f; // Subtle glow, lower than active traces
+                    }
+                }
+            }
+
             SetupCamera();
             return _renderers;
         }
