@@ -37,8 +37,7 @@ namespace ChromaVale.Presentation.Views.Components
         private float _tileSize = 1f;
         private Color _color;
         private Color _darkColor = new Color(0.04f, 0.05f, 0.06f);
-        private Color _copperIdle = new Color(0.72f, 0.42f, 0.18f); // Copper idle color for placed traces
-        private float _emissionIntensity = 0.4f; // Subtle warm copper idle glow
+        private float _emissionIntensity = 0.4f;
 
         /// <summary>
         /// Logical tile color.  Setting this drives both the HDR emission
@@ -110,12 +109,12 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _baseMaterial = new Material(shader)
                     {
-                        color = new Color(0.10f, 0.18f, 0.10f) // Dark green PCB
+                        color = ChromaPalette.PCB_Substrate // v3 dark green #0A160A
                     };
                     _baseMaterial.SetFloat("_Metallic", 0.15f);
-                    _baseMaterial.SetFloat("_Smoothness", 0.5f);
+                    _baseMaterial.SetFloat("_Smoothness", 0.35f);
                     _baseMaterial.EnableKeyword("_EMISSION");
-                    _baseMaterial.SetColor("_EmissionColor", Color.black);
+                    _baseMaterial.SetColor("_EmissionColor", new Color(0.08f, 0.15f, 0.08f));
                     _baseMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
                 return _baseMaterial;
@@ -138,10 +137,10 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _viaMaterial = new Material(shader)
                     {
-                        color = new Color(0.8f, 0.55f, 0.2f) // Brighter gold/copper
+                        color = ChromaPalette.ENIG_Gold // v3 ENIG gold pad (#D4A843)
                     };
                     _viaMaterial.SetFloat("_Metallic", 0.95f);
-                    _viaMaterial.SetFloat("_Smoothness", 0.7f);
+                    _viaMaterial.SetFloat("_Smoothness", 0.6f);
                     _viaMaterial.EnableKeyword("_EMISSION");
                     _viaMaterial.SetColor("_EmissionColor", new Color(0.4f, 0.25f, 0.08f) * 0.5f); // Subtle glow visible in dark
                     _viaMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
@@ -259,8 +258,8 @@ namespace ChromaVale.Presentation.Views.Components
             float blend = Mathf.Clamp01(_emissionIntensity / 12.0f);
             Color blended = Color.Lerp(targetColor, surgeColor, blend);
             _mpb.SetColor("_EmissionColor", blended * _emissionIntensity);
-            // Keep copper base — only emission surges
-            _mpb.SetColor("_BaseColor", new Color(0.72f, 0.42f, 0.18f)); // Bright copper always
+            // v3: CopperActive (#B87333) base stays — only emission surges
+            _mpb.SetColor("_BaseColor", ChromaPalette.CopperActive);
 
             if (_traceRoot != null)
                 ApplyMpbToTree(_traceRoot.transform, _mpb);
@@ -403,111 +402,94 @@ public void SetIndicator(TileIndicator kind, Color color)
             {
                 case TileIndicator.SourceDot:
                 {
-                    // Concentric glowing rings (portal / reticle look per GDD mockup)
-                    var outerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    outerRing.name = "SourceOuterRing";
-                    Object.DestroyImmediate(outerRing.GetComponent<Collider>());
-                    outerRing.transform.SetParent(_indicatorRoot.transform, false);
-                    outerRing.transform.localPosition = new Vector3(0f, 0f, -0.20f);
-                    outerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float outerRadius = _tileSize * 0.35f;
-                    outerRing.transform.localScale = new Vector3(outerRadius * 2f, 0.08f, outerRadius * 2f);
-                    var outerRend = outerRing.GetComponent<MeshRenderer>();
-                    outerRend.sharedMaterial = indicatorMat;
-                    var outerMpb = new MaterialPropertyBlock();
-                    outerMpb.SetColor("_EmissionColor", color * 15f);
-                    outerMpb.SetColor("_BaseColor", color * 0.4f);
-                    outerRend.SetPropertyBlock(outerMpb);
+                    // ── v3: ENIG gold octagonal pad with cyan via center ──
 
-                    var innerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    innerRing.name = "SourceInnerRing";
-                    Object.DestroyImmediate(innerRing.GetComponent<Collider>());
-                    innerRing.transform.SetParent(_indicatorRoot.transform, false);
-                    innerRing.transform.localPosition = new Vector3(0f, 0f, -0.22f);
-                    innerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float innerRadius = _tileSize * 0.18f;
-                    innerRing.transform.localScale = new Vector3(innerRadius * 2f, 0.10f, innerRadius * 2f);
-                    var innerRend = innerRing.GetComponent<MeshRenderer>();
-                    innerRend.sharedMaterial = indicatorMat;
-                    var innerMpb = new MaterialPropertyBlock();
-                    innerMpb.SetColor("_EmissionColor", color * 20f);
-                    innerMpb.SetColor("_BaseColor", color * 0.5f);
-                    innerRend.SetPropertyBlock(innerMpb);
+                    // Gold outer pad ring
+                    var goldPad = TraceMeshFactory3D.CreateViaPad(Vector3.zero, _indicatorRoot.transform);
+                    goldPad.name = "SourceENIGPad";
+                    goldPad.transform.SetParent(_indicatorRoot.transform, false);
 
-                    var centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    centerDot.name = "SourceCenterDot";
-                    Object.DestroyImmediate(centerDot.GetComponent<Collider>());
-                    centerDot.transform.SetParent(_indicatorRoot.transform, false);
-                    centerDot.transform.localPosition = new Vector3(0f, 0f, -0.30f);
-                    centerDot.transform.localScale = Vector3.one * (_tileSize * 0.08f);
-                    var dotRend = centerDot.GetComponent<MeshRenderer>();
-                    dotRend.sharedMaterial = indicatorMat;
-                    var dotMpb = new MaterialPropertyBlock();
-                    dotMpb.SetColor("_EmissionColor", color * 25f);
-                    dotMpb.SetColor("_BaseColor", color * 0.9f);
-                    dotRend.SetPropertyBlock(dotMpb);
+                    // Cyan via center (pulsing)
+                    var viaCenter = TraceMeshFactory3D.CreateViaCenter(Vector3.zero, _indicatorRoot.transform,
+                        ChromaPalette.ViaCyan);
+                    viaCenter.name = "SourceViaCenter";
 
+                    // Bloom halo disc (thin, wide, cyan)
                     var halo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                     halo.name = "SourceHalo";
                     Object.DestroyImmediate(halo.GetComponent<Collider>());
                     halo.transform.SetParent(_indicatorRoot.transform, false);
-                    halo.transform.localPosition = new Vector3(0f, 0f, -0.26f);
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.06f); // Behind pad ring
                     halo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float haloRadius = _tileSize * 0.50f;
-                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.05f, haloRadius * 2f);
+                    float haloRadius = _tileSize * 0.40f;
+                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.02f, haloRadius * 2f);
                     var haloRend = halo.GetComponent<MeshRenderer>();
-                    haloRend.sharedMaterial = indicatorMat;
-                    var haloMpb = new MaterialPropertyBlock();
-                    haloMpb.SetColor("_EmissionColor", color * 6f);
-                    haloMpb.SetColor("_BaseColor", color * 0.0f);
-                    haloRend.SetPropertyBlock(haloMpb);
+                    if (haloRend != null)
+                    {
+                        var haloMat = new Material(indicatorMat.shader) { color = Color.clear };
+                        haloMat.SetFloat("_Metallic", 0f);
+                        haloMat.SetFloat("_Smoothness", 0f);
+                        haloMat.EnableKeyword("_EMISSION");
+                        haloMat.SetColor("_EmissionColor", ChromaPalette.ViaCyan * 3f);
+                        haloMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                        haloRend.sharedMaterial = haloMat;
+                    }
+
+                    // Bright center pin-point (small glowing sphere at via center)
+                    var centerPin = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    centerPin.name = "SourcePin";
+                    Object.DestroyImmediate(centerPin.GetComponent<Collider>());
+                    centerPin.transform.SetParent(_indicatorRoot.transform, false);
+                    centerPin.transform.localPosition = new Vector3(0f, 0f, -0.11f);
+                    centerPin.transform.localScale = Vector3.one * (_tileSize * 0.03f);
+                    var pinRend = centerPin.GetComponent<MeshRenderer>();
+                    if (pinRend != null)
+                    {
+                        var pinMat = new Material(indicatorMat.shader) { color = ChromaPalette.ViaCyan };
+                        pinMat.SetFloat("_Metallic", 0f);
+                        pinMat.SetFloat("_Smoothness", 0.5f);
+                        pinMat.EnableKeyword("_EMISSION");
+                        pinMat.SetColor("_EmissionColor", ChromaPalette.ViaCyan * 15f);
+                        pinMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                        pinRend.sharedMaterial = pinMat;
+                    }
                     break;
                 }
 
                 case TileIndicator.TargetRing:
                 {
-                    var outerRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    outerRing.name = "TargetOuterRing";
-                    Object.DestroyImmediate(outerRing.GetComponent<Collider>());
-                    outerRing.transform.SetParent(_indicatorRoot.transform, false);
-                    outerRing.transform.localPosition = new Vector3(0f, 0f, -0.20f);
-                    outerRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float ringRadius = _tileSize * 0.30f;
-                    outerRing.transform.localScale = new Vector3(ringRadius * 2f, 0.08f, ringRadius * 2f);
-                    var ringRend = outerRing.GetComponent<MeshRenderer>();
-                    ringRend.sharedMaterial = indicatorMat;
-                    var ringMpb = new MaterialPropertyBlock();
-                    ringMpb.SetColor("_EmissionColor", color * 18f);
-                    ringMpb.SetColor("_BaseColor", color * 0.4f);
-                    ringRend.SetPropertyBlock(ringMpb);
+                    // ── v3: ENIG gold octagonal pad with dark void via center ──
 
-                    var centerDot = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    centerDot.name = "TargetCenterDot";
-                    Object.DestroyImmediate(centerDot.GetComponent<Collider>());
-                    centerDot.transform.SetParent(_indicatorRoot.transform, false);
-                    centerDot.transform.localPosition = new Vector3(0f, 0f, -0.28f);
-                    centerDot.transform.localScale = Vector3.one * (_tileSize * 0.10f);
-                    var dotRend = centerDot.GetComponent<MeshRenderer>();
-                    dotRend.sharedMaterial = indicatorMat;
-                    var dotMpb = new MaterialPropertyBlock();
-                    dotMpb.SetColor("_EmissionColor", color * 25f);
-                    dotMpb.SetColor("_BaseColor", color * 0.9f);
-                    dotRend.SetPropertyBlock(dotMpb);
+                    // Gold outer pad ring (same geometry as source)
+                    var goldPad = TraceMeshFactory3D.CreateViaPad(Vector3.zero, _indicatorRoot.transform);
+                    goldPad.name = "TargetENIGPad";
+                    goldPad.transform.SetParent(_indicatorRoot.transform, false);
 
+                    // Dark void via center (no emission until restoration)
+                    var viaCenter = TraceMeshFactory3D.CreateViaCenter(Vector3.zero, _indicatorRoot.transform,
+                        ChromaPalette.DestVoid);
+                    viaCenter.name = "TargetVoid";
+
+                    // Subtle dormant halo (barely visible, dark)
                     var halo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    halo.name = "TargetHalo";
+                    halo.name = "TargetDormantHalo";
                     Object.DestroyImmediate(halo.GetComponent<Collider>());
                     halo.transform.SetParent(_indicatorRoot.transform, false);
-                    halo.transform.localPosition = new Vector3(0f, 0f, -0.24f);
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.06f); // Behind pad ring
                     halo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float haloRadius = _tileSize * 0.42f;
-                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.05f, haloRadius * 2f);
+                    float haloRadius = _tileSize * 0.38f;
+                    halo.transform.localScale = new Vector3(haloRadius * 2f, 0.02f, haloRadius * 2f);
                     var haloRend = halo.GetComponent<MeshRenderer>();
-                    haloRend.sharedMaterial = indicatorMat;
-                    var haloMpb = new MaterialPropertyBlock();
-                    haloMpb.SetColor("_EmissionColor", color * 6f);
-                    haloMpb.SetColor("_BaseColor", color * 0.0f);
-                    haloRend.SetPropertyBlock(haloMpb);
+                    if (haloRend != null)
+                    {
+                        var haloMat = new Material(indicatorMat.shader) { color = Color.clear };
+                        haloMat.SetFloat("_Metallic", 0f);
+                        haloMat.SetFloat("_Smoothness", 0f);
+                        haloMat.EnableKeyword("_EMISSION");
+                        haloMat.SetColor("_EmissionColor", ChromaPalette.DestVoid * 0.3f); // Barely visible
+                        haloMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                        haloRend.sharedMaterial = haloMat;
+                    }
                     break;
                 }
 
@@ -584,15 +566,24 @@ private void ApplyColor()
         {
             if (_mpb == null) return;
 
-            // Pipe KEEPS copper base — only EMISSION changes for flow glow
-            // When idle (no flow active), emit warm copper glow instead of dead black
+            // v3: Flat copper foil — CopperActive base with cyan emission overlay when lit
+            // When idle (no flow active), emit oxidized copper glow
             Color emissionColor = _color * _emissionIntensity;
             if (emissionColor.r < 0.01f && emissionColor.g < 0.01f && emissionColor.b < 0.01f)
             {
-                emissionColor = _copperIdle * Mathf.Max(_emissionIntensity, 0.4f);
+                // Idle: oxidized copper subtle glow
+                emissionColor = ChromaPalette.CopperOxidized * Mathf.Max(_emissionIntensity, 0.15f);
+                _mpb.SetColor("_BaseColor", ChromaPalette.CopperOxidized);
+            }
+            else
+            {
+                // Active: CopperActive base + cyan emission overlay
+                _mpb.SetColor("_BaseColor", ChromaPalette.CopperActive);
+                // Blend cyan emission on top of copper
+                emissionColor = Color.Lerp(ChromaPalette.CopperActive * _emissionIntensity,
+                    ChromaPalette.TraceCyanEmission * _emissionIntensity, 0.4f);
             }
             _mpb.SetColor("_EmissionColor", emissionColor);
-            _mpb.SetColor("_BaseColor", new Color(0.72f, 0.42f, 0.18f));
 
             if (_baseRenderer != null)
             {
@@ -637,69 +628,52 @@ private void ApplyColor()
 
         private IEnumerator SourcePulseCoroutine()
         {
-            var outerRing = _indicatorRoot.transform.Find("SourceOuterRing");
-            var innerRing = _indicatorRoot.transform.Find("SourceInnerRing");
-            var centerDot = _indicatorRoot.transform.Find("SourceCenterDot");
+            // v3: Find new ENIG pad geometry by name
+            var goldPad = _indicatorRoot.transform.Find("SourceENIGPad");
+            var viaCenter = _indicatorRoot.transform.Find("SourceViaCenter");
             var halo = _indicatorRoot.transform.Find("SourceHalo");
-            if (outerRing == null || innerRing == null) yield break;
+            var centerPin = _indicatorRoot.transform.Find("SourcePin");
+            if (goldPad == null || viaCenter == null) yield break;
 
-            var outerRend = outerRing.GetComponent<MeshRenderer>();
-            var innerRend = innerRing.GetComponent<MeshRenderer>();
-            if (outerRend == null || innerRend == null) yield break;
+            var viaRend = viaCenter.GetComponent<MeshRenderer>();
+            if (viaRend == null) yield break;
 
-            Color pulseColor = _indicatorColor;
-            float baseOuterIntensity = 15f;
-            float baseInnerIntensity = 20f;
+            Color pulseColor = ChromaPalette.ViaCyan;
+            // 1.0→1.4 sine wave, 1.5s cycle per spec
+            float pulsePeriod = 1.5f;
 
-            while (_indicatorRoot != null && outerRing != null && innerRing != null)
+            while (_indicatorRoot != null && viaCenter != null)
             {
-                // Sine wave 0→1→0 every ~2.1 seconds (3 rad/s)
-                float t = (Mathf.Sin(Time.time * 3f) + 1f) * 0.5f;
+                // Sine wave 0→1→0 with 1.5s cycle
+                float t = (Mathf.Sin(Time.time * (2f * Mathf.PI / pulsePeriod)) + 1f) * 0.5f;
 
-                float outerIntensity = Mathf.Lerp(baseOuterIntensity * 0.5f, baseOuterIntensity * 1.8f, t);
-                float innerIntensity = Mathf.Lerp(baseInnerIntensity * 0.4f, baseInnerIntensity * 2.0f, t);
+                // Via center pulses: emission intensity 1.0→1.4 (spec)
+                float viaIntensity = Mathf.Lerp(1.0f, 1.4f, t);
 
-                if (outerRend != null)
+                if (viaRend != null && viaRend.sharedMaterial != null)
                 {
-                    var outerMpb = new MaterialPropertyBlock();
-                    outerMpb.SetColor("_EmissionColor", pulseColor * outerIntensity);
-                    outerMpb.SetColor("_BaseColor", pulseColor * 0.15f);
-                    outerRend.SetPropertyBlock(outerMpb);
+                    viaRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * viaIntensity);
                 }
 
-                if (innerRend != null)
-                {
-                    var innerMpb = new MaterialPropertyBlock();
-                    innerMpb.SetColor("_EmissionColor", pulseColor * innerIntensity);
-                    innerMpb.SetColor("_BaseColor", pulseColor * 0.25f);
-                    innerRend.SetPropertyBlock(innerMpb);
-                }
-
-                // Pulse halo too
+                // Pulse halo bloom
                 if (halo != null)
                 {
                     var haloRend = halo.GetComponent<MeshRenderer>();
-                    if (haloRend != null)
+                    if (haloRend != null && haloRend.sharedMaterial != null)
                     {
-                        float haloIntensity = Mathf.Lerp(1.5f, 6f, t);
-                        var haloMpb = new MaterialPropertyBlock();
-                        haloMpb.SetColor("_EmissionColor", pulseColor * haloIntensity);
-                        haloMpb.SetColor("_BaseColor", pulseColor * 0.0f);
-                        haloRend.SetPropertyBlock(haloMpb);
+                        float haloIntensity = Mathf.Lerp(2.0f, 4.0f, t);
+                        haloRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * haloIntensity);
                     }
                 }
 
-                // Center dot: constant bright
-                if (centerDot != null)
+                // Center pin breathes
+                if (centerPin != null)
                 {
-                    var dotRend = centerDot.GetComponent<MeshRenderer>();
-                    if (dotRend != null)
+                    var pinRend = centerPin.GetComponent<MeshRenderer>();
+                    if (pinRend != null && pinRend.sharedMaterial != null)
                     {
-                        float dotIntensity = Mathf.Lerp(15f, 25f, t);
-                        var dotMpb = new MaterialPropertyBlock();
-                        dotMpb.SetColor("_EmissionColor", pulseColor * dotIntensity);
-                        dotMpb.SetColor("_BaseColor", pulseColor * 0.8f);
-                        dotRend.SetPropertyBlock(dotMpb);
+                        float pinIntensity = Mathf.Lerp(10f, 18f, t);
+                        pinRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * pinIntensity);
                     }
                 }
 

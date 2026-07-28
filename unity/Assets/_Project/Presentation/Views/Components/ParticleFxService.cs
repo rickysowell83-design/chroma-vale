@@ -13,6 +13,10 @@ namespace ChromaVale.Presentation.Views.Components
         private ParticleSystem _cascadingBloomBurst;
         private ParticleSystem _victoryFireworks;
         private ParticleSystem _flowHead;
+        private ParticleSystem _restorationSpark;
+        private ParticleSystem _restorationIgnition;
+        private ParticleSystem _restorationRing;
+        private ParticleSystem _restorationSustain;
 
         private void Awake()
         {
@@ -22,6 +26,7 @@ namespace ChromaVale.Presentation.Views.Components
             BuildCascadingBloom();
             BuildVictoryFireworks();
             BuildFlowHead();
+            BuildRestorationPulse();
         }
 
         private static Material GetParticleMaterial()
@@ -423,6 +428,206 @@ namespace ChromaVale.Presentation.Views.Components
 
             var shape = _flowHead.shape;
             shape.enabled = false;
+        }
+
+        // ── Restoration Pulse (v3) ─────────────────────────────────────
+        // SPARK → IGNITION → RING EXPANSION → SUSTAIN
+
+        private void BuildRestorationPulse()
+        {
+            // Phase 1: SPARK — bright initial flash burst
+            _restorationSpark = BuildPooledSystem("RestorationSpark", 32);
+            var sparkMain = _restorationSpark.main;
+            sparkMain.startLifetime = 0.25f;
+            sparkMain.startSpeed = 0.3f;
+            sparkMain.startSize = 0.08f;
+            sparkMain.startColor = Color.white;
+            sparkMain.loop = false;
+            sparkMain.playOnAwake = false;
+
+            var sparkEmission = _restorationSpark.emission;
+            sparkEmission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 16)
+            });
+
+            var sparkShape = _restorationSpark.shape;
+            sparkShape.enabled = true;
+            sparkShape.shapeType = ParticleSystemShapeType.Sphere;
+            sparkShape.radius = 0.05f;
+
+            var sparkGradient = new Gradient();
+            sparkGradient.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(ChromaPalette.ViaCyan, 0.5f),
+                    new GradientColorKey(ChromaPalette.NeonCyan, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0.5f, 0.5f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            var sparkColor = _restorationSpark.colorOverLifetime;
+            sparkColor.enabled = true;
+            sparkColor.color = new ParticleSystem.MinMaxGradient(sparkGradient);
+
+            // Phase 2: IGNITION — expanding fire orange/cyan burst
+            _restorationIgnition = BuildPooledSystem("RestorationIgnition", 48);
+            var ignMain = _restorationIgnition.main;
+            ignMain.startLifetime = 0.6f;
+            ignMain.startSpeed = 1.5f;
+            ignMain.startSize = 0.12f;
+            ignMain.startColor = new Color(1f, 0.8f, 0.2f); // Hot orange
+            ignMain.loop = false;
+            ignMain.playOnAwake = false;
+            ignMain.startDelay = 0.1f; // Follows spark
+
+            var ignEmission = _restorationIgnition.emission;
+            ignEmission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 24)
+            });
+
+            var ignShape = _restorationIgnition.shape;
+            ignShape.enabled = true;
+            ignShape.shapeType = ParticleSystemShapeType.Sphere;
+            ignShape.radius = 0.15f;
+
+            var ignGradient = new Gradient();
+            ignGradient.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(new Color(1f, 0.8f, 0.2f), 0f),
+                    new GradientColorKey(ChromaPalette.ViaCyan, 0.7f),
+                    new GradientColorKey(Color.clear, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0.6f, 0.7f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            var ignColor = _restorationIgnition.colorOverLifetime;
+            ignColor.enabled = true;
+            ignColor.color = new ParticleSystem.MinMaxGradient(ignGradient);
+
+            // Phase 3: RING EXPANSION — expanding circle ring
+            _restorationRing = BuildPooledSystem("RestorationRing", 64);
+            var ringMain = _restorationRing.main;
+            ringMain.startLifetime = 0.8f;
+            ringMain.startSpeed = 1.0f;
+            ringMain.startSize = 0.06f;
+            ringMain.startColor = ChromaPalette.ViaCyan;
+            ringMain.loop = false;
+            ringMain.playOnAwake = false;
+            ringMain.startDelay = 0.2f; // Follows ignition
+
+            var ringEmission = _restorationRing.emission;
+            ringEmission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 36)
+            });
+
+            var ringShape = _restorationRing.shape;
+            ringShape.enabled = true;
+            ringShape.shapeType = ParticleSystemShapeType.Circle;
+            ringShape.radius = 0.1f;
+            ringShape.arc = 360f;
+
+            var ringSize = _restorationRing.sizeOverLifetime;
+            ringSize.enabled = true;
+            var ringCurve = new AnimationCurve();
+            ringCurve.AddKey(0f, 0.2f);
+            ringCurve.AddKey(0.5f, 1.5f);
+            ringCurve.AddKey(1f, 2.5f);
+            ringSize.size = new ParticleSystem.MinMaxCurve(1f, ringCurve);
+
+            var ringAlpha = _restorationRing.colorOverLifetime;
+            ringAlpha.enabled = true;
+            var ringAlphaGrad = new Gradient();
+            ringAlphaGrad.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(ChromaPalette.ViaCyan, 0f),
+                    new GradientColorKey(ChromaPalette.NeonCyan, 0.5f),
+                    new GradientColorKey(Color.clear, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(1f, 0f),
+                    new GradientAlphaKey(0.8f, 0.4f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            ringAlpha.color = new ParticleSystem.MinMaxGradient(ringAlphaGrad);
+
+            // Phase 4: SUSTAIN — lingering cyan glow particles
+            _restorationSustain = BuildPooledSystem("RestorationSustain", 32);
+            var susMain = _restorationSustain.main;
+            susMain.startLifetime = 1.5f;
+            susMain.startSpeed = 0.15f;
+            susMain.startSize = 0.05f;
+            susMain.startColor = ChromaPalette.ViaCyan;
+            susMain.loop = false;
+            susMain.playOnAwake = false;
+            susMain.startDelay = 0.4f; // After ring starts
+
+            var susEmission = _restorationSustain.emission;
+            susEmission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, 20)
+            });
+
+            var susShape = _restorationSustain.shape;
+            susShape.enabled = true;
+            susShape.shapeType = ParticleSystemShapeType.Sphere;
+            susShape.radius = 0.3f;
+
+            var susNoise = _restorationSustain.noise;
+            susNoise.enabled = true;
+            susNoise.strength = new ParticleSystem.MinMaxCurve(0.15f);
+            susNoise.frequency = 0.2f;
+
+            var susColor = _restorationSustain.colorOverLifetime;
+            susColor.enabled = true;
+            var susGrad = new Gradient();
+            susGrad.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(ChromaPalette.ViaCyan, 0f),
+                    new GradientColorKey(ChromaPalette.NeonCyan, 0.6f),
+                    new GradientColorKey(Color.clear, 1f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(0.8f, 0f),
+                    new GradientAlphaKey(0.3f, 0.8f),
+                    new GradientAlphaKey(0f, 1f)
+                }
+            );
+            susColor.color = new ParticleSystem.MinMaxGradient(susGrad);
+        }
+
+        /// <summary>
+        /// Fire the Restoration Pulse at a target via pad — all 4 phases:
+        /// SPARK → IGNITION → RING EXPANSION → SUSTAIN
+        /// </summary>
+        public void RestorationPulse(Vector3 position)
+        {
+            _restorationSpark.transform.position = position;
+            _restorationIgnition.transform.position = position;
+            _restorationRing.transform.position = position;
+            _restorationSustain.transform.position = position;
+
+            _restorationSpark.Play();
+            _restorationIgnition.Play();
+            _restorationRing.Play();
+            _restorationSustain.Play();
         }
 
         public void FlowHeadPulse(Vector3 position, Color color)

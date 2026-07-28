@@ -4,73 +4,49 @@ using UnityEngine;
 namespace ChromaVale.Presentation.Views.Components
 {
     /// <summary>
-    /// Static factory that builds 3D pipe meshes from Unity primitive cylinders and spheres.
-    /// All pipes use a shared dark-circuit-board material; per-tile color and emission is
-    /// driven via MaterialPropertyBlock on the TileVisual that owns the pipe.
-    /// Joints now include glow-ring occlusion rings, and cross/elbow/T-junction have
-    /// fillet-sphere chamfers for a smooth PCB trace appearance.
+    /// Static factory that builds flat copper-foil trace meshes from Unity primitive Cubes.
+    /// All traces use a shared copper material; per-tile color and emission is
+    /// driven via MaterialPropertyBlock on the TileVisual that owns the trace.
+    /// v3: Flat copper foil — NOT pipes/tubes/cylinders. Thin Cubes flushed to the PCB surface.
     /// </summary>
     public static class TraceMeshFactory3D
     {
         private static Material _traceMaterial;
-        private static Material _occlusionRingMaterial;
+        private static Material _traceOxidizedMaterial;
+        private static Material _copperViaMaterial;
 
         /// <summary>
-        /// Radius of pipe cylinders — chunky copper like mockup, not thin PCB trace.
+        /// Width of the flat copper trace — wide like a real PCB trace.
         /// </summary>
-        private const float PipeRadius = 0.14f;
+        private const float TraceWidth = 0.30f;
 
         /// <summary>
-        /// Radius of joint spheres, slightly larger to cover cylinder seams.
+        /// Thickness (Z-depth) of the flat trace — almost flush with the tile slab.
         /// </summary>
-        private const float JointRadius = 0.22f;
+        private const float TraceThickness = 0.025f;
 
         /// <summary>
-        /// Z-offset to sit pipes slightly in front of the tile slab.
+        /// Z-offset to sit traces slightly in front of the tile slab surface.
         /// </summary>
-        private const float PipeZ = -0.12f;
+        private const float TraceZ = -0.08f;
 
         /// <summary>
-        /// Z-offset for the joint glow ring (slightly further forward than the pipe itself,
-        /// creating a subtle ambient-occlusion / contact-shadow effect).
+        /// Z-offset for via pad rings (slightly above traces).
         /// </summary>
-        private const float GlowRingZ = -0.13f;
+        private const float PadZ = -0.09f;
 
         /// <summary>
-        /// Radius of the glow ring that sits around each joint sphere.
+        /// Radius of the center via hole / ENIG pad ring.
         /// </summary>
-        private const float GlowRingRadius = 0.18f;
+        private const float ViaOuterRadius = 0.32f;
+        private const float ViaInnerRadius = 0.05f;
+        private const float PadThickness = 0.06f;
+
+        // ── Materials ──────────────────────────────────────────────────
 
         /// <summary>
-        /// Very dark non-metallic material used for the glow/occlusion rings around joints.
-        /// </summary>
-        private static Material OcclusionRingMaterial
-        {
-            get
-            {
-                if (_occlusionRingMaterial == null)
-                {
-                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-                    if (shader == null) shader = Shader.Find("Standard");
-                    if (shader == null) shader = Shader.Find("Sprites/Default");
-
-                    _occlusionRingMaterial = new Material(shader)
-                    {
-                        color = new Color(0.02f, 0.025f, 0.035f) // Near-black for AO ring
-                    };
-                    _occlusionRingMaterial.SetFloat("_Metallic", 0f);
-                    _occlusionRingMaterial.SetFloat("_Smoothness", 0f);
-                }
-                return _occlusionRingMaterial;
-            }
-        }
-
-        /// <summary>
-        /// Get or create the shared dark-cyberpunk pipe material with AAA URP Lit quality.
-        /// Color: very dark brushed-metal core.
-        /// Metallic 1.0 + Smoothness 0.85 gives a glossy glass/neon-tube surface.
-        /// Emission is DEAD by default (black); TileVisual overrides via MaterialPropertyBlock.
-        /// Clear-coat enabled for a subtle glass-like top layer.
+        /// Active/lit copper trace material — copper base #B87333, metallic, with
+        /// emission slot for TileVisual's MaterialPropertyBlock override.
         /// </summary>
         public static Material PipeMaterial
         {
@@ -84,142 +60,90 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _traceMaterial = new Material(shader)
                     {
-                        color = new Color(0.06f, 0.07f, 0.10f) // Very dark brushed metal core
+                        color = ChromaPalette.CopperOxidized // Dark oxidized when idle
                     };
-                    _traceMaterial.SetFloat("_Metallic", 1.0f);       // Fully metallic — AAA copper trace
-                    _traceMaterial.SetFloat("_Smoothness", 0.85f);    // Glossy glass/neon tube surface
+                    _traceMaterial.SetFloat("_Metallic", 0.9f);
+                    _traceMaterial.SetFloat("_Smoothness", 0.4f);     // Matte copper, not glossy
                     _traceMaterial.EnableKeyword("_EMISSION");
-                    // DEFAULT DEAD — TileVisual's MaterialPropertyBlock overrides during flow animation
-                    _traceMaterial.SetColor("_EmissionColor", Color.black);
-                    _traceMaterial.SetFloat("_CoatMask", 0.25f);      // Clear-coat amount
-                    _traceMaterial.EnableKeyword("_CLEARCOAT");        // Clear-coat layer enabled
+                    _traceMaterial.SetColor("_EmissionColor", Color.black); // Dead until flow
                     _traceMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
                 return _traceMaterial;
             }
         }
 
-        private static Material _copperPipeMaterial;
-
         /// <summary>
-        /// Copper-toned pipe material for imported .glb models.
-        /// Bright metallic copper core, emission dead by default.
+        /// Oxidized copper material for unlit/ghost traces — dark matte.
         /// </summary>
-        private static Material CopperPipeMaterial
+        public static Material OxidizedTraceMaterial
         {
             get
             {
-                if (_copperPipeMaterial == null)
+                if (_traceOxidizedMaterial == null)
                 {
                     Shader shader = Shader.Find("Universal Render Pipeline/Lit");
                     if (shader == null) shader = Shader.Find("Standard");
                     if (shader == null) shader = Shader.Find("Sprites/Default");
 
-                    _copperPipeMaterial = new Material(shader)
+                    _traceOxidizedMaterial = new Material(shader)
                     {
-                        color = new Color(0.78f, 0.50f, 0.22f) // Brighter warm copper with specular highlights
+                        color = ChromaPalette.CopperOxidized
                     };
-                    _copperPipeMaterial.SetFloat("_Metallic", 1.0f);
-                    _copperPipeMaterial.SetFloat("_Smoothness", 0.85f); // High gloss for specular highlights
-                    _copperPipeMaterial.EnableKeyword("_EMISSION");
-                    _copperPipeMaterial.SetColor("_EmissionColor", new Color(0.3f, 0.15f, 0.04f)); // Visible warm idle glow
-                    _copperPipeMaterial.SetFloat("_CoatMask", 0.3f);
-                    _copperPipeMaterial.EnableKeyword("_CLEARCOAT");
-                    _copperPipeMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    _traceOxidizedMaterial.SetFloat("_Metallic", 0.6f);
+                    _traceOxidizedMaterial.SetFloat("_Smoothness", 0.15f);
+                    _traceOxidizedMaterial.EnableKeyword("_EMISSION");
+                    _traceOxidizedMaterial.SetColor("_EmissionColor", new Color(0.1f, 0.05f, 0.02f));
+                    _traceOxidizedMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
-                return _copperPipeMaterial;
+                return _traceOxidizedMaterial;
             }
         }
 
-        private static Material _blockerBarrierMaterial;
-
         /// <summary>
-        /// Dark red-black material for the Blocker barrier — communicates danger / do not pass.
+        /// ENIG gold via pad material for source/target contact pads.
         /// </summary>
-        private static Material BlockerBarrierMaterial
+        public static Material ViaPadMaterial
         {
             get
             {
-                if (_blockerBarrierMaterial == null)
+                if (_copperViaMaterial == null)
                 {
                     Shader shader = Shader.Find("Universal Render Pipeline/Lit");
                     if (shader == null) shader = Shader.Find("Standard");
                     if (shader == null) shader = Shader.Find("Sprites/Default");
 
-                    _blockerBarrierMaterial = new Material(shader)
+                    _copperViaMaterial = new Material(shader)
                     {
-                        color = new Color(0.15f, 0.02f, 0.02f)
+                        color = ChromaPalette.ENIG_Gold
                     };
-                    _blockerBarrierMaterial.SetFloat("_Metallic", 0.3f);
-                    _blockerBarrierMaterial.SetFloat("_Smoothness", 0.2f);
-                    _blockerBarrierMaterial.EnableKeyword("_EMISSION");
-                    _blockerBarrierMaterial.SetColor("_EmissionColor", new Color(0.3f, 0.01f, 0.01f) * 2f);
-                    _blockerBarrierMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    _copperViaMaterial.SetFloat("_Metallic", 0.95f);
+                    _copperViaMaterial.SetFloat("_Smoothness", 0.6f);
+                    _copperViaMaterial.EnableKeyword("_EMISSION");
+                    _copperViaMaterial.SetColor("_EmissionColor", new Color(0.30f, 0.20f, 0.04f));
+                    _copperViaMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
-                return _blockerBarrierMaterial;
+                return _copperViaMaterial;
             }
         }
 
         /// <summary>
-        /// Set the _EmissionColor on a MaterialPropertyBlock for per-tile pipe glow.
-        /// Intensity is multiplied by 5.0 for a punchy neon effect.
+        /// Set the _EmissionColor on a MaterialPropertyBlock for per-tile trace glow.
         /// Called by TileVisual during flow animation.
         /// </summary>
         public static void SetPipeEmission(MaterialPropertyBlock mpb, Color emissionColor)
         {
             mpb.SetColor("_EmissionColor", emissionColor * 5.0f);
+            mpb.SetColor("_BaseColor", ChromaPalette.CopperActive);
         }
 
-        /// <summary>
-        /// Try loading a Sketchfab pipe prefab from Resources. Instantiate on success.
-        /// Returns true if loaded, false to fall back to runtime cylinders.
-        /// </summary>
-        private static bool TryLoadPrefab(string resourcePath, Transform parent)
-        {
-            var prefab = Resources.Load<GameObject>("Models/SketchfabPipes/" + resourcePath);
-            if (prefab == null) return false;
-
-            var instance = Object.Instantiate(prefab, parent);
-            instance.name = resourcePath;
-            instance.transform.localPosition = new Vector3(0f, 0f, PipeZ);
-            // Model is vertical (Y-up), rotate to horizontal (X-aligned) like our cylinders
-            instance.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-
-            // Convert glTF shader to URP/Lit and scale to fit tile
-            var urpShader = Shader.Find("Universal Render Pipeline/Lit");
-            foreach (var mr in instance.GetComponentsInChildren<MeshRenderer>())
-            {
-                foreach (var mat in mr.sharedMaterials)
-                {
-                    if (mat != null && mat.shader.name.Contains("glTF"))
-                    {
-                        mat.shader = urpShader;
-                        mat.EnableKeyword("_EMISSION");
-                        mat.SetColor("_EmissionColor", Color.black);
-                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    }
-                }
-            }
-
-            // Scale: native ~5 units tall → fit in 1.0 unit
-            instance.transform.localScale = Vector3.one * 0.2f;
-
-            foreach (var col in instance.GetComponentsInChildren<Collider>())
-                Object.DestroyImmediate(col);
-
-            return true;
-        }
+        // ── Factory ────────────────────────────────────────────────────
 
         /// <summary>
-        /// Build a 3D pipe mesh as a child of the given transform.
+        /// Build a flat copper-foil trace as a child of the given transform.
         /// </summary>
-        /// <param name="shape">The trace shape to build.</param>
-        /// <param name="rotationDeg">Z-axis rotation in degrees.</param>
-        /// <param name="parent">Parent transform for the pipe group.</param>
-        /// <returns>The root GameObject of the pipe group (rotated by rotationDeg).</returns>
         public static GameObject BuildPipe(SegmentShape shape, int rotationDeg, Transform parent)
         {
-            var root = new GameObject("Pipe_" + shape);
+            var root = new GameObject("Trace_" + shape);
             root.transform.SetParent(parent, false);
             root.transform.localPosition = Vector3.zero;
             root.transform.localRotation = Quaternion.Euler(0f, 0f, rotationDeg);
@@ -227,329 +151,393 @@ namespace ChromaVale.Presentation.Views.Components
             switch (shape)
             {
                 case SegmentShape.Straight:
-                    BuildStraight(root.transform);
+                    BuildFlatStraight(root.transform);
                     break;
 
                 case SegmentShape.Corner:
-                    BuildElbow(root.transform);
+                    BuildFlatElbow(root.transform);
                     break;
 
                 case SegmentShape.Splitter:
-                    BuildTJunction(root.transform);
+                    BuildFlatTJunction(root.transform);
                     break;
 
                 case SegmentShape.CrossJunction:
-                    BuildCross(root.transform);
+                    BuildFlatCross(root.transform);
                     break;
 
                 case SegmentShape.Diode:
-                    BuildValve(root.transform);
+                    BuildFlatValve(root.transform);
                     break;
 
                 case SegmentShape.Repeater:
-                    BuildAmplifier(root.transform);
+                    BuildFlatAmplifier(root.transform);
                     break;
 
                 case SegmentShape.Combiner:
-                    BuildMixer(root.transform);
+                    BuildFlatMixer(root.transform);
                     break;
 
                 case SegmentShape.Breaker:
-                    BuildBlocker(root.transform);
+                    BuildFlatBlocker(root.transform);
                     break;
 
                 default:
-                    BuildStraight(root.transform);
+                    BuildFlatStraight(root.transform);
                     break;
             }
 
             return root;
         }
 
-        /// <summary>
-        /// Create a primitive cylinder configured as a pipe segment.
-        /// Collider is destroyed immediately — collision lives on the tile BoxCollider.
-        /// Z localScale uses radius*2.2f for a subtly oval "trace" cross-section rather
-        /// than a round tube — more PCB-like.
-        /// </summary>
-        private static GameObject CreatePipeCylinder(float height, float radius, Vector3 localPos, float zRot, Transform parent)
-        {
-            var cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            cyl.name = "PipeSeg";
-            Object.DestroyImmediate(cyl.GetComponent<Collider>());
-
-            cyl.transform.SetParent(parent, false);
-            cyl.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
-            cyl.transform.localRotation = Quaternion.Euler(0f, 0f, zRot);
-            // Flat wide cross-section like a PCB trace (wider than tall)
-            cyl.transform.localScale = new Vector3(radius * 2.0f, height / 2f, radius * 1.5f);
-
-            var renderer = cyl.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;
-
-            return cyl;
-        }
+        // ── Flat Trace Primitives ──────────────────────────────────────
 
         /// <summary>
-        /// Create a primitive sphere configured as a pipe joint.
-        /// Collider is destroyed immediately.
-        /// Also creates a subtle glow/occlusion ring around the joint.
+        /// Create a flat copper foil strip (thin Cube) for a trace segment.
+        /// Width = TraceWidth, thickness = TraceThickness, length = height.
+        /// Positioned flat on the PCB surface.
         /// </summary>
-        private static GameObject CreateJointSphere(Vector3 localPos, Transform parent)
+        private static GameObject CreateFlatTrace(float length, Vector3 localPos, bool horizontal, Transform parent)
         {
-            var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.name = "PipeJoint";
-            Object.DestroyImmediate(sphere.GetComponent<Collider>());
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = "FlatTrace";
+            Object.DestroyImmediate(cube.GetComponent<Collider>());
 
-            sphere.transform.SetParent(parent, false);
-            sphere.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
-            sphere.transform.localScale = Vector3.one * (JointRadius * 2f);
-
-            var renderer = sphere.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;
-
-            // Add subtle ambient-occlusion / contact-shadow ring around this joint
-            CreateJointGlowRing(localPos, parent);
-
-            return sphere;
-        }
-
-        /// <summary>
-        /// Create a tiny thin glow ring around a joint sphere for a subtle ambient-occlusion /
-        /// contact-shadow effect — enhances the "glass tube sitting on PCB" look.
-        /// </summary>
-        private static void CreateJointGlowRing(Vector3 localPos, Transform parent)
-        {
-            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "PipeGlowRing";
-            Object.DestroyImmediate(ring.GetComponent<Collider>());
-
-            ring.transform.SetParent(parent, false);
-            ring.transform.localPosition = new Vector3(localPos.x, localPos.y, GlowRingZ);
-            ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // Flat disc
-            ring.transform.localScale = new Vector3(GlowRingRadius * 2f, 0.015f, GlowRingRadius * 2f);
-
-            var renderer = ring.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sharedMaterial = OcclusionRingMaterial;
-        }
-
-        /// <summary>
-        /// Create a small fillet sphere for joint corner blending (smooth PCB chamfer look).
-        /// </summary>
-        private static void CreateFilletSphere(Vector3 localPos, float scale, Transform parent)
-        {
-            var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            sphere.name = "PipeFillet";
-            Object.DestroyImmediate(sphere.GetComponent<Collider>());
-
-            sphere.transform.SetParent(parent, false);
-            sphere.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
-            sphere.transform.localScale = Vector3.one * scale;
-
-            var renderer = sphere.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;
-        }
-
-        /// <summary>
-        /// Create a single tiny rivet sphere for industrial cyberpunk detailing.
-        /// </summary>
-        private static void CreateRivet(Vector3 localPos, float scale, Transform parent)
-        {
-            var rivet = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            rivet.name = "PipeRivet";
-            Object.DestroyImmediate(rivet.GetComponent<Collider>());
-            rivet.transform.SetParent(parent, false);
-            rivet.transform.localPosition = new Vector3(localPos.x, localPos.y, PipeZ);
-            rivet.transform.localScale = Vector3.one * scale;
-            var renderer = rivet.GetComponent<MeshRenderer>();
-            if (renderer != null) renderer.sharedMaterial = CopperPipeMaterial;
-        }
-
-        /// <summary>
-        /// Add four rivet spheres (two at each end) flanking a pipe segment.
-        /// </summary>
-        /// <param name="center">Center position of the cylinder parent.</param>
-        /// <param name="halfLength">Half the cylinder's length along its axis.</param>
-        /// <param name="horizontal">True if the cylinder is oriented along X (zRot=90).</param>
-        /// <param name="parent">Parent transform of the pipe group.</param>
-        private static void AddSegmentRivets(Vector3 center, float halfLength, bool horizontal, Transform parent)
-        {
-            float off = PipeRadius * 0.7f;
-            const float rivetScale = 0.03f;
-
+            cube.transform.SetParent(parent, false);
+            cube.transform.localPosition = new Vector3(localPos.x, localPos.y, TraceZ);
+            // Horizontal traces run along X; vertical run along Y
             if (horizontal)
-            {
-                // Pipe along X — rivets above/below at each end
-                CreateRivet(new Vector3(center.x - halfLength, center.y + off, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x - halfLength, center.y - off, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x + halfLength, center.y + off, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x + halfLength, center.y - off, 0f), rivetScale, parent);
-            }
+                cube.transform.localScale = new Vector3(length, TraceWidth, TraceThickness);
             else
+                cube.transform.localScale = new Vector3(TraceWidth, length, TraceThickness);
+
+            var renderer = cube.GetComponent<MeshRenderer>();
+            if (renderer != null) renderer.sharedMaterial = PipeMaterial;
+
+            return cube;
+        }
+
+        /// <summary>
+        /// Create a flat square pad at a joint/via location.
+        /// </summary>
+        private static GameObject CreateJointPad(Vector3 localPos, Transform parent)
+        {
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = "JointPad";
+            Object.DestroyImmediate(cube.GetComponent<Collider>());
+
+            cube.transform.SetParent(parent, false);
+            cube.transform.localPosition = new Vector3(localPos.x, localPos.y, TraceZ);
+            // Slightly larger square where traces meet
+            cube.transform.localScale = new Vector3(TraceWidth * 1.1f, TraceWidth * 1.1f, TraceThickness);
+
+            var renderer = cube.GetComponent<MeshRenderer>();
+            if (renderer != null) renderer.sharedMaterial = PipeMaterial;
+
+            return cube;
+        }
+
+        /// <summary>
+        /// Create an octagonal via pad ring (approximated with a thin flattened cylinder).
+        /// </summary>
+/// <summary>
+        /// Create an octagonal ENIG gold via pad ring using a custom 8-sided mesh.
+        /// </summary>
+        public static GameObject CreateViaPad(Vector3 worldPos, Transform parent, float scale = 1.0f)
+        {
+            var ring = new GameObject("ViaPad");
+            ring.transform.SetParent(parent, false);
+            ring.transform.localPosition = new Vector3(0f, 0f, PadZ);
+
+            float outerR = ViaOuterRadius * scale;
+            float innerR = ViaInnerRadius * scale;
+            int sides = 8;
+
+            var mesh = new Mesh { name = "OctPadRing" };
+            var verts = new System.Collections.Generic.List<Vector3>();
+            var tris = new System.Collections.Generic.List<int>();
+            var norms = new System.Collections.Generic.List<Vector3>();
+
+            // Build an octagonal ring: outer ring + inner ring, extruded
+            for (int i = 0; i < sides; i++)
             {
-                // Pipe along Y — rivets left/right at each end
-                CreateRivet(new Vector3(center.x + off, center.y - halfLength, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x - off, center.y - halfLength, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x + off, center.y + halfLength, 0f), rivetScale, parent);
-                CreateRivet(new Vector3(center.x - off, center.y + halfLength, 0f), rivetScale, parent);
+                float angle = (i / (float)sides) * Mathf.PI * 2f;
+                float cos = Mathf.Cos(angle);
+                float sin = Mathf.Sin(angle);
+
+                // Top face vertices
+                verts.Add(new Vector3(cos * outerR, sin * outerR, PadThickness * 0.5f));  // outer top
+                verts.Add(new Vector3(cos * innerR, sin * innerR, PadThickness * 0.5f));  // inner top
+                // Bottom face vertices
+                verts.Add(new Vector3(cos * outerR, sin * outerR, -PadThickness * 0.5f)); // outer bottom
+                verts.Add(new Vector3(cos * innerR, sin * innerR, -PadThickness * 0.5f)); // inner bottom
             }
+
+            // Build triangles for each side segment
+            for (int i = 0; i < sides; i++)
+            {
+                int next = (i + 1) % sides;
+                int o0 = i * 4, i0 = i * 4 + 1, o1 = next * 4, i1 = next * 4 + 1;
+                int ob0 = i * 4 + 2, ib0 = i * 4 + 3, ob1 = next * 4 + 2, ib1 = next * 4 + 3;
+
+                // Top face (inner ring outward to outer ring)
+                tris.AddRange(new[] { i0, o0, o1, i0, o1, i1 });
+                // Bottom face
+                tris.AddRange(new[] { ob0, ib0, ib1, ob0, ib1, ob1 });
+                // Outer wall
+                tris.AddRange(new[] { o0, ob0, ob1, o0, ob1, o1 });
+                // Inner wall
+                tris.AddRange(new[] { ib0, i0, i1, ib0, i1, ib1 });
+            }
+
+            // Normals (all point up for top faces, down for bottom; walls get per-face normals in shader)
+            for (int i = 0; i < verts.Count; i++)
+                norms.Add(new Vector3(0f, 0f, 1f));
+
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.SetNormals(norms);
+            mesh.RecalculateBounds();
+
+            var mf = ring.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+            var renderer = ring.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = ViaPadMaterial;
+
+            return ring;
         }
 
         /// <summary>
-        /// Build a straight pipe using the imported .glb model if available,
-        /// falling back to a runtime cylinder.
+        /// Create a dimple/hole in a via pad (dark center circle).
         /// </summary>
-        private static void BuildStraight(Transform parent)
+/// <summary>
+        /// Create an octagonal dimple/hole in a via pad (dark center, 8-sided).
+        /// </summary>
+        public static GameObject CreateViaCenter(Vector3 worldPos, Transform parent, Color viaColor, float scale = 1.0f)
         {
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
+            var center = new GameObject("ViaCenter");
+            center.transform.SetParent(parent, false);
+            center.transform.localPosition = new Vector3(0f, 0f, PadZ - 0.005f);
+
+            float innerR = ViaInnerRadius * scale;
+            int sides = 8;
+            float thickness = PadThickness + 0.01f;
+
+            var mesh = new Mesh { name = "OctCenter" };
+            var verts = new System.Collections.Generic.List<Vector3>();
+            var tris = new System.Collections.Generic.List<int>();
+
+            // Top disc: center + ring vertices
+            verts.Add(new Vector3(0f, 0f, thickness * 0.5f)); // index 0: center top
+            // Bottom disc: center + ring vertices
+            verts.Add(new Vector3(0f, 0f, -thickness * 0.5f)); // index 1: center bottom
+
+            int vTopStart = 2;
+            int vBotStart = 2 + sides;
+
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = (i / (float)sides) * Mathf.PI * 2f;
+                float cos = Mathf.Cos(angle);
+                float sin = Mathf.Sin(angle);
+                verts.Add(new Vector3(cos * innerR, sin * innerR, thickness * 0.5f));
+            }
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = (i / (float)sides) * Mathf.PI * 2f;
+                float cos = Mathf.Cos(angle);
+                float sin = Mathf.Sin(angle);
+                verts.Add(new Vector3(cos * innerR, sin * innerR, -thickness * 0.5f));
+            }
+
+            // Top face triangles (fan from center)
+            for (int i = 0; i < sides; i++)
+            {
+                int next = (i + 1) % sides;
+                tris.AddRange(new[] { 0, vTopStart + i, vTopStart + next });
+            }
+            // Bottom face triangles (fan from center, reversed winding)
+            for (int i = 0; i < sides; i++)
+            {
+                int next = (i + 1) % sides;
+                tris.AddRange(new[] { 1, vBotStart + next, vBotStart + i });
+            }
+            // Side wall triangles
+            for (int i = 0; i < sides; i++)
+            {
+                int next = (i + 1) % sides;
+                int t0 = vTopStart + i, t1 = vTopStart + next;
+                int b0 = vBotStart + i, b1 = vBotStart + next;
+                tris.AddRange(new[] { t0, b0, b1, t0, b1, t1 });
+            }
+
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var mf = center.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+
+            var renderer = center.AddComponent<MeshRenderer>();
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+
+            var mat = new Material(shader) { color = viaColor };
+            mat.SetFloat("_Metallic", 0.1f);
+            mat.SetFloat("_Smoothness", 0.2f);
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", viaColor * 0.5f);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            renderer.sharedMaterial = mat;
+
+            return center;
         }
 
-        /// <summary>
-        /// Build an elbow: two half-length cylinders meeting at a joint sphere.
-        /// </summary>
-        private static void BuildElbow(Transform parent)
+        // ── Shape Builders ─────────────────────────────────────────────
+
+        private static void BuildFlatStraight(Transform parent)
         {
-            CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0.25f, 0f, 0f), 90f, parent);
-            CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0f, 0.25f, 0f), 0f, parent);
-            CreateJointSphere(Vector3.zero, parent);
+            CreateFlatTrace(1.0f, Vector3.zero, true, parent);
         }
 
-        /// <summary>
-        /// Build a T-junction: full straight + half stub + joint sphere + rivets + fillets.
-        /// Two fillet spheres smooth the inner corners where the stub meets the straight.
-        /// </summary>
-        private static void BuildTJunction(Transform parent)
+        private static void BuildFlatElbow(Transform parent)
         {
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            CreatePipeCylinder(0.5f, PipeRadius, new Vector3(0f, 0.25f, 0f), 0f, parent);
-            CreateJointSphere(Vector3.zero, parent);
+            // Two half-length flat traces meeting at center
+            CreateFlatTrace(0.5f, new Vector3(0.25f, 0f, 0f), true, parent);   // Right arm
+            CreateFlatTrace(0.5f, new Vector3(0f, 0.25f, 0f), false, parent);  // Up arm
+            CreateJointPad(Vector3.zero, parent);
         }
 
-        /// <summary>
-        /// Build a cross: two full cylinders crossing at center + joint sphere + rivets + fillets.
-        /// Four fillet spheres at the inner corners blend the intersection for a smooth fillet look.
-        /// </summary>
-        private static void BuildCross(Transform parent)
+        private static void BuildFlatTJunction(Transform parent)
         {
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 0f, parent);
-            CreateJointSphere(Vector3.zero, parent);
+            CreateFlatTrace(1.0f, Vector3.zero, true, parent);                  // Horizontal through
+            CreateFlatTrace(0.5f, new Vector3(0f, 0.25f, 0f), false, parent);  // Vertical stub up
+            CreateJointPad(Vector3.zero, parent);
         }
 
-        /// <summary>
-        /// Build a valve: straight pipe + flattened cylinder ring + cylinder disc handle on top + rivets.
-        /// </summary>
-        private static void BuildValve(Transform parent)
+        private static void BuildFlatCross(Transform parent)
         {
-            // Straight pipe along X
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
-            AddSegmentRivets(Vector3.zero, 0.5f, true, parent);
-
-            // Ring disk: flattened cylinder (torus-like disc, lies in pipe plane)
-            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "ValveRing";
-            Object.DestroyImmediate(ring.GetComponent<Collider>());
-            ring.transform.SetParent(parent, false);
-            ring.transform.localPosition = new Vector3(0f, 0f, PipeZ - 0.04f);
-            ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            ring.transform.localScale = new Vector3(0.55f, 0.04f, 0.55f);
-            var ringRenderer = ring.GetComponent<MeshRenderer>();
-            if (ringRenderer != null) ringRenderer.sharedMaterial = PipeMaterial;
-
-            // Handle disc: flat cylinder knob on top of the ring
-            var handle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            handle.name = "ValveHandle";
-            Object.DestroyImmediate(handle.GetComponent<Collider>());
-            handle.transform.SetParent(parent, false);
-            handle.transform.localPosition = new Vector3(0f, 0.28f, PipeZ - 0.04f);
-            handle.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            handle.transform.localScale = new Vector3(0.22f, 0.04f, 0.22f);
-            var handleRenderer = handle.GetComponent<MeshRenderer>();
-            if (handleRenderer != null) handleRenderer.sharedMaterial = PipeMaterial;
+            CreateFlatTrace(1.0f, Vector3.zero, true, parent);   // Horizontal
+            CreateFlatTrace(1.0f, Vector3.zero, false, parent);  // Vertical
+            CreateJointPad(Vector3.zero, parent);
         }
 
-        /// <summary>
-        /// Build an amplifier: triangle of 3 angled cylinders + apex joint on a straight trace.
-        /// The triangle/chevron shape is unique — reads like an op-amp symbol.
-        /// </summary>
-        private static void BuildAmplifier(Transform parent)
+        private static void BuildFlatValve(Transform parent)
         {
-            // Main horizontal trace through the component
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
+            // Straight trace with diode symbol marking
+            CreateFlatTrace(1.0f, Vector3.zero, true, parent);
 
-            // Triangle body — 3 angled cylinders forming a right-pointing triangle
-            CreatePipeCylinder(0.36f, PipeRadius, new Vector3(0.10f, 0f, 0f), 0f, parent);
-            CreatePipeCylinder(0.28f, PipeRadius, new Vector3(0.20f, 0.09f, 0f), 45f, parent);
-            CreatePipeCylinder(0.28f, PipeRadius, new Vector3(0.20f, -0.09f, 0f), -45f, parent);
+            // Triangle arrow marker (using a small rotated cube as diamond)
+            var arrow = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            arrow.name = "ValveArrow";
+            Object.DestroyImmediate(arrow.GetComponent<Collider>());
+            arrow.transform.SetParent(parent, false);
+            arrow.transform.localPosition = new Vector3(0.1f, 0f, TraceZ - 0.005f);
+            arrow.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            arrow.transform.localScale = new Vector3(0.12f, 0.12f, TraceThickness + 0.005f);
+            var arrowRend = arrow.GetComponent<MeshRenderer>();
+            if (arrowRend != null) arrowRend.sharedMaterial = PipeMaterial;
 
-            // Joint sphere at triangle apex (right point)
-            CreateJointSphere(new Vector3(0.30f, 0f, 0f), parent);
-
-            // Output trace stub to the right of the triangle
-            CreatePipeCylinder(0.20f, PipeRadius, new Vector3(0.50f, 0f, 0f), 90f, parent);
-
-            // Small input marker dot on the left side
-            CreateFilletSphere(new Vector3(0.02f, 0f, 0f), 0.04f, parent);
+            // Vertical bar (diode cathode line)
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bar.name = "ValveBar";
+            Object.DestroyImmediate(bar.GetComponent<Collider>());
+            bar.transform.SetParent(parent, false);
+            bar.transform.localPosition = new Vector3(0.2f, 0f, TraceZ - 0.005f);
+            bar.transform.localScale = new Vector3(0.03f, TraceWidth * 0.7f, TraceThickness + 0.005f);
+            var barRend = bar.GetComponent<MeshRenderer>();
+            if (barRend != null) barRend.sharedMaterial = PipeMaterial;
         }
 
-        /// <summary>
-        /// Build a mixer: X-shaped diagonal crossing + oversized mixing chamber sphere.
-        /// The enlarged center sphere immediately reads as "something happens here."
-        /// </summary>
-        private static void BuildMixer(Transform parent)
+        private static void BuildFlatAmplifier(Transform parent)
         {
-            // Main horizontal trace
-            CreatePipeCylinder(1.0f, PipeRadius, Vector3.zero, 90f, parent);
+            // Horizontal trace through
+            CreateFlatTrace(1.0f, Vector3.zero, true, parent);
 
-            // X-shaped diagonals crossing at center
-            CreatePipeCylinder(0.35f, PipeRadius, Vector3.zero, 45f, parent);
-            CreatePipeCylinder(0.35f, PipeRadius, Vector3.zero, -45f, parent);
+            // Triangle chevron (op-amp symbol)
+            var chevronRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            chevronRight.name = "AmpChevronR";
+            Object.DestroyImmediate(chevronRight.GetComponent<Collider>());
+            chevronRight.transform.SetParent(parent, false);
+            chevronRight.transform.localPosition = new Vector3(0.12f, 0.08f, TraceZ - 0.005f);
+            chevronRight.transform.localRotation = Quaternion.Euler(0f, 0f, -35f);
+            chevronRight.transform.localScale = new Vector3(0.1f, 0.20f, TraceThickness + 0.005f);
+            var rRend = chevronRight.GetComponent<MeshRenderer>();
+            if (rRend != null) rRend.sharedMaterial = PipeMaterial;
 
-            // Enlarged mixing chamber sphere (2.5x normal joint diameter)
-            var mixer = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            mixer.name = "MixerChamber";
-            Object.DestroyImmediate(mixer.GetComponent<Collider>());
-            mixer.transform.SetParent(parent, false);
-            mixer.transform.localPosition = new Vector3(0f, 0f, PipeZ);
-            mixer.transform.localScale = Vector3.one * (JointRadius * 5f);
-            var mr = mixer.GetComponent<MeshRenderer>();
-            if (mr != null) mr.sharedMaterial = CopperPipeMaterial;
-
-            // Larger glow ring around mixing chamber
-            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "MixerGlowRing";
-            Object.DestroyImmediate(ring.GetComponent<Collider>());
-            ring.transform.SetParent(parent, false);
-            ring.transform.localPosition = new Vector3(0f, 0f, GlowRingZ);
-            ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            ring.transform.localScale = new Vector3(GlowRingRadius * 5f, 0.015f, GlowRingRadius * 5f);
-            var rr = ring.GetComponent<MeshRenderer>();
-            if (rr != null) rr.sharedMaterial = OcclusionRingMaterial;
+            var chevronLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            chevronLeft.name = "AmpChevronL";
+            Object.DestroyImmediate(chevronLeft.GetComponent<Collider>());
+            chevronLeft.transform.SetParent(parent, false);
+            chevronLeft.transform.localPosition = new Vector3(0.12f, -0.08f, TraceZ - 0.005f);
+            chevronLeft.transform.localRotation = Quaternion.Euler(0f, 0f, 35f);
+            chevronLeft.transform.localScale = new Vector3(0.1f, 0.20f, TraceThickness + 0.005f);
+            var lRend = chevronLeft.GetComponent<MeshRenderer>();
+            if (lRend != null) lRend.sharedMaterial = PipeMaterial;
         }
 
-        /// <summary>
-        /// Build a blocker: truncated stubs + dark red-black barrier block.
-        /// The gap and red-black barrier communicate "flow stops here."
-        /// </summary>
-        private static void BuildBlocker(Transform parent)
+        private static void BuildFlatMixer(Transform parent)
         {
-            // Truncated stubs — don't reach center, leaving a gap
-            CreatePipeCylinder(0.30f, PipeRadius, new Vector3(-0.35f, 0f, 0f), 90f, parent);
-            CreatePipeCylinder(0.30f, PipeRadius, new Vector3(0.35f, 0f, 0f), 90f, parent);
+            // X-shaped diagonal crossing
+            var diag1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            diag1.name = "MixerDiag1";
+            Object.DestroyImmediate(diag1.GetComponent<Collider>());
+            diag1.transform.SetParent(parent, false);
+            diag1.transform.localPosition = new Vector3(0f, 0f, TraceZ);
+            diag1.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            diag1.transform.localScale = new Vector3(TraceWidth, 1.0f, TraceThickness);
+            var d1Rend = diag1.GetComponent<MeshRenderer>();
+            if (d1Rend != null) d1Rend.sharedMaterial = PipeMaterial;
 
-            // Solid barrier block across the gap
-            var barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            barrier.name = "BlockerBarrier";
-            Object.DestroyImmediate(barrier.GetComponent<Collider>());
-            barrier.transform.SetParent(parent, false);
-            barrier.transform.localPosition = new Vector3(0f, 0f, PipeZ - 0.02f);
-            barrier.transform.localScale = new Vector3(0.12f, 0.55f, 0.30f);
-            var br = barrier.GetComponent<MeshRenderer>();
-            if (br != null) br.sharedMaterial = BlockerBarrierMaterial;
+            var diag2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            diag2.name = "MixerDiag2";
+            Object.DestroyImmediate(diag2.GetComponent<Collider>());
+            diag2.transform.SetParent(parent, false);
+            diag2.transform.localPosition = new Vector3(0f, 0f, TraceZ);
+            diag2.transform.localRotation = Quaternion.Euler(0f, 0f, -45f);
+            diag2.transform.localScale = new Vector3(TraceWidth, 1.0f, TraceThickness);
+            var d2Rend = diag2.GetComponent<MeshRenderer>();
+            if (d2Rend != null) d2Rend.sharedMaterial = PipeMaterial;
 
-            // Warning X mark on the barrier face
-            CreateRivet(new Vector3(0f, 0.06f, PipeZ - 0.03f), PipeRadius * 0.4f, parent);
-            CreateRivet(new Vector3(0f, -0.06f, PipeZ - 0.03f), PipeRadius * 0.4f, parent);
+            // Center mixing pad
+            var center = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            center.name = "MixerCenter";
+            Object.DestroyImmediate(center.GetComponent<Collider>());
+            center.transform.SetParent(parent, false);
+            center.transform.localPosition = new Vector3(0f, 0f, TraceZ - 0.003f);
+            center.transform.localScale = new Vector3(TraceWidth * 1.6f, TraceThickness + 0.006f, TraceWidth * 1.6f);
+            center.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var cRend = center.GetComponent<MeshRenderer>();
+            if (cRend != null) cRend.sharedMaterial = PipeMaterial;
+        }
+
+        private static void BuildFlatBlocker(Transform parent)
+        {
+            // Dark barrier across the trace — blocks signal
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bar.name = "BlockerBar";
+            Object.DestroyImmediate(bar.GetComponent<Collider>());
+            bar.transform.SetParent(parent, false);
+            bar.transform.localPosition = new Vector3(0f, 0f, TraceZ - 0.01f);
+            bar.transform.localScale = new Vector3(TraceWidth + 0.06f, TraceWidth + 0.06f, TraceThickness + 0.015f);
+
+            var renderer = bar.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+
+                var mat = new Material(shader) { color = new Color(0.15f, 0.02f, 0.02f) };
+                mat.SetFloat("_Metallic", 0.3f);
+                mat.SetFloat("_Smoothness", 0.2f);
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor("_EmissionColor", new Color(0.5f, 0.02f, 0.02f));
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                renderer.sharedMaterial = mat;
+            }
         }
     }
 }

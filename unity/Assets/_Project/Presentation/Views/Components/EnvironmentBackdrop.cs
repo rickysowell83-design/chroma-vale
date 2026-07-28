@@ -498,7 +498,7 @@ public void Build()
             var textGO = new GameObject("BillboardText");
             textGO.transform.SetParent(canvasGO.transform);
             var tmp = textGO.AddComponent<TextMeshProUGUI>();
-            tmp.text = "CHROMA VALE  ::  NEON DISTRICT  ::  FLOW THE PIPES  ::  ";
+            tmp.text = "CHROMA VALE  ::  NEON DISTRICT  ::  ROUTE THE TRACES  ::  ";
             tmp.fontSize = 48f;
             tmp.color = ChromaPalette.NeonCyan;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -513,7 +513,7 @@ public void Build()
 
         private IEnumerator ScrollBillboardText(TMP_Text text)
         {
-            string msg = "CHROMA VALE  ::  NEON DISTRICT  ::  FLOW THE PIPES  ::  ";
+            string msg = "CHROMA VALE  ::  NEON DISTRICT  ::  ROUTE THE TRACES  ::  ";
             while (text != null)
             {
                 for (int i = 0; i < msg.Length; i++)

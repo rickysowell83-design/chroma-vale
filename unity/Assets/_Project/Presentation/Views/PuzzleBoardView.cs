@@ -80,8 +80,8 @@ namespace ChromaVale.Presentation.Views
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
             _cellLerps = new Coroutine[_board.Width, _board.Height];
-            // STRIPPED for pipeline test — _envBackdrop.Build();
-            // STRIPPED for pipeline test — _musicDirector.StartMusic();
+            _envBackdrop.Build();
+            // KEPT for pipeline test — _musicDirector.StartMusic();
 
             WireEvents();
 
@@ -127,11 +127,10 @@ namespace ChromaVale.Presentation.Views
             _flowButtonComponent = CreateChildComponent<RouteButton>("RouteButton");
             _inventoryPanelComponent = CreateChildComponent<InventoryPanel>("InventoryPanel");
             _winPopupComponent = CreateChildComponent<WinPopup>("WinPopup");
-            // STRIPPED for pipeline test
-            // _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
+            _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
             // _musicDirector = CreateChildComponent<MusicDirector>("MusicDirector");
             // _cameraShake = Camera.main.gameObject.AddComponent<CameraShake>();
-            // _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
+            _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
         }
 
         private void WireEvents()
@@ -170,7 +169,7 @@ namespace ChromaVale.Presentation.Views
             string hintText = step switch
             {
                 0 => "Drag traces to connect source to target",
-                1 => "Good. Now press FLOW to test the circuit.",
+                1 => "Good. Now press ROUTE to test the circuit.",
                 _ => ""
             };
 
@@ -550,7 +549,7 @@ namespace ChromaVale.Presentation.Views
 
         private IEnumerator RunFlowSimulation()
         {
-            _flowButtonComponent.SetInteractable(false);
+            _flowButtonComponent.SetRouting(true);
             _inventoryPanelComponent.SetLocked(true);
 
             _flowSim.OnSignalAdvance += HandleFlowAdvance;
@@ -593,7 +592,8 @@ namespace ChromaVale.Presentation.Views
                     _particleFx.WinCascade(positions);
                 }
                 yield return new WaitForSeconds(0.5f);
-                _winPopupComponent.Show(_starsEarned, _moveCount, _levelNumber >= _maxLevel);
+                _winPopupComponent.Show(_starsEarned, _moveCount, _levelNumber >= _maxLevel,
+                    tracesUsed: _inventory.PlacedCount, maxTraces: _inventory.Pieces.Count);
             }
             else
             {
@@ -602,7 +602,7 @@ namespace ChromaVale.Presentation.Views
                 ResetPuzzle();
             }
 
-            _flowButtonComponent.SetInteractable(true);
+            _flowButtonComponent.SetRouting(false);
             _inventoryPanelComponent.SetLocked(false);
         }
 
@@ -656,7 +656,10 @@ namespace ChromaVale.Presentation.Views
             {
                 StartCoroutine(TargetBloomAnim(_renderers[x, y], colorIndex));
                 if (_particleFx != null)
+                {
                     _particleFx.TargetBloom(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
+                    _particleFx.RestorationPulse(_renderers[x, y].transform.position);
+                }
             }
             if (_audioService != null) _audioService.PlaySound("target_reached");
         }

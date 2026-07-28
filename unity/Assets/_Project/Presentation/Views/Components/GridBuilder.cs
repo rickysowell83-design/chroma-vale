@@ -109,7 +109,8 @@ namespace ChromaVale.Presentation.Views.Components
             // ── Add ghost component outlines on random empty tiles ──
             AddGhostComponents(board, tileSize);
             SetupCamera();
-            AddPcbWings(board, tileSize);
+            // ── Dark wing panels removed — replaced by PCB texture extensions ──
+            // AddPcbWings(board, tileSize);
             return _renderers;
         }
 
@@ -137,7 +138,7 @@ private void SetupCamera()
                 cam.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
                 cam.nearClipPlane = 0.3f;
                 cam.farClipPlane = 100f;
-                cam.backgroundColor = ChromaPalette.DarkBG;
+                cam.backgroundColor = Color.black; // Pure black — no wings/panels
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 if (cam.GetComponent<UnityEngine.EventSystems.PhysicsRaycaster>() == null)
                     cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();

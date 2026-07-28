@@ -15,6 +15,8 @@ namespace ChromaVale.Presentation.Views.Components
         private TextMeshProUGUI _subtitleText;
         private TextMeshProUGUI _scoreText;
         private TextMeshProUGUI _starText;
+        private TextMeshProUGUI _tracesText;
+        private TextMeshProUGUI _signalText;
         private GameObject _nextLevelButton;
 
         public event Action OnNextLevel;
@@ -38,7 +40,7 @@ namespace ChromaVale.Presentation.Views.Components
             var bg = new GameObject("WinBG");
             bg.transform.SetParent(transform, false);
             _bgImage = bg.AddComponent<Image>();
-            _bgImage.color = new Color(0.02f, 0.02f, 0.06f, 0f);
+            _bgImage.color = ChromaPalette.WinPopupBG; // v3 #0D1117, alpha 1 (fades to 0.85)
             _bgImage.raycastTarget = false;
             var br = bg.GetComponent<RectTransform>();
             br.anchorMin = Vector2.zero;
@@ -98,6 +100,32 @@ namespace ChromaVale.Presentation.Views.Components
             wr4.anchorMax = new Vector2(0.5f, 0.43f);
             wr4.sizeDelta = new Vector2(400, 25);
 
+            // Traces Used stat (v3)
+            var t5 = new GameObject("WinTraces");
+            t5.transform.SetParent(bg.transform, false);
+            _tracesText = t5.AddComponent<TextMeshProUGUI>();
+            _tracesText.text = "Traces used: 0/6";
+            _tracesText.fontSize = 13;
+            _tracesText.alignment = TextAlignmentOptions.Center;
+            _tracesText.color = new Color(0.35f, 0.35f, 0.45f);
+            var wr5 = _tracesText.GetComponent<RectTransform>();
+            wr5.anchorMin = new Vector2(0.5f, 0.38f);
+            wr5.anchorMax = new Vector2(0.5f, 0.38f);
+            wr5.sizeDelta = new Vector2(400, 25);
+
+            // Signal Clean stat (v3)
+            var t6 = new GameObject("WinSignal");
+            t6.transform.SetParent(bg.transform, false);
+            _signalText = t6.AddComponent<TextMeshProUGUI>();
+            _signalText.text = "Signal clean: YES";
+            _signalText.fontSize = 13;
+            _signalText.alignment = TextAlignmentOptions.Center;
+            _signalText.color = ChromaPalette.NeonGreen;
+            var wr6 = _signalText.GetComponent<RectTransform>();
+            wr6.anchorMin = new Vector2(0.5f, 0.33f);
+            wr6.anchorMax = new Vector2(0.5f, 0.33f);
+            wr6.sizeDelta = new Vector2(400, 25);
+
             // Play Again
             CreatePopupButton(bg, "Play Again", new Vector2(0.5f, 0.3f),
                 () => { if (OnReplay != null) OnReplay(); },
@@ -142,16 +170,26 @@ namespace ChromaVale.Presentation.Views.Components
             return go;
         }
 
-        public void Show(int starsEarned, int moveCount, bool isLastLevel)
+        public void Show(int starsEarned, int moveCount, bool isLastLevel, int tracesUsed = 0, int maxTraces = 6)
         {
+            // v3: White title text
             _titleText.text = "CIRCUIT RESTORED!";
+            _titleText.color = Color.white;
             _subtitleText.text = starsEarned >= 3
                 ? "All targets reached. Maximum efficiency."
-                : "Flow delivered successfully.";
+                : "Signal routed successfully.";
             _subtitleText.color = starsEarned >= 3
                 ? ChromaPalette.NeonCyan
                 : new Color(0.5f, 0.5f, 0.6f);
             _scoreText.text = "Completed in " + moveCount + " moves";
+
+            // v3: Traces used stat
+            if (_tracesText != null)
+                _tracesText.text = "Traces used: " + tracesUsed + "/" + maxTraces;
+
+            // v3: Signal clean stat (always YES when circuit is restored)
+            if (_signalText != null)
+                _signalText.text = "Signal clean: YES";
 
             // Stars — ASCII brackets
             _starText.text = starsEarned switch
