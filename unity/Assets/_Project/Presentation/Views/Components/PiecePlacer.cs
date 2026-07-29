@@ -8,23 +8,33 @@ namespace ChromaVale.Presentation.Views.Components
     {
         public static PiecePlacer Instance { get; private set; }
 
-        [Header("Trace Pieces — Dormant")]
+        [Header("Trace Pieces — Dormant (Fallback)")]
         [SerializeField] private GameObject _straightDormantPrefab;
         [SerializeField] private GameObject _cornerDormantPrefab;
         [SerializeField] private GameObject _tJunctionDormantPrefab;
         [SerializeField] private GameObject _crossDormantPrefab;
 
-        [Header("Trace Pieces — Active")]
+        [Header("Trace Pieces — Active (Fallback)")]
         [SerializeField] private GameObject _straightActivePrefab;
         [SerializeField] private GameObject _cornerActivePrefab;
         [SerializeField] private GameObject _tJunctionActivePrefab;
         [SerializeField] private GameObject _crossActivePrefab;
 
+        [Header("Trace Pieces — Blender Models (v3)")]
+        [SerializeField] private GameObject _straightTraceModel;
+        [SerializeField] private GameObject _cornerTraceModel;
+        [SerializeField] private GameObject _splitterTraceModel;
+        [SerializeField] private GameObject _crossTraceModel;
+
+        [Header("Board Tiles — Blender Models (v3)")]
+        [SerializeField] private GameObject _flatTileModel;
+        [SerializeField] private GameObject _groovedTileModel;
+
         [Header("Node Pieces")]
         [SerializeField] private GameObject _sourcePadPrefab;
         [SerializeField] private GameObject _destPadPrefab;
 
-        [Header("Board Structure")]
+        [Header("Board Structure (Fallback)")]
         [SerializeField] private GameObject _boardSubstratePrefab;
         [SerializeField] private GameObject _emptyCellPrefab;
 
@@ -35,6 +45,32 @@ namespace ChromaVale.Presentation.Views.Components
         private GameObject _boardSubstrateInstance;
         private readonly Dictionary<(int x, int y), GameObject> _cellPieces = new();
 
+        // Shared copper trace material — one instance, per-tile variation via MaterialPropertyBlock
+        private static Material _traceMaterial;
+        private static Material TraceMaterial
+        {
+            get
+            {
+                if (_traceMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    if (shader == null) shader = Shader.Find("Sprites/Default");
+
+                    _traceMaterial = new Material(shader)
+                    {
+                        color = ChromaPalette.CopperActive // #B87333 bright copper
+                    };
+                    _traceMaterial.SetFloat("_Metallic", 0.9f);
+                    _traceMaterial.SetFloat("_Smoothness", 0.6f);
+                    _traceMaterial.EnableKeyword("_EMISSION");
+                    _traceMaterial.SetColor("_EmissionColor", new Color(0.15f, 0.08f, 0.02f)); // Subtle warm idle glow
+                    _traceMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+                return _traceMaterial;
+            }
+        }
+
         private void Awake()
         {
             Instance = this;
@@ -44,6 +80,25 @@ namespace ChromaVale.Presentation.Views.Components
         private void LoadPrefabsIfNeeded()
         {
 #if UNITY_EDITOR
+            // ── v3 Blender trace models (single mesh, material handles active/dormant) ──
+            if (_straightTraceModel == null)
+            {
+                _straightTraceModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/straight_trace.glb");
+                _cornerTraceModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/corner_trace.glb");
+                _splitterTraceModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/splitter_trace.glb");
+                _crossTraceModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/cross_trace.glb");
+                _flatTileModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/flat_tile.glb");
+                _groovedTileModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/_Project/Models/Pieces/grooved_tile.glb");
+                Debug.Log("[PiecePlacer] Auto-loaded 6 Blender trace/tile models (v3).");
+            }
+
+            // ── Fallback: old Sketchfab prefabs ──
             if (_straightDormantPrefab == null)
             {
                 _straightDormantPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
@@ -74,7 +129,7 @@ namespace ChromaVale.Presentation.Views.Components
                     "Assets/_Project/Prefabs/Pieces/mounting_hole.prefab");
                 _boardEdgePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(
                     "Assets/_Project/Prefabs/Pieces/board_edge.prefab");
-                Debug.Log("[PiecePlacer] Auto-loaded all 14 prefab references.");
+                Debug.Log("[PiecePlacer] Auto-loaded all 14 legacy prefab references (fallback).");
             }
 #endif
         }
@@ -84,88 +139,126 @@ namespace ChromaVale.Presentation.Views.Components
             if (Instance == this) Instance = null;
         }
 
-        public GameObject GetDormantPrefab(SegmentShape shape) => shape switch
+        /// <summary>
+        /// Get the single-mesh Blender trace model for the given shape.
+        /// Falls back to old dormant prefab if v3 model not available.
+        /// </summary>
+        private GameObject GetTraceModel(SegmentShape shape)
         {
-            SegmentShape.Straight      => _straightDormantPrefab,
-            SegmentShape.Corner        => _cornerDormantPrefab,
-            SegmentShape.Splitter      => _tJunctionDormantPrefab,
-            SegmentShape.CrossJunction => _crossDormantPrefab,
-            _                           => _straightDormantPrefab
-        };
+            GameObject model = shape switch
+            {
+                SegmentShape.Straight      => _straightTraceModel,
+                SegmentShape.Corner        => _cornerTraceModel,
+                SegmentShape.Splitter      => _splitterTraceModel,
+                SegmentShape.CrossJunction => _crossTraceModel,
+                _                           => null
+            };
 
-        public GameObject GetActivePrefab(SegmentShape shape) => shape switch
+            if (model != null) return model;
+
+            // Fallback to old dormant prefab
+            Debug.LogWarning($"[PiecePlacer] v3 model missing for {shape}, using legacy dormant prefab.");
+            return shape switch
+            {
+                SegmentShape.Straight      => _straightDormantPrefab,
+                SegmentShape.Corner        => _cornerDormantPrefab,
+                SegmentShape.Splitter      => _tJunctionDormantPrefab,
+                SegmentShape.CrossJunction => _crossDormantPrefab,
+                _                           => _straightDormantPrefab
+            };
+        }
+
+        // Legacy accessors — kept for backward compat but always return the v3 single mesh
+        public GameObject GetDormantPrefab(SegmentShape shape) => GetTraceModel(shape);
+        public GameObject GetActivePrefab(SegmentShape shape) => GetTraceModel(shape);
+
+        /// <summary>
+        /// Apply the shared copper trace material to all MeshRenderers on a trace
+        /// root and its children.  The per-tile visual state (ghost/idle/energised)
+        /// is driven later via TileVisual.ApplyColor's MaterialPropertyBlock.
+        /// </summary>
+        private static void ApplyTraceMaterial(GameObject traceRoot)
         {
-            SegmentShape.Straight      => _straightActivePrefab,
-            SegmentShape.Corner        => _cornerActivePrefab,
-            SegmentShape.Splitter      => _tJunctionActivePrefab,
-            SegmentShape.CrossJunction => _crossActivePrefab,
-            _                           => _straightActivePrefab
-        };
+            if (traceRoot == null) return;
+            var renderers = traceRoot.GetComponentsInChildren<MeshRenderer>();
+            foreach (var r in renderers)
+            {
+                if (r == null) continue;
+                // Only replace if the current material is from the .glb import
+                // (default Lit or missing shader).  Don't override indicator materials.
+                var mat = r.sharedMaterial;
+                if (mat == null || mat.shader == null
+                    || mat.shader.name == "Hidden/InternalErrorShader"
+                    || mat.shader.name == "Standard"
+                    || mat.shader.name == "Universal Render Pipeline/Lit")
+                {
+                    r.sharedMaterial = TraceMaterial;
+                }
+            }
+        }
 
         public GameObject PlaceTracePiece(SegmentShape shape, int rotationDeg,
             Transform parent, Vector3? worldPosition = null)
         {
-            var prefab = GetDormantPrefab(shape);
-            if (prefab == null)
+            var model = GetTraceModel(shape);
+            if (model == null)
             {
-                Debug.LogWarning($"[PiecePlacer] No prefab for {shape}");
+                Debug.LogWarning($"[PiecePlacer] No model for {shape}");
                 return null;
             }
-            var instance = Instantiate(prefab, parent);
-            instance.name = $"Piece_{shape}_dormant";
+            var instance = Instantiate(model, parent);
+            instance.name = $"Piece_{shape}_trace";
             if (worldPosition.HasValue)
                 instance.transform.position = worldPosition.Value;
             else
                 instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.Euler(0f, 0f, rotationDeg);
             instance.transform.localScale = Vector3.one;
+
+            // Apply shared copper material before TileVisual's MPB overrides kick in
+            ApplyTraceMaterial(instance);
+
             return instance;
         }
 
+        /// <summary>
+        /// Legacy ActivatePiece — v3 uses a single mesh with material-driven state,
+        /// so activating just means swapping material property blocks (handled by
+        /// TileVisual.ApplyColor).  For backward compat with callers that still
+        /// invoke this method, return the dormant instance unchanged.
+        /// </summary>
         public GameObject ActivatePiece(SegmentShape shape, Transform dormantInstance)
         {
-            var activePrefab = GetActivePrefab(shape);
-            if (activePrefab == null || dormantInstance == null) return null;
-            var parent = dormantInstance.parent;
-            var pos = dormantInstance.localPosition;
-            var rot = dormantInstance.localRotation;
-            var scale = dormantInstance.localScale;
-            DestroyImmediate(dormantInstance.gameObject);
-            var active = Instantiate(activePrefab, parent);
-            active.name = $"Piece_{shape}_active";
-            active.transform.localPosition = pos;
-            active.transform.localRotation = rot;
-            active.transform.localScale = scale;
-            return active;
+            // v3: single mesh — no geometry swap needed.  TileVisual handles the
+            // active/dormant distinction via MaterialPropertyBlock in ApplyColor().
+            // Just log and return the existing instance.
+            Debug.Log($"[PiecePlacer] ActivatePiece({shape}) — v3 single-mesh, no-op swap.");
+            return dormantInstance?.gameObject;
         }
 
         public GameObject PlacePieceAtCell(SegmentShape shape, int rotationDeg,
             int cellX, int cellY, Vector3 worldPosition, Transform parent)
         {
-            var prefab = GetDormantPrefab(shape);
-            if (prefab == null) return null;
-            var instance = Instantiate(prefab, worldPosition,
+            var model = GetTraceModel(shape);
+            if (model == null) return null;
+            var instance = Instantiate(model, worldPosition,
                 Quaternion.Euler(0f, 0f, rotationDeg), parent);
-            instance.name = $"Piece_{shape}_{cellX}_{cellY}_dormant";
+            instance.name = $"Piece_{shape}_{cellX}_{cellY}_trace";
             instance.transform.localScale = Vector3.one;
+            ApplyTraceMaterial(instance);
             _cellPieces[(cellX, cellY)] = instance;
             return instance;
         }
 
+        /// <summary>
+        /// Legacy ActivatePieceAtCell — v3 single-mesh, no-op geometry swap.
+        /// TileVisual handles the visual state via MaterialPropertyBlock.
+        /// </summary>
         public void ActivatePieceAtCell(int cellX, int cellY, SegmentShape shape,
             int rotationDeg, Transform parent)
         {
-            var key = (cellX, cellY);
-            if (!_cellPieces.TryGetValue(key, out var dormant)) return;
-            var activePrefab = GetActivePrefab(shape);
-            if (activePrefab == null) return;
-            var pos = dormant.transform.position;
-            var rot = dormant.transform.rotation;
-            DestroyImmediate(dormant);
-            var active = Instantiate(activePrefab, pos, rot, parent);
-            active.name = $"Piece_{shape}_{cellX}_{cellY}_active";
-            active.transform.localScale = Vector3.one;
-            _cellPieces[key] = active;
+            // v3: no-op — the mesh stays the same, only MPB changes
+            Debug.Log($"[PiecePlacer] ActivatePieceAtCell({cellX},{cellY}) — v3 no-op.");
         }
 
         public void RemovePieceAtCell(int cellX, int cellY)
@@ -206,11 +299,14 @@ namespace ChromaVale.Presentation.Views.Components
         public GameObject PlaceBoardSubstrate(int gridWidth, int gridHeight,
             float cellSize, Transform parent)
         {
-            if (_boardSubstratePrefab == null) { Debug.LogWarning("[PiecePlacer] No board_substrate prefab"); return null; }
+            // v3: prefer flat_tile Blender model for board substrate
+            var substrateModel = _flatTileModel != null ? _flatTileModel : _boardSubstratePrefab;
+            if (substrateModel == null) { Debug.LogWarning("[PiecePlacer] No board substrate model"); return null; }
+
             float boardWorldW = gridWidth * cellSize;
             float boardWorldH = gridHeight * cellSize;
             const float modelSize = 5f;
-            var instance = Instantiate(_boardSubstratePrefab, Vector3.zero, Quaternion.identity, parent);
+            var instance = Instantiate(substrateModel, Vector3.zero, Quaternion.identity, parent);
             instance.name = "BoardSubstrate";
             instance.transform.localScale = new Vector3(boardWorldW / modelSize, boardWorldH / modelSize, 1f);
             _boardSubstrateInstance = instance;
@@ -219,8 +315,10 @@ namespace ChromaVale.Presentation.Views.Components
 
         public GameObject PlaceEmptyCell(Vector3 worldPosition, Transform parent)
         {
-            if (_emptyCellPrefab == null) return null;
-            var instance = Instantiate(_emptyCellPrefab, worldPosition, Quaternion.identity, parent);
+            // v3: prefer grooved_tile Blender model for empty cells
+            var cellModel = _groovedTileModel != null ? _groovedTileModel : _emptyCellPrefab;
+            if (cellModel == null) return null;
+            var instance = Instantiate(cellModel, worldPosition, Quaternion.identity, parent);
             instance.name = "EmptyCell";
             instance.transform.localScale = Vector3.one;
             return instance;
@@ -257,11 +355,12 @@ namespace ChromaVale.Presentation.Views.Components
 
         public bool ValidateLevel1Essentials()
         {
-            if (_straightDormantPrefab == null) { Debug.LogError("[PiecePlacer] Missing straight_dormant"); return false; }
-            if (_straightActivePrefab == null) { Debug.LogError("[PiecePlacer] Missing straight_active"); return false; }
+            if (GetTraceModel(SegmentShape.Straight) == null)
+                { Debug.LogError("[PiecePlacer] Missing straight trace model"); return false; }
             if (_sourcePadPrefab == null) { Debug.LogError("[PiecePlacer] Missing source_pad"); return false; }
             if (_destPadPrefab == null) { Debug.LogError("[PiecePlacer] Missing dest_pad"); return false; }
-            if (_boardSubstratePrefab == null) { Debug.LogError("[PiecePlacer] Missing board_substrate"); return false; }
+            if ((_flatTileModel ?? _boardSubstratePrefab) == null)
+                { Debug.LogError("[PiecePlacer] Missing board substrate"); return false; }
             return true;
         }
     }
