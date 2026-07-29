@@ -277,6 +277,20 @@ namespace ChromaVale.Presentation.Views.Components
         {
             ClearShape();
 
+            // v3: Use PiecePlacer prefabs (Blender-authored .glb pieces) if available.
+            // Falls back to procedural TraceMeshFactory3D for shapes without prefabs.
+            if (PiecePlacer.Instance != null)
+            {
+                _traceRoot = PiecePlacer.Instance.PlaceTracePiece(shape, rotationDeg, transform);
+                if (_traceRoot != null)
+                {
+                    _traceRoot.transform.localScale = Vector3.one * _tileSize;
+                    ApplyColor();
+                    return;
+                }
+            }
+
+            // Fallback: procedural flat copper trace
             _traceRoot = TraceMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
             _traceRoot.transform.localScale = Vector3.one * _tileSize;
 
@@ -310,8 +324,22 @@ namespace ChromaVale.Presentation.Views.Components
         {
             HidePlacementPreview();
 
-            _previewRoot = TraceMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
-            _previewRoot.transform.localScale = Vector3.one * _tileSize;
+            // v3: Use PiecePlacer prefab for preview if available
+            if (PiecePlacer.Instance != null)
+            {
+                _previewRoot = PiecePlacer.Instance.PlaceTracePiece(shape, rotationDeg, transform);
+                if (_previewRoot != null)
+                {
+                    _previewRoot.transform.localScale = Vector3.one * _tileSize;
+                }
+            }
+
+            // Fallback: procedural trace preview
+            if (_previewRoot == null)
+            {
+                _previewRoot = TraceMeshFactory3D.BuildPipe(shape, rotationDeg, transform);
+                _previewRoot.transform.localScale = Vector3.one * _tileSize;
+            }
 
             // Create translucent preview material (URP/Lit, transparent, alpha ~0.35, no emission)
             Shader shader = Shader.Find("Universal Render Pipeline/Lit");
@@ -458,37 +486,71 @@ public void SetIndicator(TileIndicator kind, Color color)
 
                 case TileIndicator.TargetRing:
                 {
-                    // ── v3: ENIG gold octagonal pad with dark void via center ──
+                    // ── Legibility overhaul: destination pad as dark recessed socket ──
+                    // Distinct from source pad (gold hex pad). Reads as "empty and waiting."
 
-                    // Gold outer pad ring (same geometry as source)
-                    var goldPad = TraceMeshFactory3D.CreateViaPad(Vector3.zero, _indicatorRoot.transform);
-                    goldPad.name = "TargetENIGPad";
-                    goldPad.transform.SetParent(_indicatorRoot.transform, false);
+                    // Dark charcoal recessed ring (NOT gold — gold is for sources)
+                    var socketRing = TraceMeshFactory3D.CreateViaPad(Vector3.zero, _indicatorRoot.transform);
+                    socketRing.name = "TargetSocketRing";
+                    socketRing.transform.SetParent(_indicatorRoot.transform, false);
+                    // Override ring material to dark charcoal instead of ENIG gold
+                    var ringRend = socketRing.GetComponent<MeshRenderer>();
+                    if (ringRend != null)
+                    {
+                        var ringMat = new Material(indicatorMat.shader) { color = new Color(0.12f, 0.12f, 0.14f) };
+                        ringMat.SetFloat("_Metallic", 0.6f);
+                        ringMat.SetFloat("_Smoothness", 0.2f);
+                        ringMat.EnableKeyword("_EMISSION");
+                        ringMat.SetColor("_EmissionColor", color * 0.15f); // Faint color-tinted rim
+                        ringMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                        ringRend.sharedMaterial = ringMat;
+                    }
 
-                    // Dark void via center (no emission until restoration)
+                    // Dark void via center (deep recess)
                     var viaCenter = TraceMeshFactory3D.CreateViaCenter(Vector3.zero, _indicatorRoot.transform,
-                        ChromaPalette.DestVoid);
+                        new Color(0.008f, 0.015f, 0.008f)); // Darker than DestVoid
                     viaCenter.name = "TargetVoid";
 
-                    // Subtle dormant halo (barely visible, dark)
+                    // ── Pulsing rim ring: thin glowing ring that says "fill me" ──
+                    var pulseRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    pulseRing.name = "TargetPulseRing";
+                    Object.DestroyImmediate(pulseRing.GetComponent<Collider>());
+                    pulseRing.transform.SetParent(_indicatorRoot.transform, false);
+                    pulseRing.transform.localPosition = new Vector3(0f, 0f, -0.09f);
+                    pulseRing.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    float pulseRadius = _tileSize * 0.30f;
+                    pulseRing.transform.localScale = new Vector3(pulseRadius * 2f, 0.015f, pulseRadius * 2f);
+                    var pulseRend = pulseRing.GetComponent<MeshRenderer>();
+                    if (pulseRend != null)
+                    {
+                        var pulseMat = new Material(indicatorMat.shader) { color = Color.clear };
+                        pulseMat.SetFloat("_Metallic", 0f);
+                        pulseMat.SetFloat("_Smoothness", 0f);
+                        pulseMat.EnableKeyword("_EMISSION");
+                        pulseMat.SetColor("_EmissionColor", color * 1.8f); // Bright pulsing rim in signal color
+                        pulseMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                        pulseRend.sharedMaterial = pulseMat;
+                    }
+
+                    // Outer dormant glow halo (subtle, behind everything)
                     var halo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    halo.name = "TargetDormantHalo";
+                    halo.name = "TargetHalo";
                     Object.DestroyImmediate(halo.GetComponent<Collider>());
                     halo.transform.SetParent(_indicatorRoot.transform, false);
-                    halo.transform.localPosition = new Vector3(0f, 0f, -0.06f); // Behind pad ring
+                    halo.transform.localPosition = new Vector3(0f, 0f, -0.11f);
                     halo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    float haloRadius = _tileSize * 0.38f;
+                    float haloRadius = _tileSize * 0.42f;
                     halo.transform.localScale = new Vector3(haloRadius * 2f, 0.02f, haloRadius * 2f);
-                    var haloRend = halo.GetComponent<MeshRenderer>();
-                    if (haloRend != null)
+                    var haloRend2 = halo.GetComponent<MeshRenderer>();
+                    if (haloRend2 != null)
                     {
                         var haloMat = new Material(indicatorMat.shader) { color = Color.clear };
                         haloMat.SetFloat("_Metallic", 0f);
                         haloMat.SetFloat("_Smoothness", 0f);
                         haloMat.EnableKeyword("_EMISSION");
-                        haloMat.SetColor("_EmissionColor", ChromaPalette.DestVoid * 0.3f); // Barely visible
+                        haloMat.SetColor("_EmissionColor", color * 0.5f);
                         haloMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                        haloRend.sharedMaterial = haloMat;
+                        haloRend2.sharedMaterial = haloMat;
                     }
                     break;
                 }
@@ -566,24 +628,40 @@ private void ApplyColor()
         {
             if (_mpb == null) return;
 
-            // v3: Flat copper foil — CopperActive base with cyan emission overlay when lit
-            // When idle (no flow active), emit oxidized copper glow
+            // Legibility overhaul: three distinct trace states
+            //   Ghost (_emissionIntensity == 0): dark recessed matte, zero emission
+            //   Player placed idle: bright copper with subtle warm glow
+            //   Energized: full neon emission in signal colour
+
             Color emissionColor = _color * _emissionIntensity;
-            if (emissionColor.r < 0.01f && emissionColor.g < 0.01f && emissionColor.b < 0.01f)
+
+            if (_emissionIntensity <= 0.01f)
             {
-                // Idle: oxidized copper subtle glow
-                emissionColor = ChromaPalette.CopperOxidized * Mathf.Max(_emissionIntensity, 0.15f);
-                _mpb.SetColor("_BaseColor", ChromaPalette.CopperOxidized);
+                // Ghost trace: zero emission, dark matte recessed — reads as "part of the board"
+                _mpb.SetColor("_BaseColor", _color); // GhostTraceCopper
+                _mpb.SetColor("_EmissionColor", Color.black);
+                _mpb.SetFloat("_Metallic", 0.3f);    // Dull, non-reflective
+                _mpb.SetFloat("_Smoothness", 0.1f);  // Recessed matte
+            }
+            else if (_emissionIntensity < 1.0f)
+            {
+                // Player placed idle: bright copper with subtle warm specular
+                emissionColor = _color * (_emissionIntensity * 0.25f);
+                _mpb.SetColor("_BaseColor", _color); // PlayerTraceCopper
+                _mpb.SetColor("_EmissionColor", emissionColor);
+                _mpb.SetFloat("_Metallic", 0.85f);   // Specular copper sheen
+                _mpb.SetFloat("_Smoothness", 0.55f);  // Raised, slightly glossy
             }
             else
             {
-                // Active: CopperActive base + cyan emission overlay
+                // Active/energized: bright copper base + neon emission overlay
                 _mpb.SetColor("_BaseColor", ChromaPalette.CopperActive);
-                // Blend cyan emission on top of copper
                 emissionColor = Color.Lerp(ChromaPalette.CopperActive * _emissionIntensity,
                     ChromaPalette.TraceCyanEmission * _emissionIntensity, 0.4f);
+                _mpb.SetColor("_EmissionColor", emissionColor);
+                _mpb.SetFloat("_Metallic", 0.9f);     // Full metallic sheen
+                _mpb.SetFloat("_Smoothness", 0.6f);    // Polished when energized
             }
-            _mpb.SetColor("_EmissionColor", emissionColor);
 
             if (_baseRenderer != null)
             {

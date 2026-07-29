@@ -1,5 +1,5 @@
 using System;
-using System.Collections;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -207,7 +207,7 @@ namespace ChromaVale.Presentation.Views.Components
             }
 
             gameObject.SetActive(true);
-            StartCoroutine(FadeBg());
+            FadeBg();
         }
 
         public void Hide()
@@ -215,17 +215,14 @@ namespace ChromaVale.Presentation.Views.Components
             gameObject.SetActive(false);
         }
 
-        private IEnumerator FadeBg()
+        private void FadeBg()
         {
-            float e = 0f, d = 0.8f;
-            while (e < d)
-            {
-                e += Time.deltaTime;
-                var c = _bgImage.color;
-                c.a = Mathf.Lerp(0f, 0.8f, e / d);
-                _bgImage.color = c;
-                yield return null;
-            }
+            if (_bgImage == null) return;
+            // Reset alpha then tween to 0.8 over 0.8s
+            var c = _bgImage.color;
+            c.a = 0f;
+            _bgImage.color = c;
+            _bgImage.DOFade(0.8f, 0.8f).SetEase(Ease.OutQuad);
         }
     }
 }

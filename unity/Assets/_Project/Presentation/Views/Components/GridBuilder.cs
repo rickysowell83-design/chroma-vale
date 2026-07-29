@@ -27,7 +27,9 @@ namespace ChromaVale.Presentation.Views.Components
             _tileSize = tileSize;
 
             _renderers = new TileVisual[board.Width, board.Height];
-            var off = new Vector3(-board.Width * tileSize / 2f, -board.Height * tileSize / 2f, 0);
+            // Y-offset shifts board upward to avoid overlap with bottom-docked inventory panel (15% height)
+            float boardYShift = board.Height * tileSize * 0.10f;
+            var off = new Vector3(-board.Width * tileSize / 2f, -board.Height * tileSize / 2f + boardYShift, 0);
 
             // Load PCB texture material once, create per-tile copies with correct UV offsets
             var pcbMaster = Resources.Load<Material>("Materials/PCB_Board");
@@ -72,6 +74,13 @@ namespace ChromaVale.Presentation.Views.Components
                 {
                     var srcColor = GetPipeColor(src.ColorIndex);
                     tv.SetIndicator(TileIndicator.SourceDot, srcColor);
+
+                    // v3: Overlay Blender-authored source_pad prefab
+                    if (PiecePlacer.Instance != null)
+                    {
+                        var worldPos = new Vector3(src.X * tileSize + off.x, src.Y * tileSize + off.y, 0);
+                        PiecePlacer.Instance.PlaceSourcePad(worldPos, tv.transform);
+                    }
                 }
             }
 
@@ -82,6 +91,13 @@ namespace ChromaVale.Presentation.Views.Components
                 {
                     var tgtColor = GetPipeColor(tgt.ColorIndex);
                     tv.SetIndicator(TileIndicator.TargetRing, tgtColor);
+
+                    // v3: Overlay Blender-authored dest_pad prefab
+                    if (PiecePlacer.Instance != null)
+                    {
+                        var worldPos = new Vector3(tgt.X * tileSize + off.x, tgt.Y * tileSize + off.y, 0);
+                        PiecePlacer.Instance.PlaceDestPad(worldPos, tv.transform);
+                    }
                 }
             }
 
@@ -94,8 +110,8 @@ namespace ChromaVale.Presentation.Views.Components
                     if (tv != null)
                     {
                         tv.SetShape(gt.Shape, gt.Rotation);
-                        tv.Color = ChromaPalette.CopperOxidized; // v3 oxidized copper #5C3A1E
-                        tv.EmissionIntensity = 0.08f; // Very subtle, barely visible ghost
+                        tv.Color = ChromaPalette.GhostTraceCopper; // Dark oxidized #3A2A1A — reads as "part of the board"
+                        tv.EmissionIntensity = 0.0f; // Zero emission — ghost traces are dark/matte/recessed
                     }
                 }
             }
@@ -111,6 +127,13 @@ namespace ChromaVale.Presentation.Views.Components
             SetupCamera();
             // ── Dark wing panels removed — replaced by PCB texture extensions ──
             // AddPcbWings(board, tileSize);
+
+            // v3: Instantiate Blender-authored board substrate (one piece covering entire grid)
+            if (PiecePlacer.Instance != null)
+            {
+                PiecePlacer.Instance.PlaceBoardSubstrate(board.Width, board.Height, tileSize, transform);
+            }
+
             return _renderers;
         }
 
@@ -130,20 +153,104 @@ private void SetupCamera()
             var cam = Camera.main;
             if (cam != null)
             {
-                // ── Flat top-down orthographic PCB view ──
-                // Board is in the XY plane at z=0. Camera looks straight down.
+                // ── 2.5D orthographic view with 15° tilt (§3.1) ──
+                // Tilt reveals beveled PCB edges and socket depth without
+                // introducing parallax distortion. Board sits in XY plane.
+                float tiltDeg = 15f;
+                float tiltRad = tiltDeg * Mathf.Deg2Rad;
+
                 cam.orthographic = true;
-                cam.orthographicSize = ComputeOrthoSize();
-                cam.transform.position = new Vector3(0f, 0f, -10f);
-                cam.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+                // Compensate ortho size for tilt: tilted ortho projects a taller
+                // Y span onto the screen (by 1/cos(tilt)), so shrink to match.
+                cam.orthographicSize = ComputeOrthoSize() * Mathf.Cos(tiltRad);
+
+                // Camera positioned slightly above the board center so the
+                // tilted view still frames the board in the center of the screen.
+                float camDist = 12f;
+                float camY = camDist * Mathf.Sin(tiltRad);
+                float camZ = -camDist * Mathf.Cos(tiltRad);
+                cam.transform.position = new Vector3(0f, camY, camZ);
+                cam.transform.rotation = Quaternion.Euler(tiltDeg, 0f, 0f);
+
                 cam.nearClipPlane = 0.3f;
                 cam.farClipPlane = 100f;
-                cam.backgroundColor = Color.black; // Pure black — no wings/panels
+                cam.backgroundColor = new Color(0.02f, 0.04f, 0.06f); // §3.4 — near-black void
                 cam.clearFlags = CameraClearFlags.SolidColor;
+
+                // PhysicsRaycaster for tile click detection
                 if (cam.GetComponent<UnityEngine.EventSystems.PhysicsRaycaster>() == null)
                     cam.gameObject.AddComponent<UnityEngine.EventSystems.PhysicsRaycaster>();
-                DisableBackdrop();
+
+                // ── Shadow settings (§3.3) ──
+                // Soft shadows on for PCB slab drop shadow
+                QualitySettings.shadows = ShadowQuality.All;
+                QualitySettings.shadowResolution = ShadowResolution.Medium;
+                QualitySettings.shadowDistance = 10f;
+                QualitySettings.shadowCascades = 2;
+
+                // ── 3-point lighting (§3.2) ──
+                SetupLighting();
+
+                // Enable the cyberpunk backdrop (was disabled in flat mode)
+                var backdrop = GameObject.Find("CyberpunkBackdrop");
+                if (backdrop != null) backdrop.SetActive(true);
             }
+        }
+
+        /// <summary>
+        /// Create key, fill, and rim directional lights for 2.5D PCB rendering (§3.2).
+        /// Destroys any existing lights named KeyLight/FillLight/RimLight to avoid
+        /// duplicates on level reload.
+        /// </summary>
+        private void SetupLighting()
+        {
+            // Destroy old lights if they exist (from previous level loads)
+            foreach (var name in new[] { "KeyLight", "FillLight", "RimLight" })
+            {
+                var old = GameObject.Find(name);
+                if (old != null) DestroyImmediate(old);
+            }
+
+            // Key light: 45° above, 30° from right, warm white
+            {
+                var go = new GameObject("KeyLight");
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.transform.rotation = Quaternion.Euler(45f, 30f, 0f);
+                light.intensity = 1.2f;
+                light.color = new Color(1f, 0.97f, 0.94f); // #FFF8F0
+                light.shadows = LightShadows.Soft;
+                light.shadowStrength = 0.3f;
+                light.shadowNormalBias = 0.4f;
+            }
+
+            // Fill light: 30° above, 150° from left, cool white (softens left shadows)
+            {
+                var go = new GameObject("FillLight");
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.transform.rotation = Quaternion.Euler(30f, 150f, 0f);
+                light.intensity = 0.4f;
+                light.color = new Color(0.94f, 0.96f, 1f); // #F0F4FF
+                light.shadows = LightShadows.None;
+            }
+
+            // Rim light: 10° above, behind the board, cyan tint (separates slab from bg)
+            {
+                var go = new GameObject("RimLight");
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Directional;
+                light.transform.rotation = Quaternion.Euler(10f, 0f, 0f);
+                light.intensity = 0.6f;
+                light.color = new Color(0f, 0.898f, 1f); // #00E5FF
+                light.shadows = LightShadows.None;
+            }
+
+            // ── Ambient: Trilight (§3.2) ──
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.039f, 0.059f, 0.165f);  // #0A1A2A
+            RenderSettings.ambientEquatorColor = new Color(0.039f, 0.086f, 0.039f); // #0A160A
+            RenderSettings.ambientGroundColor = new Color(0.008f, 0.031f, 0.008f); // #020802
         }
 
         private float ComputeOrthoSize()
@@ -238,19 +345,6 @@ private void SetupCamera()
                 go.transform.localPosition = new Vector3(0f, -halfH - tileSize * 0.35f, -0.04f);
                 var tmp = go.AddComponent<TMPro.TextMeshPro>();
                 tmp.text = "CHROMA-VALE REV 3";
-                tmp.fontSize = 3.5f;
-                tmp.color = ChromaPalette.SilkscreenLabel;
-                tmp.alignment = TMPro.TextAlignmentOptions.Center;
-                tmp.fontStyle = TMPro.FontStyles.Normal;
-            }
-
-            // "LEVEL 1" along top edge
-            {
-                var go = new GameObject("Silkscreen_BoardLabel_Top");
-                go.transform.SetParent(transform, false);
-                go.transform.localPosition = new Vector3(0f, halfH + tileSize * 0.35f, -0.04f);
-                var tmp = go.AddComponent<TMPro.TextMeshPro>();
-                tmp.text = "LEVEL 1";
                 tmp.fontSize = 3.5f;
                 tmp.color = ChromaPalette.SilkscreenLabel;
                 tmp.alignment = TMPro.TextAlignmentOptions.Center;

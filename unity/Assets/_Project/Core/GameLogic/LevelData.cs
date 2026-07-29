@@ -115,9 +115,15 @@ namespace ChromaVale.Core.GameLogic
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 2 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                // Reduced by 2: ghosts at (1,0) and (1,3) each save one Straight on the direct path.
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
                 TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
@@ -137,14 +143,20 @@ namespace ChromaVale.Core.GameLogic
             Targets = new[] { new LevelTarget { X = 4, Y = 0, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 2 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful Corner: shows the turn from vertical to horizontal at (1,0)
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                // Helpful Straight: completes the final horizontal run
+                new GhostTrace { X = 2, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
-                // FIX 2026-07-23: shortest legal route is 5 cells — (1,2)↑(1,1)↑(1,0)→(2,0)→(3,0):
-                // 2 elbows + 3 straights. Old inventory (2S+3E) was UNSOLVABLE since
-                // shape-aware flow landed (elbows can't substitute for straights).
-                // 6 pieces so a 5-piece solve still leaves 1 unused (star scoring).
+                // Reduced by 2: ghosts save Corner + Straight on the intended path.
+                // Player needs 3 Straights: (1,2)rot=0, (1,1)rot=90, (3,0)rot=0.
                 TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
             }
         };
 
@@ -175,10 +187,21 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 3, Y = 2 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on C0's bottom-row path toward target (4,4)
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Helpful: on C1's top-row path toward target (4,0)
+                new GhostTrace { X = 1, Y = 4, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: left-column centre, off both main paths — texture only
+                new GhostTrace { X = 0, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                // Reduced: ghosts save 2 Straights. CrossJunction still required for crossing.
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2),
                 TraceSegment.CrossJunction(2),
             }
         };
@@ -199,6 +222,16 @@ namespace ChromaVale.Core.GameLogic
             Targets = new[] { new LevelTarget { X = 4, Y = 2, ColorIndex = 0 } },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 3 }, new LevelObstacle { X = 2, Y = 1 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful cap-2: safe to route through, on the direct horizontal line
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: off-path texture ghost in the corner
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                // Neutral: additional texture
+                new GhostTrace { X = 4, Y = 0, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
@@ -235,8 +268,20 @@ namespace ChromaVale.Core.GameLogic
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 2 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on C0's horizontal route at row 1
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Helpful: on C1's horizontal route at row 3
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: decorative ghosts in corners — board texture
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 4, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
+                // Reduced: helpful ghosts save 2 Straights on the direct routes.
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
                 TraceSegment.Straight(1), TraceSegment.Straight(1),
                 TraceSegment.Corner(1), TraceSegment.Corner(1),
@@ -269,8 +314,19 @@ namespace ChromaVale.Core.GameLogic
                 new LevelSignalGate { X = 2, Y = 1, Direction = TraceDirection.Right },
                 new LevelSignalGate { X = 2, Y = 3, Direction = TraceDirection.Right },
             },
+            GhostTraces = new[]
+            {
+                // Helpful chain leading into the Diode bottleneck
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 1, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                // Neutral: texture ghost in far corner
+                new GhostTrace { X = 4, Y = 4, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
+                // Reduced: ghost chain saves 2 pieces. Diode + Repeater still required.
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
                 TraceSegment.Straight(1),
                 TraceSegment.Corner(1), TraceSegment.Corner(1),
@@ -300,11 +356,24 @@ namespace ChromaVale.Core.GameLogic
                 new LevelSignalGate { X = 2, Y = 1, Direction = TraceDirection.Right },
                 new LevelSignalGate { X = 2, Y = 3, Direction = TraceDirection.Up },
             },
+            GhostTraces = new[]
+            {
+                // Helpful: on the direct horizontal route
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: decorative corner, bottom-left
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                // MISLEADING: inviting upper-route chain that dead-ends at signal gate
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = System.Array.Empty<ImpedanceCell>(),
             Inventory = new[]
             {
+                // Upper ghosts are misleading — direct route still needs player pieces.
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Straight(1), TraceSegment.Straight(1),
-                TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.Straight(1),
+                TraceSegment.Corner(1),
             }
         };
 
@@ -331,13 +400,33 @@ namespace ChromaVale.Core.GameLogic
             },
             Obstacles = new[] { new LevelObstacle { X = 2, Y = 1 }, new LevelObstacle { X = 2, Y = 3 } },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on the bottom source's horizontal path
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Helpful: on the top source's horizontal path
+                new GhostTrace { X = 1, Y = 4, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: decorative texture
+                new GhostTrace { X = 0, Y = 2, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 0, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Misleading: looks helpful on the direct path, but leads through impedance at (2,2)
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                // Centre cell — shortest path for both sources crosses here.
+                // SignalStrength=3 − 1 = 2 > 0: signal survives, but a longer clean path also exists.
+                new ImpedanceCell { X = 2, Y = 2, ResistanceCost = 1 },
+            },
+            SignalStrength = 3,
             Inventory = new[]
             {
-                TraceSegment.Straight(2),
-                TraceSegment.Straight(1), TraceSegment.Straight(1),
+                // Reduced: helpful ghosts on rows 0/4 save pieces. Misleading ghost at (1,2) baits impedance shortcut.
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1),
                 TraceSegment.Corner(2), TraceSegment.Corner(2),
                 TraceSegment.Splitter(2),
-                TraceSegment.Repeater(), TraceSegment.Repeater(),
+                TraceSegment.Repeater(),
             }
         };
 
@@ -369,13 +458,29 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 3, Y = 2 }, new LevelObstacle { X = 3, Y = 3 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on the intended routes for each colour
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 4, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Neutral: decorative board texture
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 5, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                // Misleading: tempting shortcut ghosts that force expensive detours
+                new GhostTrace { X = 2, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 3, Y = 1, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Straight(1), TraceSegment.Straight(1),
-                TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.Corner(1),
                 TraceSegment.CrossJunction(2),
-                TraceSegment.Repeater(), TraceSegment.Repeater(),
+                TraceSegment.Repeater(),
             }
         };
 
@@ -408,10 +513,26 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 3, Y = 3 }, new LevelObstacle { X = 3, Y = 4 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on the direct path through the channel
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: corner texture ghosts
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 4, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                // Misleading: tempting upper/lower bypass routes through dead-end channels
+                new GhostTrace { X = 2, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 2, Y = 2, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2),
                 TraceSegment.Diode(2, TraceDirection.Right),
             }
         };
@@ -451,10 +572,27 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 3 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: on each colour's starting horizontal path
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 4, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Neutral: decorative side pieces
+                new GhostTrace { X = 0, Y = 2, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Misleading: centre-row ghosts that look like a shortcut but force impedance crossings
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 1, Y = 1, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 3, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2),
                 TraceSegment.Diode(2), TraceSegment.Diode(2),
             }
         };
@@ -486,10 +624,27 @@ namespace ChromaVale.Core.GameLogic
                 new LevelSignalGate { X = 0, Y = 2, Direction = TraceDirection.Up },
                 new LevelSignalGate { X = 4, Y = 2, Direction = TraceDirection.Down },
             },
+            GhostTraces = new[]
+            {
+                // Helpful: corners guiding turns toward signal-gate-enforced routes
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 3, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Neutral: decorative corners
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 4, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                // Misleading: inviting horizontal shortcuts that dead-end at signal gates
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 1, Y = 2, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 2, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
                 TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
                 TraceSegment.Diode(2, TraceDirection.Up),
             }
         };
@@ -524,10 +679,30 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 4 }, new LevelObstacle { X = 3, Y = 4 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: guiding the split from source toward both targets
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 1, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 5, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Neutral: board texture
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Misleading: inviting but suboptimal side paths
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 3, Y = 3, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 1, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2),
                 TraceSegment.Splitter(2),
                 TraceSegment.Diode(2, TraceDirection.Right),
             }
@@ -597,10 +772,31 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 3, Y = 2 }, new LevelObstacle { X = 3, Y = 3 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: guiding each colour along its intended outer route
+                new GhostTrace { X = 1, Y = 0, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 4, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 1, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                // Neutral: vertical board texture on edges
+                new GhostTrace { X = 0, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Misleading: centre ghosts that look like shortcuts through the obstacle cluster
+                new GhostTrace { X = 1, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 2, Y = 1, ResistanceCost = 1 },
+                new ImpedanceCell { X = 2, Y = 4, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(1), TraceSegment.Straight(1), TraceSegment.Straight(1), TraceSegment.Straight(1),
-                TraceSegment.Corner(1), TraceSegment.Corner(1), TraceSegment.Corner(1),
+                TraceSegment.Straight(1), TraceSegment.Straight(1), TraceSegment.Straight(1),
+                TraceSegment.Corner(1), TraceSegment.Corner(1),
                 TraceSegment.Diode(1), TraceSegment.Diode(1),
             }
         };
@@ -663,11 +859,34 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 4, Y = 1 }, new LevelObstacle { X = 4, Y = 5 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: safe cap-2 path along row 3
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 4, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                // Neutral: decorative texture
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 5, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Misleading: cap-1 shortcuts that look inviting but short under p=2
+                new GhostTrace { X = 2, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 1 },
+                new GhostTrace { X = 2, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 1 },
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 1, Y = 2, ResistanceCost = 1 },
+                new ImpedanceCell { X = 1, Y = 4, ResistanceCost = 1 },
+                new ImpedanceCell { X = 4, Y = 4, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Straight(1), TraceSegment.Straight(1),
-                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                // Reduced: helpful ghosts save pieces on the safe path. Cap-1 player pieces are burst-bait.
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Straight(1),
+                TraceSegment.Corner(2),
             }
         };
 
@@ -707,11 +926,32 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 4, Y = 1 }, new LevelObstacle { X = 4, Y = 5 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: safe cap-3 trace segments on the direct horizontal line (handle p=3)
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 3 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 3 },
+                new GhostTrace { X = 2, Y = 4, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 4, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                // Neutral: edge decoration
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 5, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 4, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Misleading: vertical ghost runs that look like bypass routes
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Neutral: decorative edge ghosts — damaged-board texture
+                new GhostTrace { X = 5, Y = 5, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 0, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 1, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 4, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                // FIX 2026-07-23: pressure=3 shorts cap-2 traces instantly (AddSignal(3,...) > cap=2).
-                // Changed all 4 straights to cap-3 so the direct route handles p3 flow.
-                // Amp remains as 3-star enabler (use 3 pipes instead of 4 for ≤60% efficiency).
                 TraceSegment.Straight(3), TraceSegment.Straight(3), TraceSegment.Straight(3), TraceSegment.Straight(3),
                 TraceSegment.Corner(2), TraceSegment.Corner(2),
                 TraceSegment.Repeater(),
@@ -771,6 +1011,30 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 4, Y = 2 }, new LevelObstacle { X = 4, Y = 4 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: guiding both loads toward the shared trunk line
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 3, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 1, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Neutral: decorative edge pieces
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 5, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 0, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Misleading: tempting dead-end branches off the trunk
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 3, Y = 2, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 4, ResistanceCost = 1 },
+                new ImpedanceCell { X = 1, Y = 4, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
                 TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
@@ -815,10 +1079,35 @@ namespace ChromaVale.Core.GameLogic
                 new LevelObstacle { X = 2, Y = 4 }, new LevelObstacle { X = 4, Y = 4 },
             },
             SignalGates = System.Array.Empty<LevelSignalGate>(),
+            GhostTraces = new[]
+            {
+                // Helpful: main magenta route
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 1, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                // Neutral: decorative board infrastructure
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 5, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 4, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                // Misleading: ghost paths that look viable but lead to contamination or dead ends
+                new GhostTrace { X = 2, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 2, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 4, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 4, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 2, Y = 0, ResistanceCost = 1 },
+                new ImpedanceCell { X = 3, Y = 4, ResistanceCost = 1 },
+                new ImpedanceCell { X = 1, Y = 2, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2),
                 TraceSegment.Breaker(),
             }
         };
@@ -864,10 +1153,42 @@ namespace ChromaVale.Core.GameLogic
                 new LevelSignalGate { X = 3, Y = 1, Direction = TraceDirection.Down },
                 new LevelSignalGate { X = 3, Y = 5, Direction = TraceDirection.Up },
             },
+            GhostTraces = new[]
+            {
+                // Helpful: guiding both colours through the crossing gauntlet
+                new GhostTrace { X = 1, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 1, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 4, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 2, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 2, Shape = SegmentShape.Corner, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 3, Y = 4, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                // Neutral: edge-laced board texture — the damaged-board fantasy
+                new GhostTrace { X = 0, Y = 0, Shape = SegmentShape.Corner, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 0, Y = 6, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 6, Y = 0, Shape = SegmentShape.Corner, Rotation = 270, Capacity = 2 },
+                new GhostTrace { X = 6, Y = 6, Shape = SegmentShape.Corner, Rotation = 180, Capacity = 2 },
+                new GhostTrace { X = 6, Y = 3, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                // Misleading: tempting centre-line ghosts that dead-end into the central obstacle
+                new GhostTrace { X = 1, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 2, Y = 3, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 1, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 4, Y = 5, Shape = SegmentShape.Straight, Rotation = 0, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 1, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+                new GhostTrace { X = 5, Y = 5, Shape = SegmentShape.Straight, Rotation = 90, Capacity = 2 },
+            },
+            ImpedanceCells = new[]
+            {
+                new ImpedanceCell { X = 1, Y = 2, ResistanceCost = 1 },
+                new ImpedanceCell { X = 4, Y = 2, ResistanceCost = 1 },
+                new ImpedanceCell { X = 1, Y = 4, ResistanceCost = 1 },
+                new ImpedanceCell { X = 4, Y = 4, ResistanceCost = 1 },
+            },
             Inventory = new[]
             {
-                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
-                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
+                TraceSegment.Straight(2), TraceSegment.Straight(2), TraceSegment.Straight(2),
+                TraceSegment.Corner(2), TraceSegment.Corner(2), TraceSegment.Corner(2),
                 TraceSegment.Diode(2), TraceSegment.Diode(2),
                 TraceSegment.Repeater(),
                 TraceSegment.Breaker(),

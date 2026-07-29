@@ -77,5 +77,14 @@ namespace ChromaVale.Presentation.Views.Components
 
         /// <summary>Silkscreen label opacity (12-18%).</summary>
         public static readonly Color SilkscreenLabel = new(0.9f, 0.9f, 0.85f, 0.15f);
+
+        // ── Legibility overhaul (2026-07-29) ─────────────────────────────
+
+        /// <summary>Dark oxidized ghost trace (#3A2A1A) — pre-etched, immovable, reads as "part of the board". Zero emission.</summary>
+        public static readonly Color GhostTraceCopper = new(0.227f, 0.165f, 0.102f);
+
+        /// <summary>Bright player-placed trace — raised, slight specular. Reads as "I put this here."
+        /// Brightened from #5C3A1E to #944E2A for contrast against PCB substrate in greyscale.</summary>
+        public static readonly Color PlayerTraceCopper = new(0.58f, 0.306f, 0.165f);
     }
 }

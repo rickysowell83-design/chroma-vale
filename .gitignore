@@ -60,3 +60,8 @@ Packages/packages-lock.json
 /harness/obj/
 /testrunner/bin/
 /testrunner/obj/
+
+# Unity editor logs (can reach multi-GB)
+unity_boot.log
+*.log
+Logs/

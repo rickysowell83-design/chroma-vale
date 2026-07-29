@@ -60,10 +60,10 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _traceMaterial = new Material(shader)
                     {
-                        color = ChromaPalette.CopperOxidized // Dark oxidized when idle
+                        color = ChromaPalette.CopperOxidized // #5C3A1E — overridden by MPB; player traces get PlayerTraceCopper
                     };
-                    _traceMaterial.SetFloat("_Metallic", 0.9f);
-                    _traceMaterial.SetFloat("_Smoothness", 0.4f);     // Matte copper, not glossy
+                    _traceMaterial.SetFloat("_Metallic", 0.85f);
+                    _traceMaterial.SetFloat("_Smoothness", 0.55f);     // Bright specular copper — overridden by MPB for ghost state
                     _traceMaterial.EnableKeyword("_EMISSION");
                     _traceMaterial.SetColor("_EmissionColor", Color.black); // Dead until flow
                     _traceMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
@@ -87,12 +87,12 @@ namespace ChromaVale.Presentation.Views.Components
 
                     _traceOxidizedMaterial = new Material(shader)
                     {
-                        color = ChromaPalette.CopperOxidized
+                        color = ChromaPalette.GhostTraceCopper  // Dark oxidized #3A2A1A — reads as "part of the board"
                     };
-                    _traceOxidizedMaterial.SetFloat("_Metallic", 0.6f);
-                    _traceOxidizedMaterial.SetFloat("_Smoothness", 0.15f);
+                    _traceOxidizedMaterial.SetFloat("_Metallic", 0.4f);   // Matte, non-reflective
+                    _traceOxidizedMaterial.SetFloat("_Smoothness", 0.1f); // Dull, recessed
                     _traceOxidizedMaterial.EnableKeyword("_EMISSION");
-                    _traceOxidizedMaterial.SetColor("_EmissionColor", new Color(0.1f, 0.05f, 0.02f));
+                    _traceOxidizedMaterial.SetColor("_EmissionColor", Color.black); // Zero emission — ghost traces are dead
                     _traceOxidizedMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
                 return _traceOxidizedMaterial;
