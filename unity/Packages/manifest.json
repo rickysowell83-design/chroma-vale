@@ -1,7 +1,14 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": ["com.demigiant"]
+    }
+  ],
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
-    "com.neuecc.unirx": "https://github.com/neuecc/UniRx.git?path=Assets/Plugins/UniRx/Scripts",
+
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.2d.spriteshape": "15.0.3",
     "com.unity.burst": "1.8.29",

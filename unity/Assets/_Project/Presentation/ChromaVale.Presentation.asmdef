@@ -5,6 +5,8 @@
     "ChromaVale.Core",
     "ChromaVale.Domain",
     "ChromaVale.Infrastructure",
+    "DOTween",
+    "DOTween.Modules",
     "Unity.InputSystem",
     "Unity.TextMeshPro"
   ],

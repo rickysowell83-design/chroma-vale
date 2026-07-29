@@ -13,10 +13,9 @@
 | Render Pipeline | URP (Universal Render Pipeline) 17.x |
 | Language | C# (.NET 8) |
 | DI / IoC | VContainer 1.16+ |
-| Reactive | UniRx |
-| Tweening | DOTween (manual import via Asset Store or UPM) |
+| Tweening | DOTween (installed via UnityPackage, OpenUPM scoped registry) |
 | Serialization | Newtonsoft.Json (Unity package) |
-| Testing | Unity Test Framework + NSubstitute |
+| Testing | Unity Test Framework + NUnit (hand-written fakes) |
 
 ## Architecture: Four-Layer Clean Design
 
@@ -96,7 +95,7 @@ Assets/_Project/
 - Object pool all frequently spawned objects (orbs, particles, pipe segments).
 - No `FindObjectOfType` or `GetComponent` in update loops.
 - No LINQ in hot paths (`.Where()`, `.Select()`, etc.) — use `for`/`foreach`.
-- UI updates via reactive streams (UniRx), not `Update()` polling.
+- UI updates via direct event subscription, not `Update()` polling.
 - Sprite Atlas for all 2D assets.
 
 ## What NOT to Do
@@ -106,8 +105,11 @@ Assets/_Project/
 - ❌ Direct scene references across scenes (use DI + addressables if needed).
 - ❌ Hardcoded strings for analytics events (use constants/enums).
 - ❌ MonoBehaviour inheritance chains deeper than 2 levels.
-- ❌ Coroutines for game logic (use UniRx streams or async/await).
-- ❌ `SendMessage` or `BroadcastMessage` — use C# events or UniRx.
+- ❌ SendMessage or BroadcastMessage — use C# events.
+
+## Animation Guidelines
+- **Use DOTween for all visual animation** (position, scale, alpha, color).
+- **Coroutines are acceptable for sequencing** (e.g., chaining tweens, flow simulation ticks).
 
 ## When Opening This Project in Unity
 

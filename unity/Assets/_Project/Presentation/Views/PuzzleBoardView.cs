@@ -6,6 +6,7 @@ using ChromaVale.Domain.Progression;
 using ChromaVale.Domain.PuzzleBoard;
 using ChromaVale.Infrastructure.Audio;
 using ChromaVale.Presentation.Views.Components;
+using DG.Tweening;
 using static ChromaVale.Presentation.Views.Components.ChromaPalette;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -25,18 +26,16 @@ namespace ChromaVale.Presentation.Views
         private SignalRouter _flowSim;
         private TraceInventory _inventory;
         private TileVisual[,] _renderers;
-        private Coroutine[,] _cellLerps;
         private LevelData _level;
         private LevelRepository _levelRepo = new();
         private int _maxLevel;
 
-        // Tutorial step system
-        private int _tutorialStep;
-        private Coroutine _typewriterCoroutine;
+        // Visual tutorial system (v2 §5) - hand-pointer
         private bool _hasPlacedFirstPiece;
-        // Tutorial guide arrow
-        private LineRenderer _tutorialGuideArrow;
-
+        private bool _tutorialActive;
+        private bool _handTransitioned;
+        private Coroutine _tutorialCoroutine;
+        private TutorialHandPointer _tutorialHandPointer;
 
         // Component references
         private GridBuilder _gridBuilder;
@@ -45,17 +44,14 @@ namespace ChromaVale.Presentation.Views
         private InventoryPanel _inventoryPanelComponent;
         private WinPopup _winPopupComponent;
         private EnvironmentBackdrop _envBackdrop;
-        private MusicDirector _musicDirector;
-        private CameraShake _cameraShake;
-        private ParticleFxService _particleFx;
+        private PiecePlacer _piecePlacer;
+private ParticleFxService _particleFx;
 
         // State
         private bool _solved;
         private int _moveCount;
         private int _starsEarned;
         private readonly Stack<(int x, int y, int pieceIdx)> _undoStack = new();
-
-        // Pending rotation applied when placing from inventory (rotate-before-place)
         private int _pendingRotation = 0;
 
         // Audio
@@ -65,10 +61,8 @@ namespace ChromaVale.Presentation.Views
         private void Start()
         {
             _maxLevel = _levelRepo.LevelCount;
-
             _audioService = AudioServiceInstaller.Instance;
 
-                        // HARD-LOCKED to Level 1 for pipeline test — ignore save data
             _levelNumber = 1;
             _level = _levelRepo.GetLevel(_levelNumber);
             _board = new GridBoard(_level);
@@ -79,9 +73,8 @@ namespace ChromaVale.Presentation.Views
             CreateComponents();
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
-            _cellLerps = new Coroutine[_board.Width, _board.Height];
+
             _envBackdrop.Build();
-            // KEPT for pipeline test — _musicDirector.StartMusic();
 
             WireEvents();
 
@@ -89,28 +82,20 @@ namespace ChromaVale.Presentation.Views
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
             _hudPanel.SetPieceCount(_inventory.AvailableCount);
             _inventoryPanelComponent.Bind(_inventory);
-
-            // FLOW button dimmed until at least one pipe is placed
             _flowButtonComponent.SetInteractable(false);
 
-            // STRIPPED — _musicDirector.PlayBeep(440f, 0.15f);
-
             if (_audioService != null) _audioService.PlaySound("level_start");
-
             StartCoroutine(PulseSources());
 
-            // Level 1 tutorial: pulse the source indicator emission
             if (_levelNumber == 1)
             {
                 foreach (var src in _level.Sources)
-                {
                     if (_renderers[src.X, src.Y] != null)
                         _renderers[src.X, src.Y].StartSourcePulse();
-                }
-            }
 
-            // Show initial tutorial hint for Level 1
-            ShowTutorialStep(0);
+                _tutorialActive = true;
+                _tutorialCoroutine = StartCoroutine(RunHandPointerTutorial());
+            }
         }
 
         private T CreateChildComponent<T>(string name) where T : MonoBehaviour
@@ -120,7 +105,7 @@ namespace ChromaVale.Presentation.Views
             return go.AddComponent<T>();
         }
 
-        private void CreateComponents()
+private void CreateComponents()
         {
             _gridBuilder = CreateChildComponent<GridBuilder>("GridBuilder");
             _hudPanel = CreateChildComponent<HudPanel>("HudPanel");
@@ -128,9 +113,10 @@ namespace ChromaVale.Presentation.Views
             _inventoryPanelComponent = CreateChildComponent<InventoryPanel>("InventoryPanel");
             _winPopupComponent = CreateChildComponent<WinPopup>("WinPopup");
             _envBackdrop = CreateChildComponent<EnvironmentBackdrop>("EnvironmentBackdrop");
-            // _musicDirector = CreateChildComponent<MusicDirector>("MusicDirector");
-            // _cameraShake = Camera.main.gameObject.AddComponent<CameraShake>();
+            _tutorialHandPointer = CreateChildComponent<TutorialHandPointer>("TutorialHandPointer");
             _particleFx = CreateChildComponent<ParticleFxService>("ParticleFxService");
+            // v3: PiecePlacer — manages Blender-authored prefab instantiation
+            _piecePlacer = CreateChildComponent<PiecePlacer>("PiecePlacer");
         }
 
         private void WireEvents()
@@ -152,181 +138,61 @@ namespace ChromaVale.Presentation.Views
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // TUTORIAL STEP SYSTEM
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
+        // HAND-POINTER TUTORIAL (v2 §5)
+        // ================================================================
 
-        /// <summary>
-        /// Show a contextual tutorial hint for the current step.
-        /// Each step displays a typewriter-style message appropriate to the player's progress.
-        /// </summary>
-        private void ShowTutorialStep(int step)
+        private IEnumerator RunHandPointerTutorial()
         {
-            if (_levelNumber != 1) return;
+            if (_level.Sources.Length == 0 || _level.Targets.Length == 0) yield break;
 
-            _tutorialStep = step;
+            yield return new WaitForSeconds(0.6f);
 
-            string hintText = step switch
+            // Step 1: Point at first inventory piece
+            PointHandAtInventorySlot(SegmentShape.Straight);
+
+            // Wait for player to pick a piece
+            while (!_hasPlacedFirstPiece && _tutorialActive)
             {
-                0 => "Drag traces to connect source to target",
-                1 => "Good. Now press ROUTE to test the circuit.",
-                _ => ""
-            };
-
-            if (!string.IsNullOrEmpty(hintText))
-            {
-                StartTypewriterHint(hintText);
-            }
-
-            // Show guide arrow when tutorial first appears
-            if (step == 0)
-            {
-                ShowTutorialGuideArrow();
-            }
-        }
-
-        /// <summary>
-        /// Show a dashed cyan guide arrow from source to target for tutorial.
-        /// Uses a world-space LineRenderer with animated dash offset.
-        /// </summary>
-        private void ShowTutorialGuideArrow()
-        {
-            if (_tutorialGuideArrow != null) return;
-            if (_level.Sources.Length == 0 || _level.Targets.Length == 0) return;
-
-            var src = _level.Sources[0];
-            var tgt = _level.Targets[0];
-            if (_renderers[src.X, src.Y] == null || _renderers[tgt.X, tgt.Y] == null) return;
-
-            var arrowGo = new GameObject("TutorialGuideArrow");
-            arrowGo.transform.SetParent(transform);
-            _tutorialGuideArrow = arrowGo.AddComponent<LineRenderer>();
-
-            // Use URP-compatible material
-            var mat = new Material(Shader.Find("Sprites/Default"));
-            mat.color = ChromaPalette.NeonCyan;
-            _tutorialGuideArrow.material = mat;
-            _tutorialGuideArrow.startWidth = 0.06f;
-            _tutorialGuideArrow.endWidth = 0.06f;
-            _tutorialGuideArrow.textureMode = LineTextureMode.Tile;
-            _tutorialGuideArrow.startColor = ChromaPalette.NeonCyan;
-            _tutorialGuideArrow.endColor = ChromaPalette.NeonCyan;
-
-            var srcPos = _renderers[src.X, src.Y].transform.position;
-            var tgtPos = _renderers[tgt.X, tgt.Y].transform.position;
-            // Offset Z slightly above the board
-            srcPos.z -= 0.3f;
-            tgtPos.z -= 0.3f;
-
-            _tutorialGuideArrow.positionCount = 2;
-            _tutorialGuideArrow.SetPosition(0, srcPos);
-            _tutorialGuideArrow.SetPosition(1, tgtPos);
-
-            // Start dash animation coroutine
-            StartCoroutine(AnimateGuideArrowDash());
-        }
-
-        /// <summary>
-        /// Animate the tutorial guide arrow with a moving dash pattern.
-        /// </summary>
-        private System.Collections.IEnumerator AnimateGuideArrowDash()
-        {
-            float dashSpeed = 1.5f;
-            float offset = 0f;
-            while (_tutorialGuideArrow != null && _tutorialGuideArrow.material != null)
-            {
-                offset += Time.deltaTime * dashSpeed;
-                _tutorialGuideArrow.material.mainTextureOffset = new Vector2(offset, 0);
-                // Pulse alpha for breathing effect
-                float alpha = 0.4f + 0.3f * Mathf.Sin(Time.time * 2f);
-                var c = _tutorialGuideArrow.startColor;
-                c.a = alpha;
-                _tutorialGuideArrow.startColor = c;
-                _tutorialGuideArrow.endColor = c;
-                yield return null;
-            }
-        }
-
-        /// <summary>
-        /// Hide and destroy the tutorial guide arrow.
-        /// </summary>
-        private void HideTutorialGuideArrow()
-        {
-            if (_tutorialGuideArrow != null)
-            {
-                Destroy(_tutorialGuideArrow.gameObject);
-                _tutorialGuideArrow = null;
-            }
-        }
-
-
-        /// <summary>
-        /// Display hint text with a typewriter character-reveal effect over ~1 second.
-        /// </summary>
-        private void StartTypewriterHint(string text)
-        {
-            if (_typewriterCoroutine != null)
-                StopCoroutine(_typewriterCoroutine);
-            _typewriterCoroutine = StartCoroutine(TypewriterEffect(text));
-        }
-
-        private IEnumerator TypewriterEffect(string fullText)
-        {
-            float totalDuration = 1.0f;
-            int totalChars = fullText.Length;
-            float delayPerChar = totalDuration / totalChars;
-            string currentText = "";
-
-            for (int i = 0; i <= totalChars; i++)
-            {
-                currentText = fullText.Substring(0, i);
-                _hudPanel.ShowHint(currentText + (i < totalChars ? "<color=#80808080>\u258C</color>" : ""));
-                yield return new WaitForSeconds(delayPerChar);
-            }
-
-            // Full text without cursor blink
-            _hudPanel.ShowHint(fullText);
-            _typewriterCoroutine = null;
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-
-
-
-        private IEnumerator PulseSources()
-        {
-            while (!_solved)
-            {
-                foreach (var src in _level.Sources)
+                if (_inventoryPanelComponent.SelectedPieceIndex >= 0 && !_handTransitioned)
                 {
-                    if (_renderers[src.X, src.Y] != null)
-                    {
-                        var sr = _renderers[src.X, src.Y];
-                        sr.transform.localScale = Vector3.one * 1.25f;
-                    }
+                    _handTransitioned = true;
+                    yield return new WaitForSeconds(0.15f);
+                    PointHandAtBoardCell(2, 1);
                 }
-                yield return new WaitForSeconds(0.6f);
-                foreach (var src in _level.Sources)
-                {
-                    if (_renderers[src.X, src.Y] != null)
-                    {
-                        var sr = _renderers[src.X, src.Y];
-                        sr.transform.localScale = Vector3.one;
-                    }
-                }
-                yield return new WaitForSeconds(0.6f);
+                yield return new WaitForSeconds(0.2f);
             }
+
+            // Step 4: Fade out after first placement
+            if (_tutorialHandPointer != null)
+                _tutorialHandPointer.FadeOut();
+            _tutorialActive = false;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // INPUT — Piece Placement
-        // ═══════════════════════════════════════════════════════════════
+        private void PointHandAtInventorySlot(SegmentShape shape)
+        {
+            if (_tutorialHandPointer == null) return;
+            Vector2 screenPos = new Vector2(Screen.width * 0.22f, Screen.height * 0.10f);
+            _tutorialHandPointer.PointAt(screenPos, "PICK THIS", false);
+            _inventoryPanelComponent.SelectPieceForTutorial(shape);
+        }
+
+        private void PointHandAtBoardCell(int x, int y)
+        {
+            if (_tutorialHandPointer == null || _renderers[x, y] == null) return;
+            Vector3 worldPos = _renderers[x, y].transform.position;
+            Vector3 screenPos3 = Camera.main.WorldToScreenPoint(worldPos);
+            Vector2 screenPos = new Vector2(screenPos3.x - Screen.width * 0.5f, screenPos3.y - Screen.height * 0.5f);
+            _tutorialHandPointer.TransitionTo(screenPos, "PLACE HERE", true);
+        }
+
+        // ================================================================
+        // INPUT
+        // ================================================================
 
         public void OnPointerDown(int x, int y)
         {
-            if (_solved) return;
-            if (_flowSim.IsRunning) return;
-
+            if (_solved || _flowSim.IsRunning) return;
             var cell = _board.GetCell(x, y);
 
             int existingIdx = _inventory.GetPieceIndexAt(x, y);
@@ -337,149 +203,115 @@ namespace ChromaVale.Presentation.Views
             }
 
             if (cell.Type == CellType.Empty && _inventoryPanelComponent.SelectedPieceIndex >= 0)
-            {
                 PlaceSelectedPiece(x, y);
-            }
         }
 
         public void OnRightClick()
         {
-            if (_solved) return;
-            if (_flowSim.IsRunning) return;
+            if (_solved || _flowSim.IsRunning) return;
             UndoPlacement();
         }
 
         private void Update()
         {
-            // Scroll to rotate the pending piece before placement
             if (_solved || _flowSim == null || _flowSim.IsRunning) return;
-
             if (_inventoryPanelComponent.SelectedPieceIndex >= 0)
             {
                 float scrollDelta = Mouse.current.scroll.ReadValue().y;
-                if (scrollDelta > 0f)
-                {
-                    _pendingRotation = (_pendingRotation + 90) % 360;
-                    _inventoryPanelComponent.SetPendingRotation(_pendingRotation);
-                }
-                else if (scrollDelta < 0f)
-                {
-                    _pendingRotation = (_pendingRotation - 90 + 360) % 360;
-                    _inventoryPanelComponent.SetPendingRotation(_pendingRotation);
-                }
+                if (scrollDelta > 0f) { _pendingRotation = (_pendingRotation + 90) % 360; _inventoryPanelComponent.SetPendingRotation(_pendingRotation); }
+                else if (scrollDelta < 0f) { _pendingRotation = (_pendingRotation - 90 + 360) % 360; _inventoryPanelComponent.SetPendingRotation(_pendingRotation); }
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // PLACEMENT PREVIEW GHOST
-        // ═══════════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Called by TileClickHandler when the pointer enters a tile cell.
-        /// If a piece is selected from the inventory and the cell is empty,
-        /// shows a translucent preview ghost of the pipe at this tile.
-        /// </summary>
         public void OnTileHover(int x, int y)
         {
-            if (_solved) return;
-            if (_flowSim == null || _flowSim.IsRunning) return;
-            if (_inventoryPanelComponent == null) return;
+            if (_solved || _flowSim == null || _flowSim.IsRunning) return;
+            if (_inventoryPanelComponent == null || _inventory == null) return;
             if (_renderers == null || x < 0 || y < 0 || x >= _renderers.GetLength(0) || y >= _renderers.GetLength(1)) return;
-            if (_inventory == null) return;
 
             int selIdx = _inventoryPanelComponent.SelectedPieceIndex;
             if (selIdx < 0) return;
-
             var cell = _board.GetCell(x, y);
             if (cell.Type != CellType.Empty) return;
 
             var piece = _inventory.Pieces[selIdx];
             if (_renderers[x, y] != null)
-            {
                 _renderers[x, y].ShowPlacementPreview(piece.Shape, _pendingRotation);
-            }
         }
 
-        /// <summary>
-        /// Called by TileClickHandler when the pointer exits a tile cell.
-        /// Hides the placement preview ghost on this tile.
-        /// </summary>
         public void OnTileHoverExit(int x, int y)
         {
             if (_renderers == null || x < 0 || y < 0 || x >= _renderers.GetLength(0) || y >= _renderers.GetLength(1)) return;
-            if (_renderers[x, y] != null)
-            {
-                _renderers[x, y].HidePlacementPreview();
-            }
+            if (_renderers[x, y] != null) _renderers[x, y].HidePlacementPreview();
         }
 
-        private void RotatePlacement(int x, int y, int pieceIdx)
+private void RotatePlacement(int x, int y, int pieceIdx)
         {
             var piece = _inventory.GetPieceAt(x, y);
             if (piece == null) return;
-
             piece.Rotate();
-
             _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
-            // Show copper idle (no glow) between rotations
-            _renderers[x, y].Color = ChromaPalette.CopperDark;
+            _renderers[x, y].Color = ChromaPalette.PlayerTraceCopper; // Bright copper #5C3A1E
+            if (_flowSim != null) _flowSim.SetTraceShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
 
-            if (_flowSim != null)
+            // v3: Update prefab piece rotation (remove old, place new)
+            if (_piecePlacer != null)
             {
-                _flowSim.SetTraceShape(x, y, piece.Shape, piece.Direction, piece.Rotation);
+                _piecePlacer.RemovePieceAtCell(x, y);
+                _cellPieceInfo[(x, y)] = (piece.Shape, piece.Rotation);
+                _piecePlacer.PlacePieceAtCell(
+                    piece.Shape, piece.Rotation, x, y,
+                    _renderers[x, y].transform.position, _gridBuilder.transform);
             }
 
-            StartCoroutine(PopAnim(_renderers[x, y].transform));
+            _renderers[x, y].transform.DOPunchScale(Vector3.one * 0.3f, 0.12f, 1, 0f);
         }
 
-        private void PlaceSelectedPiece(int x, int y)
+private void PlaceSelectedPiece(int x, int y)
         {
             int selIdx = _inventoryPanelComponent.SelectedPieceIndex;
             if (selIdx < 0) return;
 
             bool placed = _inventory.TryPlace(selIdx, _board, x, y, _flowSim, rotation: _pendingRotation);
-            if (placed)
+            if (!placed) return;
+
+            _undoStack.Push((x, y, selIdx));
+            _moveCount++;
+            _hudPanel.SetMoves(_moveCount);
+            _renderers[x, y].Color = ChromaPalette.PlayerTraceCopper; // Bright copper #5C3A1E — player placed
+            var piece = _inventory.GetPieceAt(x, y);
+            if (piece != null)
             {
-                _undoStack.Push((x, y, selIdx));
-                _moveCount++;
-                _hudPanel.SetMoves(_moveCount);
-                _renderers[x, y].Color = ChromaPalette.CopperDark; // Copper idle — neon flows later
-                var piece = _inventory.GetPieceAt(x, y);
-                if (piece != null) _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
-                StartCoroutine(PopAnim(_renderers[x, y].transform));
-                _inventoryPanelComponent.Refresh();
-                _inventoryPanelComponent.ClearSelection();
-                _pendingRotation = 0;
-                _inventoryPanelComponent.SetPendingRotation(0);
-
-                // Enable FLOW button now that at least one pipe is on the board
-                _flowButtonComponent.SetInteractable(true);
-                _hudPanel.SetPieceCount(_inventory.AvailableCount);
-
-                // Tutorial step advancement
-                if (!_hasPlacedFirstPiece && _levelNumber == 1)
+                _renderers[x, y].SetShape(piece.Shape, piece.Rotation);
+                // v3: Instantiate Blender-authored prefab piece
+                if (_piecePlacer != null)
                 {
-                    _hasPlacedFirstPiece = true;
-                    HideTutorialGuideArrow();
-
-                    ShowTutorialStep(1);
-                }
-                else
-                {
-                    _hudPanel.HideHint();
-                }
-
-                if (_audioService != null) _audioService.PlaySound("pipe_place");
-                // STRIPPED — _musicDirector.PlayBeep(660f, 0.08f);
-                if (_particleFx != null)
-                    _particleFx.PlacementPuff(_renderers[x, y].transform.position, GetPipeColor(0));
-                if (_cameraShake != null) _cameraShake.Shake(0.06f, 0.05f);
-
-                if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
-                {
-                    StartCoroutine(RunFlowSimulation());
+                    _cellPieceInfo[(x, y)] = (piece.Shape, piece.Rotation);
+                    _piecePlacer.PlacePieceAtCell(
+                        piece.Shape, piece.Rotation, x, y,
+                        _renderers[x, y].transform.position, _gridBuilder.transform);
                 }
             }
+            _renderers[x, y].transform.DOPunchScale(Vector3.one * 0.3f, 0.12f, 1, 0f);
+            _inventoryPanelComponent.Refresh();
+            _inventoryPanelComponent.ClearSelection();
+            _pendingRotation = 0;
+            _inventoryPanelComponent.SetPendingRotation(0);
+
+            _flowButtonComponent.SetInteractable(true);
+            _hudPanel.SetPieceCount(_inventory.AvailableCount);
+
+            if (!_hasPlacedFirstPiece && _levelNumber == 1)
+            {
+                _hasPlacedFirstPiece = true;
+                _handTransitioned = false; // reset for next piece cycle
+            }
+
+            if (_audioService != null) _audioService.PlaySound("pipe_place");
+            if (_particleFx != null) _particleFx.PlacementPuff(_renderers[x, y].transform.position, GetPipeColor(0));
+
+            if (!_solved && !_flowSim.IsRunning && CheckAllConnected())
+                StartCoroutine(RunFlowSimulation());
         }
 
         private bool CheckAllConnected()
@@ -493,57 +325,57 @@ namespace ChromaVale.Presentation.Views
                 foreach (var tgt in _level.Targets)
                 {
                     if (tgt.ColorIndex != src.ColorIndex) continue;
-                    if (router.IsPathConnected(srcX, srcY, tgt.X, tgt.Y))
-                    {
-                        foundPath = true;
-                        break;
-                    }
+                    if (router.IsPathConnected(srcX, srcY, tgt.X, tgt.Y)) { foundPath = true; break; }
                 }
                 if (!foundPath) return false;
             }
             return true;
         }
 
-        private void UndoPlacement()
+private void UndoPlacement()
         {
             if (_undoStack.Count == 0) return;
             var top = _undoStack.Peek();
             int x = top.x, y = top.y;
 
-            bool undone = _inventory.TryUndo(_board);
-            if (undone)
+            if (!_inventory.TryUndo(_board)) return;
+
+            _renderers[x, y].ClearShape();
+            _renderers[x, y].Color = DarkTile;
+
+            // v3: Remove prefab piece
+            _piecePlacer?.RemovePieceAtCell(x, y);
+            _cellPieceInfo.Remove((x, y));
+
+            _moveCount = Mathf.Max(0, _moveCount - 1);
+            _hudPanel.SetMoves(_moveCount);
+            _hudPanel.SetPieceCount(_inventory.AvailableCount);
+            _inventoryPanelComponent.Refresh();
+            _undoStack.Pop();
+            if (_audioService != null) _audioService.PlaySound("undo");
+
+            if (_undoStack.Count == 0 && _levelNumber == 1)
             {
-                _renderers[x, y].ClearShape();
-                _renderers[x, y].Color = DarkTile;
-                _moveCount = Mathf.Max(0, _moveCount - 1);
-                _hudPanel.SetMoves(_moveCount);
-                _hudPanel.SetPieceCount(_inventory.AvailableCount);
-                _inventoryPanelComponent.Refresh();
-                _undoStack.Pop();
-                if (_audioService != null) _audioService.PlaySound("undo");
-
-                // Reset tutorial step if player undid first piece
-                if (_undoStack.Count == 0 && _levelNumber == 1)
+                _hasPlacedFirstPiece = false;
+                _handTransitioned = false;
+                if (!_tutorialActive)
                 {
-                    _hasPlacedFirstPiece = false;
-                    _tutorialStep = 0;
+                    _tutorialActive = true;
+                    _tutorialCoroutine = StartCoroutine(RunHandPointerTutorial());
                 }
-
-                // Re-dim FLOW button if no pipes left on board
-                if (_undoStack.Count == 0)
-                    _flowButtonComponent.SetInteractable(false);
             }
+
+            if (_undoStack.Count == 0)
+                _flowButtonComponent.SetInteractable(false);
         }
 
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
         // FLOW SIMULATION
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
 
         public void OnRouteButtonPressed()
         {
-            if (_solved || _flowSim.IsRunning) return;
-            if (_inventory.PlacedCount == 0) return;
-
+            if (_solved || _flowSim.IsRunning || _inventory.PlacedCount == 0) return;
             StartCoroutine(RunFlowSimulation());
         }
 
@@ -559,12 +391,9 @@ namespace ChromaVale.Presentation.Views
 
             _flowSim.StartSimulation(_board, _level, _inventory);
 
-            // Pulse flow-head at each source to signal simulation start
             if (_particleFx != null)
-            {
                 foreach (var src in _level.Sources)
                     _particleFx.FlowHeadPulse(_renderers[src.X, src.Y].transform.position, GetPipeColor(src.ColorIndex));
-            }
 
             while (_flowSim.GetResult() == SimulationResult.InProgress)
             {
@@ -581,11 +410,7 @@ namespace ChromaVale.Presentation.Views
             if (result == SimulationResult.AllTargetsReached)
             {
                 _solved = true;
-                // STRIPPED — _musicDirector.PlayBeep(880f, 0.3f);
                 _starsEarned = ScoreCalculator.Calculate(_inventory, _flowSim, _level);
-                // HARD-LOCKED: skip save for pipeline test
-                // if (SaveGameManager.Instance != null)
-                //     SaveGameManager.Instance.RecordLevelComplete(_levelNumber, _starsEarned);
                 if (_particleFx != null)
                 {
                     var positions = _level.Targets.Select(t => _renderers[t.X, t.Y].transform.position).ToArray();
@@ -606,21 +431,29 @@ namespace ChromaVale.Presentation.Views
             _inventoryPanelComponent.SetLocked(false);
         }
 
-        private void HandleFlowAdvance(int x, int y, int colorIndex)
+private void HandleFlowAdvance(int x, int y, int colorIndex)
         {
             if (_renderers[x, y] != null)
             {
-                // Stop any existing lerp on this cell — re-entrant safety
-                if (_cellLerps[x, y] != null)
-                    StopCoroutine(_cellLerps[x, y]);
-                _cellLerps[x, y] = StartCoroutine(FlowLerpAnim(_renderers[x, y], DarkTile, GetPipeColor(colorIndex)));
+                var tv = _renderers[x, y];
+                var originalScale = tv.transform.localScale;
+                tv.SetFlowIdle();
+                tv.SetFlowActive(GetPipeColor(colorIndex));
+                tv.transform.DOScale(originalScale * 1.15f, 0.075f)
+                    .SetEase(Ease.OutQuad)
+                    .OnComplete(() => tv.transform.DOScale(originalScale, 0.075f).SetEase(Ease.OutQuad));
+
+                // v3: Swap dormant prefab for active (emissive) variant
+                if (_piecePlacer != null && _cellPieceInfo.TryGetValue((x, y), out var info))
+                {
+                    _piecePlacer.ActivatePieceAtCell(x, y, info.shape, info.rotation, _gridBuilder.transform);
+                }
             }
             if (_audioService != null && Time.realtimeSinceStartup - _lastFlowTickSoundTime >= 0.1f)
             {
                 _audioService.PlaySound("flow_tick");
                 _lastFlowTickSoundTime = Time.realtimeSinceStartup;
             }
-            // NEW: Flow-head particle pulse at the wave-front cell
             if (_particleFx != null)
                 _particleFx.FlowHeadPulse(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
         }
@@ -630,22 +463,22 @@ namespace ChromaVale.Presentation.Views
             if (_renderers[x, y] != null)
             {
                 _renderers[x, y].Color = new Color(0.5f, 0.1f, 0.05f);
-                StartCoroutine(BurstAnim(_renderers[x, y].transform));
-                if (_particleFx != null)
-                    _particleFx.BurstExplosion(_renderers[x, y].transform.position);
+                            _renderers[x, y].transform.DOShakePosition(0.4f, 0.15f, 10, 90f, false, true);
+                if (_particleFx != null) _particleFx.BurstExplosion(_renderers[x, y].transform.position);
             }
             _inventory.MarkShorted(x, y);
             if (_audioService != null) _audioService.PlaySound("pipe_burst");
-            if (_cameraShake != null) _cameraShake.Shake(0.25f, 0.30f);
         }
 
         private void HandleColorMix(int x, int y, int colorA, int colorB)
         {
             if (_renderers[x, y] != null)
             {
-                StartCoroutine(MixFlashAnim(_renderers[x, y]));
-                if (_particleFx != null)
-                    _particleFx.MixSwirl(_renderers[x, y].transform.position, GetPipeColor(colorA), GetPipeColor(colorB));
+                var tv = _renderers[x, y];
+                var orig = tv.Color;
+                tv.Color = Color.white;
+                DOTween.To(() => tv.Color, c => tv.Color = c, orig, 0.1f);
+                if (_particleFx != null) _particleFx.MixSwirl(_renderers[x, y].transform.position, GetPipeColor(colorA), GetPipeColor(colorB));
             }
             if (_audioService != null) _audioService.PlaySound("color_mix");
         }
@@ -654,7 +487,17 @@ namespace ChromaVale.Presentation.Views
         {
             if (_renderers[x, y] != null)
             {
-                StartCoroutine(TargetBloomAnim(_renderers[x, y], colorIndex));
+                var tv = _renderers[x, y];
+                var targetColor = GetPipeColor(colorIndex);
+                var origScale = tv.transform.localScale;
+                var origColor = tv.Color;
+                DOTween.To(() => tv.Color, c => tv.Color = c, targetColor * 1.5f, 0.5f).SetEase(Ease.OutQuad);
+                tv.transform.DOScale(origScale * 1.5f, 0.5f).SetEase(Ease.OutQuad)
+                    .OnComplete(() =>
+                    {
+                        tv.Color = targetColor;
+                        tv.transform.localScale = origScale;
+                    });
                 if (_particleFx != null)
                 {
                     _particleFx.TargetBloom(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
@@ -664,175 +507,103 @@ namespace ChromaVale.Presentation.Views
             if (_audioService != null) _audioService.PlaySound("target_reached");
         }
 
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
         // WIN / RESET / LEVEL PROGRESSION
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
 
-        public void ResetPuzzle()
-        {
-            LoadLevel(_levelNumber);
-        }
-
-        private void AdvanceLevel()
-        {
-            // HARD-LOCKED for pipeline test — always reload Level 1
-            LoadLevel(1);
-        }
+        public void ResetPuzzle() { LoadLevel(_levelNumber); }
+        private void AdvanceLevel() { LoadLevel(1); }
 
         private void LoadLevel(int levelNum)
         {
             StopAllCoroutines();
             _gridBuilder.Clear();
 
-            // Reset tutorial state
-            _tutorialStep = 0;
+            _tutorialActive = false;
             _hasPlacedFirstPiece = false;
-            _typewriterCoroutine = null;
-            HideTutorialGuideArrow();
+            _handTransitioned = false;
+            if (_tutorialHandPointer != null) _tutorialHandPointer.Hide();
 
             _solved = false;
             _moveCount = 0;
             _starsEarned = 0;
             _pendingRotation = 0;
             _undoStack.Clear();
+            _cellPieceInfo.Clear();
+            _piecePlacer?.ClearAllPieces();
             _winPopupComponent.Hide();
 
             _levelNumber = levelNum;
             _level = _levelRepo.GetLevel(_levelNumber);
-
             _board = new GridBoard(_level);
             _flowSim = new SignalRouter();
             _inventory = new TraceInventory(_level.Inventory);
 
             _renderers = _gridBuilder.Build(_level, _board, _tileSize, this);
-            _cellLerps = new Coroutine[_board.Width, _board.Height];
 
             _hudPanel.SetMoves(0);
             _hudPanel.SetLevel(_levelNumber, _maxLevel);
             _hudPanel.SetPieceCount(_inventory.AvailableCount);
             _inventoryPanelComponent.Bind(_inventory);
-            _flowButtonComponent.SetInteractable(false);  // Dimmed until first pipe placed
+            _flowButtonComponent.SetInteractable(false);
             _inventoryPanelComponent.SetLocked(false);
 
-            // Show contextual tutorial for level 1 using the level's DisplayName
-            if (_levelNumber == 1)
-            {
-                ShowTutorialStep(0);
-            }
-            else
-            {
-                _hudPanel.HideHint();
-            }
-
-            // Level 1 tutorial: pulse the source indicator emission
             if (_levelNumber == 1)
             {
                 foreach (var src in _level.Sources)
-                {
                     if (_renderers[src.X, src.Y] != null)
                         _renderers[src.X, src.Y].StartSourcePulse();
-                }
+
+                _tutorialActive = true;
+                _tutorialCoroutine = StartCoroutine(RunHandPointerTutorial());
             }
 
             StartCoroutine(PulseSources());
         }
 
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
         // COLOR HELPERS
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
 
         private Color GetPipeColor(int ci) => ci switch
         {
-            0 => NeonCyan,
-            1 => NeonMagenta,
-            2 => NeonYellow,
-            3 => NeonOrange,
-            4 => NeonPurple,
-            5 => NeonRed,
-            6 => NeonPurple,
-            7 => NeonGreen,
-            8 => NeonOrange,
-            9 => new Color(0.4f, 0.25f, 0.1f), // Brown
-            _ => NeonCyan
+            0 => NeonCyan, 1 => NeonMagenta, 2 => NeonYellow, 3 => NeonOrange,
+            4 => NeonPurple, 5 => NeonRed, 6 => NeonPurple, 7 => NeonGreen,
+            8 => NeonOrange, 9 => new Color(0.4f, 0.25f, 0.1f), _ => NeonCyan
         };
 
-        // ═══════════════════════════════════════════════════════════════
+// ── PiecePlacer-aware helpers ───────────────────────────────────
+        /// <summary>
+        /// Track cell→(shape, rotation) for prefab activation during flow.
+        /// </summary>
+        private readonly System.Collections.Generic.Dictionary<(int x, int y), (SegmentShape shape, int rotation)> _cellPieceInfo = new();
+
+
+        // ================================================================
         // ANIMATIONS
-        // ═══════════════════════════════════════════════════════════════
+        // ================================================================
 
-        private IEnumerator PopAnim(Transform t)
+        private IEnumerator PulseSources()
         {
-            float d = 0.12f, e = 0f;
-            var o = t.localScale;
-            while (e < d) { e += Time.deltaTime; t.localScale = o * (1f + Mathf.Sin(e / d * Mathf.PI) * 0.3f); yield return null; }
-            t.localScale = o;
-        }
-
-        private IEnumerator FlowPulseAnim(Transform t)
-        {
-            float d = 0.15f, e = 0f;
-            var o = t.localScale;
-            while (e < d) { e += Time.deltaTime; t.localScale = o * (1f + Mathf.Sin(e / d * Mathf.PI) * 0.2f); yield return null; }
-            t.localScale = o;
-        }
-
-        private IEnumerator FlowLerpAnim(TileVisual tv, Color fromColor, Color toColor)
-        {
-            float duration = 0.15f;
-            float elapsed = 0f;
-            var originalScale = tv.transform.localScale;
-            tv.SetFlowIdle();
-            tv.SetFlowActive(toColor);
-
-            while (elapsed < duration)
+            while (!_solved)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                // Scale pulse: 1.15x at start → 1.0x at end
-                float scaleT = 1f + 0.15f * (1f - t);
-                tv.transform.localScale = originalScale * scaleT;
-                yield return null;
+                foreach (var src in _level.Sources)
+                    if (_renderers[src.X, src.Y] != null)
+                        _renderers[src.X, src.Y].transform.localScale = Vector3.one * 1.25f;
+                yield return new WaitForSeconds(0.6f);
+                foreach (var src in _level.Sources)
+                    if (_renderers[src.X, src.Y] != null)
+                        _renderers[src.X, src.Y].transform.localScale = Vector3.one;
+                yield return new WaitForSeconds(0.6f);
             }
-
-            tv.transform.localScale = originalScale;
         }
 
-        private IEnumerator BurstAnim(Transform t)
+private IEnumerator FlashFailure()
         {
-            float d = 0.4f, e = 0f;
-            var orig = t.localPosition;
-            while (e < d) { e += Time.deltaTime; t.localPosition = orig + new Vector3(Random.Range(-0.15f, 0.15f), Random.Range(-0.15f, 0.15f), 0); yield return null; }
-            t.localPosition = orig;
-        }
+            // v3: Clear all prefab pieces on failure (they'll be rebuilt on next placement)
+            _piecePlacer?.ClearAllPieces();
+            _cellPieceInfo.Clear();
 
-        private IEnumerator MixFlashAnim(TileVisual tv)
-        {
-            var orig = tv.Color;
-            tv.Color = Color.white;
-            yield return new WaitForSeconds(0.1f);
-            tv.Color = orig;
-        }
-
-        private IEnumerator TargetBloomAnim(TileVisual tv, int colorIndex)
-        {
-            var targetColor = GetPipeColor(colorIndex);
-            float d = 0.5f, e = 0f;
-            var o = tv.transform.localScale;
-            var origColor = tv.Color;
-            while (e < d)
-            {
-                e += Time.deltaTime;
-                float t = e / d;
-                tv.Color = Color.Lerp(origColor, targetColor * 1.5f, t);
-                tv.transform.localScale = o * (1f + t * 0.5f);
-                yield return null;
-            }
-            tv.Color = targetColor;
-            tv.transform.localScale = o;
-        }
-
-        private IEnumerator FlashFailure()
-        {
             float d = 0.6f;
             for (int x = 0; x < _board.Width; x++)
                 for (int y = 0; y < _board.Height; y++)
@@ -856,6 +627,5 @@ namespace ChromaVale.Presentation.Views
                     };
                 }
         }
-
     }
 }
