@@ -665,9 +665,10 @@ private void ApplyColor()
 
             if (_baseRenderer != null)
             {
-                var slabMpb = new MaterialPropertyBlock();
-                slabMpb.SetColor("_EmissionColor", Color.black);
-                _baseRenderer.SetPropertyBlock(slabMpb);
+                if (_slabMpb == null)
+                    _slabMpb = new MaterialPropertyBlock();
+                _slabMpb.SetColor("_EmissionColor", Color.black);
+                _baseRenderer.SetPropertyBlock(_slabMpb);
             }
 
             if (_traceRoot != null)
@@ -716,6 +717,11 @@ private void ApplyColor()
             var viaRend = viaCenter.GetComponent<MeshRenderer>();
             if (viaRend == null) yield break;
 
+            // Cache MaterialPropertyBlocks once — avoids per-frame GPU allocation spam
+            var viaMpb = new MaterialPropertyBlock();
+            var haloMpb = new MaterialPropertyBlock();
+            var pinMpb = new MaterialPropertyBlock();
+
             Color pulseColor = ChromaPalette.ViaCyan;
             // 1.0→1.4 sine wave, 1.5s cycle per spec
             float pulsePeriod = 1.5f;
@@ -728,19 +734,21 @@ private void ApplyColor()
                 // Via center pulses: emission intensity 1.0→1.4 (spec)
                 float viaIntensity = Mathf.Lerp(1.0f, 1.4f, t);
 
-                if (viaRend != null && viaRend.sharedMaterial != null)
+                if (viaRend != null)
                 {
-                    viaRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * viaIntensity);
+                    viaMpb.SetColor("_EmissionColor", pulseColor * viaIntensity);
+                    viaRend.SetPropertyBlock(viaMpb);
                 }
 
                 // Pulse halo bloom
                 if (halo != null)
                 {
                     var haloRend = halo.GetComponent<MeshRenderer>();
-                    if (haloRend != null && haloRend.sharedMaterial != null)
+                    if (haloRend != null)
                     {
                         float haloIntensity = Mathf.Lerp(2.0f, 4.0f, t);
-                        haloRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * haloIntensity);
+                        haloMpb.SetColor("_EmissionColor", pulseColor * haloIntensity);
+                        haloRend.SetPropertyBlock(haloMpb);
                     }
                 }
 
@@ -748,10 +756,11 @@ private void ApplyColor()
                 if (centerPin != null)
                 {
                     var pinRend = centerPin.GetComponent<MeshRenderer>();
-                    if (pinRend != null && pinRend.sharedMaterial != null)
+                    if (pinRend != null)
                     {
                         float pinIntensity = Mathf.Lerp(10f, 18f, t);
-                        pinRend.sharedMaterial.SetColor("_EmissionColor", pulseColor * pinIntensity);
+                        pinMpb.SetColor("_EmissionColor", pulseColor * pinIntensity);
+                        pinRend.SetPropertyBlock(pinMpb);
                     }
                 }
 

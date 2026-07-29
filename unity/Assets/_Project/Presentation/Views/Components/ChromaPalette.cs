@@ -43,7 +43,7 @@ namespace ChromaVale.Presentation.Views.Components
         // ── v3 Mockup PCB Palette ────────────────────────────────────────
 
         /// <summary>PCB substrate dark green (#0A160A) — boosted for orthographic visibility.</summary>
-        public static readonly Color PCB_Substrate = new(0.18f, 0.30f, 0.18f);
+        public static readonly Color PCB_Substrate = new(0.085f, 0.142f, 0.085f);
 
         /// <summary>ENIG gold pad rim (#D4A843).</summary>
         public static readonly Color ENIG_Gold = new(0.831f, 0.659f, 0.263f);
@@ -72,19 +72,20 @@ namespace ChromaVale.Presentation.Views.Components
         /// <summary>Win popup background (#0D1117).</summary>
         public static readonly Color WinPopupBG = new(0.051f, 0.067f, 0.090f);
 
-        /// <summary>Ghost component outline opacity (8-12%).</summary>
-        public static readonly Color GhostComponent = new(0.08f, 0.10f, 0.08f, 0.10f);
+        /// <summary>Ghost component outline — disabled for legibility (2026-07-29 legibility overhaul).</summary>
+        public static readonly Color GhostComponent = new(0.08f, 0.10f, 0.08f, 0.00f);
 
-        /// <summary>Silkscreen label opacity (12-18%).</summary>
+        /// <summary>Silkscreen label opacity — border-only, reduced for legibility (2026-07-29).</summary>
         public static readonly Color SilkscreenLabel = new(0.9f, 0.9f, 0.85f, 0.15f);
 
         // ── Legibility overhaul (2026-07-29) ─────────────────────────────
 
-        /// <summary>Dark oxidized ghost trace (#3A2A1A) — pre-etched, immovable, reads as "part of the board". Zero emission.</summary>
-        public static readonly Color GhostTraceCopper = new(0.227f, 0.165f, 0.102f);
+        /// <summary>Dark oxidized ghost trace (#110B04) — pre-etched, immovable, reads as "part of the board". Zero emission.
+        /// Greyscale: 1.85:1 vs substrate (subordinate, visible), 5.68:1 vs player trace.</summary>
+        public static readonly Color GhostTraceCopper = new(0.065f, 0.042f, 0.018f);
 
         /// <summary>Bright player-placed trace — raised, slight specular. Reads as "I put this here."
-        /// Brightened from #5C3A1E to #944E2A for contrast against PCB substrate in greyscale.</summary>
-        public static readonly Color PlayerTraceCopper = new(0.58f, 0.306f, 0.165f);
+        /// CopperActive (#B87333): 3.08:1 greyscale contrast vs substrate — clears WCAG 3:1 minimum.</summary>
+        public static readonly Color PlayerTraceCopper = new(0.722f, 0.451f, 0.200f);
     }
 }

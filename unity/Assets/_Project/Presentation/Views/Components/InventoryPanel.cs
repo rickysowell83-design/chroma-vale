@@ -20,7 +20,7 @@ namespace ChromaVale.Presentation.Views.Components
         private TextMeshProUGUI _rotationLabel;
 
         // ---- v2 Palette ----
-        private static readonly Color TrayBg = new(0.051f, 0.067f, 0.090f, 0.85f);
+        private static readonly Color TrayBg = new(0.051f, 0.067f, 0.090f, 0.25f);
         private static readonly Color TrayBorder = new(0f, 0.898f, 1f, 0.20f);
         private static readonly Color TrayCornerAccent = new(0f, 0.898f, 1f, 0.40f);
         private static readonly Color SlotBg = new(0.039f, 0.086f, 0.039f);
@@ -52,7 +52,11 @@ namespace ChromaVale.Presentation.Views.Components
             var canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 60;
-            gameObject.AddComponent<CanvasScaler>();
+            var scaler = gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();
 
             _canvasGroup = gameObject.AddComponent<CanvasGroup>();
