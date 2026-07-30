@@ -26,6 +26,7 @@ namespace ChromaVale.Presentation.Views.Components
     {
         private static Material _baseMaterial;
         private static Material _viaMaterial;
+        private static Material _previewMaterial;
 
         private MeshRenderer _baseRenderer;
         private BoxCollider _boxCollider;
@@ -341,29 +342,28 @@ namespace ChromaVale.Presentation.Views.Components
                 _previewRoot.transform.localScale = Vector3.one * _tileSize;
             }
 
-            // Create translucent preview material (URP/Lit, transparent, alpha ~0.35, no emission)
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null) shader = Shader.Find("Standard");
+            // Use shared translucent preview material — avoids per-frame Material allocation
+            if (_previewMaterial == null)
+            {
+                Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                if (shader == null) shader = Shader.Find("Standard");
 
-            var previewMat = new Material(shader);
-            previewMat.color = new Color(0.2f, 0.9f, 0.95f, 0.35f); // NeonCyan with alpha ~0.35
-            previewMat.SetFloat("_Metallic", 1.0f);
-            previewMat.SetFloat("_Smoothness", 0.85f);
+                _previewMaterial = new Material(shader);
+                _previewMaterial.SetFloat("_Surface", 1f);
+                _previewMaterial.SetFloat("_Blend", 0f);
+                _previewMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                _previewMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                _previewMaterial.SetFloat("_ZWrite", 0f);
+                _previewMaterial.renderQueue = 3000;
+                _previewMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                _previewMaterial.DisableKeyword("_EMISSION");
+                _previewMaterial.SetColor("_EmissionColor", Color.black);
+                _previewMaterial.color = new Color(0.2f, 0.9f, 0.95f, 0.35f);
+                _previewMaterial.SetFloat("_Metallic", 1.0f);
+                _previewMaterial.SetFloat("_Smoothness", 0.85f);
+            }
 
-            // Configure transparent surface mode
-            previewMat.SetFloat("_Surface", 1f);
-            previewMat.SetFloat("_Blend", 0f);
-            previewMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            previewMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            previewMat.SetFloat("_ZWrite", 0f);
-            previewMat.renderQueue = 3000;
-            previewMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            // No emission on preview ghost
-            previewMat.DisableKeyword("_EMISSION");
-            previewMat.SetColor("_EmissionColor", Color.black);
-
-            // Apply the translucent material to all pipe child meshes
-            ApplyPreviewMatToTree(_previewRoot.transform, previewMat);
+            ApplyPreviewMatToTree(_previewRoot.transform, _previewMaterial);
         }
 
         /// <summary>
@@ -793,7 +793,7 @@ private void ApplyColor()
                 {
                     var mpb = new MaterialPropertyBlock();
                     ringRend.GetPropertyBlock(mpb);
-                    mpb.SetColor("_Color", signalColor * 0.6f);
+                    mpb.SetColor("_BaseColor", signalColor * 0.6f);
                     mpb.SetFloat("_Metallic", 0.95f);
                     mpb.SetFloat("_Smoothness", 0.7f);
                     mpb.SetColor("_EmissionColor", signalColor * 15f);
@@ -811,7 +811,7 @@ private void ApplyColor()
                 {
                     var mpb = new MaterialPropertyBlock();
                     voidRend.GetPropertyBlock(mpb);
-                    mpb.SetColor("_Color", signalColor);
+                    mpb.SetColor("_BaseColor", signalColor);
                     mpb.SetFloat("_Metallic", 0f);
                     mpb.SetFloat("_Smoothness", 0.5f);
                     mpb.SetColor("_EmissionColor", signalColor * 20f);
