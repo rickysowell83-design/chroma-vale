@@ -769,6 +769,124 @@ private void ApplyColor()
         }
 
         /// <summary>
+        /// Permanently ignite a target pad — transition from the dark "empty socket"
+        /// to a blazing neon emission.  Called when signal reaches the destination.
+        /// Mirrors the white-hot surge → settle pattern of SetFlowActive, but for
+        /// target pad indicators rather than trace meshes.
+        /// </summary>
+        /// <param name="signalColor">The neon colour of the signal that activated this pad.</param>
+        public void SetTargetActive(Color signalColor)
+        {
+            if (_indicatorRoot == null) return;
+
+            // Find target indicator children
+            var socketRing = _indicatorRoot.transform.Find("TargetSocketRing");
+            var targetVoid = _indicatorRoot.transform.Find("TargetVoid");
+            var pulseRing = _indicatorRoot.transform.Find("TargetPulseRing");
+            var targetHalo = _indicatorRoot.transform.Find("TargetHalo");
+
+            // ── Swap socket ring from dark charcoal → blazing signal color ──
+            if (socketRing != null)
+            {
+                var ringRend = socketRing.GetComponent<MeshRenderer>();
+                if (ringRend != null)
+                {
+                    var mpb = new MaterialPropertyBlock();
+                    ringRend.GetPropertyBlock(mpb);
+                    mpb.SetColor("_Color", signalColor * 0.6f);
+                    mpb.SetFloat("_Metallic", 0.95f);
+                    mpb.SetFloat("_Smoothness", 0.7f);
+                    mpb.SetColor("_EmissionColor", signalColor * 15f);
+                    ringRend.SetPropertyBlock(mpb);
+                    ringRend.sharedMaterial.EnableKeyword("_EMISSION");
+                    ringRend.sharedMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+            }
+
+            // ── Swap void center from dark → bright via pin ──
+            if (targetVoid != null)
+            {
+                var voidRend = targetVoid.GetComponent<MeshRenderer>();
+                if (voidRend != null)
+                {
+                    var mpb = new MaterialPropertyBlock();
+                    voidRend.GetPropertyBlock(mpb);
+                    mpb.SetColor("_Color", signalColor);
+                    mpb.SetFloat("_Metallic", 0f);
+                    mpb.SetFloat("_Smoothness", 0.5f);
+                    mpb.SetColor("_EmissionColor", signalColor * 20f);
+                    voidRend.SetPropertyBlock(mpb);
+                    voidRend.sharedMaterial.EnableKeyword("_EMISSION");
+                    voidRend.sharedMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+            }
+
+            // ── Boost pulse ring from faint → blazing ──
+            if (pulseRing != null)
+            {
+                var pulseRend = pulseRing.GetComponent<MeshRenderer>();
+                if (pulseRend != null)
+                {
+                    var mpb = new MaterialPropertyBlock();
+                    pulseRend.GetPropertyBlock(mpb);
+                    mpb.SetColor("_EmissionColor", signalColor * 8f);
+                    pulseRend.SetPropertyBlock(mpb);
+                }
+            }
+
+            // ── Boost halo from subtle → radiant ──
+            if (targetHalo != null)
+            {
+                var haloRend = targetHalo.GetComponent<MeshRenderer>();
+                if (haloRend != null)
+                {
+                    var mpb = new MaterialPropertyBlock();
+                    haloRend.GetPropertyBlock(mpb);
+                    mpb.SetColor("_EmissionColor", signalColor * 4f);
+                    haloRend.SetPropertyBlock(mpb);
+                }
+            }
+
+            // ── White-hot surge → settle emission ramp on the tile itself ──
+            StopAllCoroutines();
+            StartCoroutine(TargetIgnitionCoroutine(signalColor));
+        }
+
+        private IEnumerator TargetIgnitionCoroutine(Color signalColor)
+        {
+            float duration = 0.35f;
+            float elapsed = 0f;
+            float surgeDuration = 0.08f; // First 80ms: white-hot electricity flash
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+
+                if (elapsed <= surgeDuration)
+                {
+                    // White-hot flash — emission peaks at 20x
+                    float surgeT = elapsed / surgeDuration;
+                    _emissionIntensity = Mathf.Lerp(20.0f, 10.0f, surgeT);
+                    _color = Color.Lerp(Color.white, signalColor, surgeT);
+                }
+                else
+                {
+                    // Settle to target color at intensity 5.0
+                    float settleT = (elapsed - surgeDuration) / (duration - surgeDuration);
+                    _emissionIntensity = Mathf.SmoothStep(10.0f, 5.0f, settleT);
+                    _color = signalColor;
+                }
+                ApplyColor();
+                yield return null;
+            }
+
+            _emissionIntensity = 5.0f;
+            _color = signalColor;
+            ApplyColor();
+        }
+
+        /// <summary>
         /// Destroy the current indicator child, if any.
         /// </summary>
         private void ClearIndicator()

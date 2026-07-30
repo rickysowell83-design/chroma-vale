@@ -489,19 +489,28 @@ private void HandleFlowAdvance(int x, int y, int colorIndex)
             {
                 var tv = _renderers[x, y];
                 var targetColor = GetPipeColor(colorIndex);
+
+                // ── Permanent emission ramp: dark socket → blazing neon ──
+                // This swaps the TargetRing indicator materials and runs a
+                // white-hot surge coroutine (mirrors SetFlowActive on traces).
+                tv.SetTargetActive(targetColor);
+
+                // ── Scale pop for impact ──
                 var origScale = tv.transform.localScale;
-                var origColor = tv.Color;
-                DOTween.To(() => tv.Color, c => tv.Color = c, targetColor * 1.5f, 0.5f).SetEase(Ease.OutQuad);
-                tv.transform.DOScale(origScale * 1.5f, 0.5f).SetEase(Ease.OutQuad)
-                    .OnComplete(() =>
-                    {
-                        tv.Color = targetColor;
-                        tv.transform.localScale = origScale;
-                    });
+                tv.transform.DOScale(origScale * 1.5f, 0.35f).SetEase(Ease.OutBack)
+                    .OnComplete(() => tv.transform.DOScale(origScale, 0.25f).SetEase(Ease.OutQuad));
+
+                // ── Particle burst: TargetBloom + RestorationPulse ──
                 if (_particleFx != null)
                 {
-                    _particleFx.TargetBloom(_renderers[x, y].transform.position, GetPipeColor(colorIndex));
+                    _particleFx.TargetBloom(_renderers[x, y].transform.position, targetColor);
                     _particleFx.RestorationPulse(_renderers[x, y].transform.position);
+                }
+
+                // ── Screen-space shockwave: post-process bloom pulse ──
+                if (_particleFx != null)
+                {
+                    StartCoroutine(ScreenShockwavePulse());
                 }
             }
             if (_audioService != null) _audioService.PlaySound("target_reached");
@@ -626,6 +635,44 @@ private IEnumerator FlashFailure()
                         _ => DarkTile
                     };
                 }
+        }
+
+        /// <summary>
+        /// Screen-space shockwave: briefly spike the global Bloom intensity
+        /// to create a radial pulse that sweeps across the screen.  Used for
+        /// big moments — first pad per level, level complete.
+        /// </summary>
+        private IEnumerator ScreenShockwavePulse()
+        {
+            // Find the global post-process volume and spike Bloom
+            var volume = FindAnyObjectByType<UnityEngine.Rendering.Volume>();
+            if (volume == null) yield break;
+
+            UnityEngine.Rendering.Universal.Bloom bloom;
+            if (!volume.profile.TryGet(out bloom)) yield break;
+
+            float originalIntensity = bloom.intensity.value;
+            float originalThreshold = bloom.threshold.value;
+            float duration = 0.5f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                // Spike intensity: 1.4 → 4.0 → 1.4
+                // Lower threshold: 0.85 → 0.4 → 0.85 (lets more light bloom)
+                float intensityCurve = 1f - Mathf.Pow(1f - t, 3f); // Ease-out cubic
+                bloom.intensity.value = Mathf.Lerp(originalIntensity, 4.0f, intensityCurve * (1f - Mathf.Abs(t - 0.3f) * 2f));
+                bloom.threshold.value = Mathf.Lerp(originalThreshold, 0.4f, intensityCurve * (1f - Mathf.Abs(t - 0.3f) * 2f));
+
+                yield return null;
+            }
+
+            // Restore
+            bloom.intensity.value = originalIntensity;
+            bloom.threshold.value = originalThreshold;
         }
     }
 }
