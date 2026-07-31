@@ -19,6 +19,16 @@ namespace ChromaVale.Presentation.Views.Components
         private TextMeshProUGUI _headerLabel;
         private TextMeshProUGUI _rotationLabel;
 
+        // ---- Drawer state ----
+        private RectTransform _invBgRect;
+        private GameObject _handleGo;
+        private bool _isExpanded;
+        private Coroutine _collapseCoroutine;
+        private float _traySlideDistance;
+        private const float COLLAPSE_DELAY = 3f;
+        private const float TRAY_SLIDE_DURATION = 0.35f;
+        private const float HANDLE_HEIGHT = 0.025f; // thin bar when collapsed (~2.5% screen height)
+
         // ---- v2 Palette ----
         private static readonly Color TrayBg = new(0.051f, 0.067f, 0.090f, 0.25f);
         private static readonly Color TrayBorder = new(0f, 0.898f, 1f, 0.20f);
@@ -33,9 +43,13 @@ namespace ChromaVale.Presentation.Views.Components
         private static readonly Color LabelTypeColor = new(0f, 0.898f, 1f);
         private static readonly Color LabelCountColor = new(1f, 1f, 1f);
         private static readonly Color HeaderColor = new(0.35f, 0.55f, 0.65f, 0.7f);
+        private static readonly Color HandleColor = new(0f, 0.898f, 1f, 0.5f);
+        private static readonly Color HandleColorIdle = new(0f, 0.898f, 1f, 0.18f);
 
-        private const float TRAY_HEIGHT = 0.15f;
-        private const float SLOT_BOTTOM_MARGIN = 0.08f;
+        // ---- Scaled-down constants (65% of original) ----
+        private const float TRAY_HEIGHT = 0.10f;
+        private const float SLOT_AREA_BOTTOM = 0.025f;  // bottom of slot area (screen-normalized)
+        private const float SLOT_AREA_TOP = 0.065f;     // top of slot area (screen-normalized)
 
         public int SelectedPieceIndex => _selectedPieceIndex;
         public int PendingRotation { get; private set; } = 0;
@@ -44,6 +58,23 @@ namespace ChromaVale.Presentation.Views.Components
         private void Awake()
         {
             CreateUI();
+            _isExpanded = false;
+        }
+
+        private IEnumerator Start()
+        {
+            // Wait one frame for Canvas layout to settle before reading sizes
+            yield return new WaitForEndOfFrame();
+            
+            // Calculate slide distance based on laid-out tray height
+            _traySlideDistance = _invBgRect.rect.height;
+            
+            // Set initial collapsed state
+            _invBgRect.anchoredPosition = new Vector2(0f, -_traySlideDistance);
+            
+            // Brief flash to show the tray exists, then auto-collapse
+            Expand();
+            _collapseCoroutine = StartCoroutine(DelayedCollapse(COLLAPSE_DELAY * 0.5f));
         }
 
         private void CreateUI()
@@ -63,17 +94,17 @@ namespace ChromaVale.Presentation.Views.Components
             _canvasGroup.interactable = true;
             _canvasGroup.blocksRaycasts = true;
 
-            // ---- Background tray: BOTTOM-DOCKED at 15% ----
+            // ---- Background tray: BOTTOM-DOCKED ----
             var bg = new GameObject("InvBG");
             bg.transform.SetParent(transform, false);
             var bgImg = bg.AddComponent<Image>();
             bgImg.color = TrayBg;
             bgImg.raycastTarget = false;
-            var bgr = bg.GetComponent<RectTransform>();
-            bgr.anchorMin = new Vector2(0f, 0f);
-            bgr.anchorMax = new Vector2(1f, TRAY_HEIGHT);
-            bgr.offsetMin = Vector2.zero;
-            bgr.offsetMax = Vector2.zero;
+            _invBgRect = bg.GetComponent<RectTransform>();
+            _invBgRect.anchorMin = new Vector2(0f, 0f);
+            _invBgRect.anchorMax = new Vector2(1f, TRAY_HEIGHT);
+            _invBgRect.offsetMin = Vector2.zero;
+            _invBgRect.offsetMax = Vector2.zero;
 
             // ---- Top border line ----
             var topLine = new GameObject("InvTopBorder");
@@ -95,7 +126,7 @@ namespace ChromaVale.Presentation.Views.Components
             headerGo.transform.SetParent(bg.transform, false);
             _headerLabel = headerGo.AddComponent<TextMeshProUGUI>();
             _headerLabel.text = "COMPONENTS";
-            _headerLabel.fontSize = 11;
+            _headerLabel.fontSize = 9;
             _headerLabel.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
             _headerLabel.alignment = TextAlignmentOptions.Left;
             _headerLabel.color = HeaderColor;
@@ -110,7 +141,7 @@ namespace ChromaVale.Presentation.Views.Components
             rotGo.transform.SetParent(bg.transform, false);
             _rotationLabel = rotGo.AddComponent<TextMeshProUGUI>();
             _rotationLabel.text = "";
-            _rotationLabel.fontSize = 10;
+            _rotationLabel.fontSize = 8;
             _rotationLabel.fontStyle = FontStyles.Bold;
             _rotationLabel.alignment = TextAlignmentOptions.Right;
             _rotationLabel.color = ChromaPalette.NeonMagenta;
@@ -120,6 +151,43 @@ namespace ChromaVale.Presentation.Views.Components
             rotRt.offsetMin = Vector2.zero;
             rotRt.offsetMax = Vector2.zero;
             _rotationLabel.gameObject.SetActive(false);
+
+            // ---- Drawer HANDLE — always visible ----
+            _handleGo = new GameObject("InventoryHandle");
+            _handleGo.transform.SetParent(transform, false);
+            var handleImg = _handleGo.AddComponent<Image>();
+            handleImg.color = HandleColorIdle;
+            handleImg.raycastTarget = true;
+            var handleBtn = _handleGo.AddComponent<Button>();
+            handleBtn.transition = Selectable.Transition.ColorTint;
+            var cb = handleBtn.colors;
+            cb.normalColor = HandleColorIdle;
+            cb.highlightedColor = HandleColor;
+            cb.pressedColor = HandleColor;
+            cb.selectedColor = HandleColor;
+            handleBtn.colors = cb;
+            handleBtn.onClick.AddListener(() => ToggleExpanded());
+            var handleRt = _handleGo.GetComponent<RectTransform>();
+            handleRt.anchorMin = new Vector2(0f, 0f);
+            handleRt.anchorMax = new Vector2(1f, HANDLE_HEIGHT);
+            handleRt.offsetMin = Vector2.zero;
+            handleRt.offsetMax = Vector2.zero;
+
+            // ---- Handle label ----
+            var handleLabel = new GameObject("HandleLabel");
+            handleLabel.transform.SetParent(_handleGo.transform, false);
+            var hlText = handleLabel.AddComponent<TextMeshProUGUI>();
+            hlText.text = "INVENTORY";
+            hlText.fontSize = 7;
+            hlText.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
+            hlText.alignment = TextAlignmentOptions.Center;
+            hlText.color = new Color(0f, 0.898f, 1f, 0.5f);
+            hlText.raycastTarget = false;
+            var hlRt = handleLabel.GetComponent<RectTransform>();
+            hlRt.anchorMin = Vector2.zero;
+            hlRt.anchorMax = Vector2.one;
+            hlRt.offsetMin = Vector2.zero;
+            hlRt.offsetMax = Vector2.zero;
         }
 
         private void CreateCornerBrackets(Transform parent)
@@ -162,6 +230,95 @@ namespace ChromaVale.Presentation.Views.Components
             vRt.offsetMax = Vector2.zero;
         }
 
+        // ================================================================
+        // DRAWER TOGGLE
+        // ================================================================
+
+        /// <summary>Toggle the tray expanded/collapsed.</summary>
+        public void ToggleExpanded()
+        {
+            if (_isExpanded)
+                Collapse();
+            else
+                Expand();
+        }
+
+        /// <summary>Expand the tray fully (slide up).</summary>
+        public void Expand()
+        {
+            if (_isExpanded) return;
+            _isExpanded = true;
+
+            CancelCollapse();
+
+            if (_invBgRect != null)
+            {
+                _invBgRect.DOKill();
+                _invBgRect.DOAnchorPos(Vector2.zero, TRAY_SLIDE_DURATION).SetEase(Ease.OutCubic);
+            }
+
+            if (_handleGo != null)
+            {
+                var handleImg = _handleGo.GetComponent<Image>();
+                if (handleImg != null) handleImg.DOColor(HandleColor, TRAY_SLIDE_DURATION);
+            }
+        }
+
+        /// <summary>Collapse the tray to a thin handle only.</summary>
+        public void Collapse()
+        {
+            if (!_isExpanded) return;
+            _isExpanded = false;
+
+            CancelCollapse();
+
+            if (_invBgRect != null)
+            {
+                _invBgRect.DOKill();
+                _invBgRect.DOAnchorPos(new Vector2(0f, -_traySlideDistance), TRAY_SLIDE_DURATION)
+                    .SetEase(Ease.InCubic);
+            }
+
+            if (_handleGo != null)
+            {
+                var handleImg = _handleGo.GetComponent<Image>();
+                if (handleImg != null) handleImg.DOColor(HandleColorIdle, TRAY_SLIDE_DURATION);
+            }
+
+            // Also dismiss rotation label
+            if (_rotationLabel != null)
+                _rotationLabel.gameObject.SetActive(false);
+        }
+
+        /// <summary>Cancel any pending collapse coroutine.</summary>
+        private void CancelCollapse()
+        {
+            if (_collapseCoroutine != null)
+            {
+                StopCoroutine(_collapseCoroutine);
+                _collapseCoroutine = null;
+            }
+        }
+
+        /// <summary>Schedule a collapse after delay (auto-hide when idle).</summary>
+        private IEnumerator DelayedCollapse(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            Collapse();
+            _collapseCoroutine = null;
+        }
+
+        /// <summary>Schedule auto-collapse after the standard delay (called after piece placement / deselection).</summary>
+        public void ScheduleAutoCollapse()
+        {
+            CancelCollapse();
+            _collapseCoroutine = StartCoroutine(DelayedCollapse(COLLAPSE_DELAY));
+        }
+
+        // ================================================================
+        // INVENTORY BIND / REFRESH
+        // ================================================================
+
         public void Bind(TraceInventory inventory)
         {
             _inventory = inventory;
@@ -177,7 +334,7 @@ namespace ChromaVale.Presentation.Views.Components
             if (available.Count == 0) return;
 
             int count = available.Count;
-            float slotAreaWidth = 0.52f;
+            float slotAreaWidth = 0.35f; // was 0.52f — scaled to ~67%
             float slotWidth = slotAreaWidth / Mathf.Max(count, 1);
             float startX = 0.03f;
             int idx = 0;
@@ -201,8 +358,8 @@ namespace ChromaVale.Presentation.Views.Components
 
                 var sr = slot.GetComponent<RectTransform>();
                 float slotLeft = startX + idx * slotWidth;
-                sr.anchorMin = new Vector2(slotLeft, SLOT_BOTTOM_MARGIN);
-                sr.anchorMax = new Vector2(slotLeft + slotWidth * 0.9f, TRAY_HEIGHT - 0.02f);
+                sr.anchorMin = new Vector2(slotLeft, SLOT_AREA_BOTTOM);
+                sr.anchorMax = new Vector2(slotLeft + slotWidth * 0.9f, SLOT_AREA_TOP);
                 sr.offsetMin = Vector2.zero;
                 sr.offsetMax = Vector2.zero;
 
@@ -230,12 +387,12 @@ namespace ChromaVale.Presentation.Views.Components
                 thumbRt.offsetMin = Vector2.zero;
                 thumbRt.offsetMax = Vector2.zero;
 
-                // ---- Count badge (now fills more space without type label) ----
+                // ---- Count badge ----
                 var badgeGo = new GameObject("Badge");
                 badgeGo.transform.SetParent(slot.transform, false);
                 var badgeTx = badgeGo.AddComponent<TextMeshProUGUI>();
                 badgeTx.text = "x" + pieceCount;
-                badgeTx.fontSize = 12;
+                badgeTx.fontSize = 10;
                 badgeTx.enableAutoSizing = false;
                 badgeTx.fontStyle = FontStyles.Bold;
                 badgeTx.alignment = TextAlignmentOptions.Center;
@@ -418,6 +575,10 @@ namespace ChromaVale.Presentation.Views.Components
         private void SelectInventoryPiece(SegmentShape shape)
         {
             if (_inventory == null) return;
+
+            // Auto-expand tray to show selection
+            Expand();
+
             for (int i = 0; i < _inventory.Pieces.Count; i++)
             {
                 if (_inventory.Pieces[i].State == SegmentState.InHand &&
@@ -448,7 +609,7 @@ namespace ChromaVale.Presentation.Views.Components
                 if (border != null) border.color = SlotBorderSelected;
                 var body = slot.transform.Find("Body")?.GetComponent<Image>();
                 if (body != null) body.color = SlotBgSelected;
-                slot.transform.DOScale(1.08f, 0f);  // Pop up instantly
+                slot.transform.DOScale(1.08f, 0f);
                 slot.transform.DOScale(1f, 0.4f).SetEase(Ease.OutBack);
             }
         }
@@ -457,6 +618,7 @@ namespace ChromaVale.Presentation.Views.Components
         {
             _selectedPieceIndex = -1;
             ApplyHighlight(null);
+            ScheduleAutoCollapse();
         }
 
         public void SetPendingRotation(int degrees)
@@ -479,6 +641,7 @@ namespace ChromaVale.Presentation.Views.Components
         public void SelectPieceForTutorial(SegmentShape shape)
         {
             if (_inventory == null) return;
+            Expand(); // auto-expand for tutorial pick
             for (int i = 0; i < _inventory.Pieces.Count; i++)
             {
                 if (_inventory.Pieces[i].State == SegmentState.InHand &&
