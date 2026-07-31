@@ -35,7 +35,6 @@ namespace ChromaVale.Presentation.Views.Components
         private static readonly Color HeaderColor = new(0.35f, 0.55f, 0.65f, 0.7f);
 
         private const float TRAY_HEIGHT = 0.15f;
-        private const float SLOT_TOP_MARGIN = 0.22f;
         private const float SLOT_BOTTOM_MARGIN = 0.08f;
 
         public int SelectedPieceIndex => _selectedPieceIndex;
@@ -203,7 +202,7 @@ namespace ChromaVale.Presentation.Views.Components
                 var sr = slot.GetComponent<RectTransform>();
                 float slotLeft = startX + idx * slotWidth;
                 sr.anchorMin = new Vector2(slotLeft, SLOT_BOTTOM_MARGIN);
-                sr.anchorMax = new Vector2(slotLeft + slotWidth * 0.9f, 1f - SLOT_TOP_MARGIN);
+                sr.anchorMax = new Vector2(slotLeft + slotWidth * 0.9f, TRAY_HEIGHT - 0.02f);
                 sr.offsetMin = Vector2.zero;
                 sr.offsetMax = Vector2.zero;
 
