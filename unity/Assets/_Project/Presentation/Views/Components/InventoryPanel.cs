@@ -322,6 +322,7 @@ namespace ChromaVale.Presentation.Views.Components
         public void Bind(TraceInventory inventory)
         {
             _inventory = inventory;
+            Expand(); // ensure tray is visible when inventory updates
             Refresh();
         }
 
@@ -346,7 +347,7 @@ namespace ChromaVale.Presentation.Views.Components
                 bool depleted = pieceCount <= 0;
 
                 var slot = new GameObject("Slot_" + shape);
-                slot.transform.SetParent(transform, false);
+                slot.transform.SetParent(_invBgRect, false);
 
                 var bgImg = slot.AddComponent<Image>();
                 bgImg.color = depleted ? DepletedBorder : SlotBorder;
@@ -618,7 +619,8 @@ namespace ChromaVale.Presentation.Views.Components
         {
             _selectedPieceIndex = -1;
             ApplyHighlight(null);
-            ScheduleAutoCollapse();
+            // Auto-collapse removed — tray stays open during play.
+            // ScheduleAutoCollapse() only called on genuine idle now.
         }
 
         public void SetPendingRotation(int degrees)
