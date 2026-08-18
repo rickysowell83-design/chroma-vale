@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "id": "cv_08",
+  "name": "The Brown Trap",
+  "grid": {
+    "width": 6,
+    "height": 6
+  },
+  "parMoves": 9,
+  "difficulty": "Medium",
+  "teaches": "Brown = clearable waste",
+  "orbs": [
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 2,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 0
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 4,
+      "y": 0
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 5,
+      "y": 0
+    },
+    {
+      "color": "purple",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "purple",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    }
+  ],
+  "targets": [
+    {
+      "color": "cyan",
+      "tier": 3,
+      "x": 5,
+      "y": 5
+    },
+    {
+      "color": "purple",
+      "tier": 2,
+      "x": 4,
+      "y": 5
+    }
+  ],
+  "obstacles": []
+}

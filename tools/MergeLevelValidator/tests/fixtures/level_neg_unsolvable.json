@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "id": "cv_neg_control",
+  "name": "Negative Control (unsolvable by design)",
+  "grid": { "width": 4, "height": 4 },
+  "parMoves": 5,
+  "difficulty": "Test",
+  "teaches": "Validator must reject: 3 Cyan T1 cannot produce Cyan T3",
+  "orbs": [
+    { "color": "cyan", "tier": 1, "x": 0, "y": 0 },
+    { "color": "cyan", "tier": 1, "x": 1, "y": 0 },
+    { "color": "cyan", "tier": 1, "x": 2, "y": 0 }
+  ],
+  "targets": [
+    { "color": "cyan", "tier": 3, "x": 3, "y": 3 }
+  ],
+  "obstacles": []
+}

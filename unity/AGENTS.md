@@ -77,7 +77,7 @@ Assets/_Project/
 
 - One class per file (except small related types like enums).
 - Filename matches class name exactly: `PipeRouter.cs`, `ILevelRepository.cs`.
-- Tests mirror source structure under `Assets/_Project/Tests/`.
+- Tests mirror source structure under `Assets/Tests/EditMode/`.
 - Prefabs in `Assets/Prefabs/` organized by feature, not type.
 
 ## Dependency Injection
