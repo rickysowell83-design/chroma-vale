@@ -63,6 +63,20 @@ namespace ChromaVale.Core.GameLogic
         public int ParTicks = 20;        // Par completion time in ticks (for 3-star)
         public string DisplayName;       // Human-readable level name for HUD
 
+        // ───────────────────────────────────────────────────────────────────
+        // CHROMA MERGE MODE (additive — legacy pipe-flow fields above remain
+        // authoritative for the routing game; merge levels set only these).
+        // ───────────────────────────────────────────────────────────────────
+
+        /// <summary>Initial orb layout for a merge level (null for pipe-flow levels).</summary>
+        public MergeOrbPlacement[] MergeOrbs;
+
+        /// <summary>Win-condition cells: each must hold its required color+tier orb.</summary>
+        public RestorationTarget[] RestorationTargets;
+
+        /// <summary>Par move count for star rating (merge mode; 0 = unset).</summary>
+        public int ParMoves;
+
         // ═══════════════════════════════════════════════════════════════
         // WORLD 1: "First Light" — Learning to Route (Levels 1-5)
         // ═══════════════════════════════════════════════════════════════
