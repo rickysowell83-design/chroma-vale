@@ -899,18 +899,29 @@ namespace ChromaVale.Presentation.Views
             _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}";
         }
 
-        // ── Onboarding hint (Level 1 first-merge cue) ──
+        // ── Onboarding hints (level-specific first-time cues) ──
+
+        private static readonly Dictionary<int, string> OnboardingTexts = new()
+        {
+            { 1, "Drag matching orbs together to merge them!" },
+            { 4, "New: Drag DIFFERENT colors together to mix! Cyan + Magenta = Purple" },
+            { 8, "Brown orbs are waste — merge two Browns to clear them!" },
+        };
 
         private void ShowOnboardingCue(int levelNumber)
         {
-            if (levelNumber != 1) return;          // Only level 1
-            if (_onboardingCueShown) return;        // Only before the first merge
+            if (!OnboardingTexts.TryGetValue(levelNumber, out var cueText)) return;
+            if (_onboardingCueShown) return;
+
+            // Skip if player already beat this level (they know the mechanic)
             var saveManager = SaveGameManager.Instance;
-            if (saveManager != null && saveManager.GetStarsForLevel(1) > 0)
-                return;                              // Already beaten before → skip
+            if (saveManager != null && saveManager.GetStarsForLevel(levelNumber) > 0)
+                return;
 
             if (_onboardingOverlay == null)
-                _onboardingOverlay = BuildOnboardingOverlay();
+                _onboardingOverlay = BuildOnboardingOverlay(cueText);
+            else
+                _onboardingOverlay.text = cueText;  // Reuse overlay, swap text
             if (_onboardingOverlay != null)
                 _onboardingOverlay.gameObject.SetActive(true);
         }
@@ -919,12 +930,13 @@ namespace ChromaVale.Presentation.Views
         {
             if (_onboardingOverlay != null)
                 _onboardingOverlay.gameObject.SetActive(false);
-            _onboardingCueShown = true; // Treat the cue as consumed once the board starts changing
+            _onboardingCueShown = true;
         }
 
-        private TextMeshProUGUI BuildOnboardingOverlay()
+        private TextMeshProUGUI BuildOnboardingOverlay(string cueText = null)
         {
-            // Reuse the HUD canvas (ScreenSpaceOverlay) so text renders on top of the board.
+            cueText ??= "Merge two matching orbs to restore color!";
+
             var parent = _hudText != null ? _hudText.transform.parent : null;
             var canvasGo = parent != null ? parent.gameObject : null;
             if (canvasGo == null)
@@ -938,19 +950,19 @@ namespace ChromaVale.Presentation.Views
             go.transform.SetParent(canvasGo.transform, false);
 
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = "Merge two matching orbs to restore color!";
-            tmp.fontSize = 30;
+            tmp.text = cueText;
+            tmp.fontSize = 28;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = Color.white;
+            tmp.color = new Color(1f, 1f, 1f, 0.9f);
             tmp.raycastTarget = false;
 
             var rect = tmp.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.18f);
-            rect.anchorMax = new Vector2(0.5f, 0.18f);
+            rect.anchorMin = new Vector2(0.5f, 0.15f);
+            rect.anchorMax = new Vector2(0.5f, 0.15f);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(700f, 90f);
+            rect.sizeDelta = new Vector2(800f, 80f);
 
             return tmp;
         }
