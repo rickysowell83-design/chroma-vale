@@ -63,6 +63,12 @@
       "tier": 1,
       "x": 2,
       "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 3,
+      "y": 1
     }
   ],
   "targets": [
