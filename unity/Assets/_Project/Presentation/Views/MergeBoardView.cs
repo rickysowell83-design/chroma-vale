@@ -38,7 +38,9 @@ using ChromaVale.Core.GameLogic;
 using ChromaVale.Domain.PuzzleBoard;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using ChromaVale.Domain.Progression;
 using TMPro;
+using UnityEngine.UI;
 
 namespace ChromaVale.Presentation.Views
 {
@@ -138,7 +140,7 @@ namespace ChromaVale.Presentation.Views
             LoadLevel(_levelNumber);
         }
 
-        private void LoadLevel(int levelNumber)
+        public void LoadLevel(int levelNumber)
         {
             // Clear previous board state
             ClearBoard();
@@ -674,9 +676,17 @@ namespace ChromaVale.Presentation.Views
             UpdateHUD();
             if (_hudText != null) _hudText.text += $"    ★ {result.Stars}";
 
-            // TODO: Show win popup, offer next level / retry
-            // For now, auto-advance after 2 seconds
-            Invoke(nameof(NextLevel), 2f);
+            // Record stars in save data
+            var saveManager = SaveGameManager.Instance;
+            if (saveManager != null)
+            {
+                saveManager.RecordLevelComplete(_levelNumber, result.Stars);
+                Debug.Log($"[MergeBoardView] Recorded {_levelNumber} → {result.Stars}★ " +
+                          $"(total: {saveManager.TotalChromaStars})");
+            }
+
+            // Show win popup with buttons (not auto-advance)
+            ShowWinPopup(result.Stars);
         }
 
         private void UpdateHUD()
@@ -693,9 +703,147 @@ namespace ChromaVale.Presentation.Views
             if (_levelNumber > _maxLevel)
             {
                 Debug.Log("[MergeBoardView] All levels complete!");
+                ReturnToLevelSelect();
                 return;
             }
             LoadLevel(_levelNumber);
+        }
+
+        // ── Win Popup ──
+
+        private GameObject _winPopup;
+
+        private void ShowWinPopup(int stars)
+        {
+            // Don't create duplicate popups
+            if (_winPopup != null) Destroy(_winPopup);
+
+            var popupGo = new GameObject("WinPopup");
+            var canvas = popupGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            popupGo.AddComponent<GraphicRaycaster>();
+
+            // Semi-transparent backdrop
+            var backdropGo = new GameObject("Backdrop");
+            backdropGo.transform.SetParent(popupGo.transform, false);
+            var backdrop = backdropGo.AddComponent<Image>();
+            backdrop.color = new Color(0f, 0f, 0f, 0.6f);
+            backdrop.raycastTarget = true;
+            var backdropRect = backdropGo.GetComponent<RectTransform>();
+            backdropRect.anchorMin = Vector2.zero;
+            backdropRect.anchorMax = Vector2.one;
+            backdropRect.sizeDelta = Vector2.zero;
+
+            // Panel
+            var panelGo = new GameObject("Panel");
+            panelGo.transform.SetParent(popupGo.transform, false);
+            var panel = panelGo.AddComponent<Image>();
+            panel.color = new Color(0.15f, 0.17f, 0.22f, 0.95f);
+            var panelRect = panelGo.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(500f, 400f);
+            panelRect.anchoredPosition = Vector2.zero;
+
+            // Title
+            var titleGo = new GameObject("Title");
+            titleGo.transform.SetParent(panelGo.transform, false);
+            var titleText = titleGo.AddComponent<TextMeshProUGUI>();
+            titleText.text = "Level Complete!";
+            titleText.fontSize = 36;
+            titleText.alignment = TextAlignmentOptions.Center;
+            var titleRect = titleGo.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 1f);
+            titleRect.anchorMax = new Vector2(0.5f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(0f, -30f);
+            titleRect.sizeDelta = new Vector2(450f, 60f);
+
+            // Stars display
+            for (int i = 0; i < 3; i++)
+            {
+                var starGo = new GameObject($"Star_{i}");
+                starGo.transform.SetParent(panelGo.transform, false);
+                var starImg = starGo.AddComponent<Image>();
+                starImg.color = i < stars ? new Color(1f, 0.84f, 0.28f) : new Color(0.2f, 0.2f, 0.2f);
+                var starRect = starGo.GetComponent<RectTransform>();
+                starRect.anchorMin = new Vector2(0.5f, 0.5f);
+                starRect.anchorMax = new Vector2(0.5f, 0.5f);
+                starRect.pivot = new Vector2(0.5f, 0.5f);
+                starRect.sizeDelta = new Vector2(60f, 60f);
+                starRect.anchoredPosition = new Vector2((i - 1) * 80f, 30f);
+            }
+
+            // Buttons
+            CreatePopupButton(panelGo, "Next Level", new Vector2(0f, -80f), () =>
+            {
+                Destroy(_winPopup);
+                _winPopup = null;
+                NextLevel();
+            });
+
+            CreatePopupButton(panelGo, "Replay", new Vector2(0f, -150f), () =>
+            {
+                Destroy(_winPopup);
+                _winPopup = null;
+                LoadLevel(_levelNumber);
+            });
+
+            CreatePopupButton(panelGo, "Level Select", new Vector2(0f, -220f), () =>
+            {
+                Destroy(_winPopup);
+                _winPopup = null;
+                ReturnToLevelSelect();
+            });
+
+            _winPopup = popupGo;
+        }
+
+        private void CreatePopupButton(GameObject parent, string label, Vector2 pos, UnityEngine.Events.UnityAction onClick)
+        {
+            var btnGo = new GameObject($"Btn_{label}");
+            btnGo.transform.SetParent(parent.transform, false);
+            var btnImage = btnGo.AddComponent<Image>();
+            btnImage.color = new Color(0.2f, 0.3f, 0.4f);
+            var btnRect = btnGo.GetComponent<RectTransform>();
+            btnRect.anchorMin = new Vector2(0.5f, 0.5f);
+            btnRect.anchorMax = new Vector2(0.5f, 0.5f);
+            btnRect.pivot = new Vector2(0.5f, 0.5f);
+            btnRect.sizeDelta = new Vector2(300f, 50f);
+            btnRect.anchoredPosition = pos;
+
+            var btnLabel = new GameObject("Label");
+            btnLabel.transform.SetParent(btnGo.transform, false);
+            var labelText = btnLabel.AddComponent<TextMeshProUGUI>();
+            labelText.text = label;
+            labelText.fontSize = 24;
+            labelText.alignment = TextAlignmentOptions.Center;
+            var labelRect = btnLabel.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.sizeDelta = Vector2.zero;
+
+            var button = btnGo.AddComponent<Button>();
+            button.targetGraphic = btnImage;
+            button.onClick.AddListener(onClick);
+        }
+
+        private void ReturnToLevelSelect()
+        {
+            // Find LevelSelectView and return to it
+            var levelSelect = FindAnyObjectByType<LevelSelectView>();
+            if (levelSelect != null)
+            {
+                levelSelect.ReturnToSelect();
+            }
+            else
+            {
+                // Fallback: just hide the board
+                gameObject.SetActive(false);
+                Debug.LogWarning("[MergeBoardView] No LevelSelectView found — board hidden.");
+            }
         }
 
         // ── Helpers ──
