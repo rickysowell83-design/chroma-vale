@@ -17,6 +17,12 @@ namespace ChromaVale.Presentation.Views.Components
         public static readonly Color NeonPurple    = HexToColor("#9B59B6"); // Purple (mixed)
         public static readonly Color NeonGreen     = HexToColor("#6BCB77"); // Green (mixed)
         public static readonly Color NeonOrange    = HexToColor("#FF8C42"); // Orange (mixed)
+        public static readonly Color NeonRed       = HexToColor("#FF6B6B"); // Coral (warm accent)
+
+        // === Hint/indicator colors (transitional) ===
+        public static readonly Color CyanHint      = HexToColor("#4ECDC4"); // Cyan at 60% opacity context
+        public static readonly Color MagentaHint   = HexToColor("#FF6B9D"); // Magenta at 60% opacity context
+        public static readonly Color ObstacleCol   = HexToColor("#8B6F47"); // Brown — obstacle/blocker
 
         // === UI palette (Art Style Guide §3.1) ===
         public static readonly Color DarkTile          = HexToColor("#2D6B6B"); // Dark Teal — primary text

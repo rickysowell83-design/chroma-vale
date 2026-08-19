@@ -9,5 +9,10 @@ namespace ChromaVale.Presentation.Views.Components
     /// </summary>
     public class EnvironmentBackdrop : MonoBehaviour
     {
+        /// <summary>
+        /// STUB — no-op so PuzzleBoardView.cs compiles.
+        /// Full implementation (warm cream gradient background) comes in Presentation refactor.
+        /// </summary>
+        public void Build() { }
     }
 }
