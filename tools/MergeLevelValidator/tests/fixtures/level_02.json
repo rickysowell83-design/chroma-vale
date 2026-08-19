@@ -6,7 +6,7 @@
     "width": 4,
     "height": 4
   },
-  "parMoves": 6,
+  "parMoves": 4,
   "difficulty": "Tutorial",
   "teaches": "Chain merges",
   "orbs": [
