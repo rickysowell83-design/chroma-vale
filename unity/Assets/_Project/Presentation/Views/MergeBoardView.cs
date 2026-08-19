@@ -38,6 +38,7 @@ using ChromaVale.Core.GameLogic;
 using ChromaVale.Domain.PuzzleBoard;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using TMPro;
 
 namespace ChromaVale.Presentation.Views
 {
@@ -53,6 +54,9 @@ namespace ChromaVale.Presentation.Views
 
         [Header("Prefabs")]
         [SerializeField] private GameObject _orbPrefab; // Orb_T1.prefab — SpriteRenderer
+
+        [Header("HUD")]
+        [SerializeField] private TextMeshProUGUI _hudText;
 
         // ── Design Constants (locked by @game-designer) ──
         private const float MergeAnimDuration   = 0.640f; // 8 frames × 80ms
@@ -72,6 +76,7 @@ namespace ChromaVale.Presentation.Views
         private int _maxLevel;
         private float _boardOffsetX;
         private float _boardOffsetY;
+        private GameObject[,] _gridTiles;
 
         // ── Orb visuals ──
         // Maps grid position → SpriteRenderer instance for each orb on the board
@@ -110,6 +115,26 @@ namespace ChromaVale.Presentation.Views
             _maxLevel = _levelRepo.LevelCount;
             _levelNumber = Mathf.Clamp(_startLevel, 1, _maxLevel);
 
+            // If no HUD text is wired in the inspector, build a minimal screen-space
+            // overlay at runtime so level/moves/par are always visible.
+            if (_hudText == null)
+            {
+                var canvasGo = new GameObject("HUDCanvas");
+                var canvas = canvasGo.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                var tmpGo = new GameObject("HUDText");
+                tmpGo.transform.SetParent(canvasGo.transform, false);
+                _hudText = tmpGo.AddComponent<TextMeshProUGUI>();
+                _hudText.fontSize = 24;
+                _hudText.alignment = TextAlignmentOptions.Top;
+                var rect = _hudText.GetComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0.5f, 1f);
+                rect.anchorMax = new Vector2(0.5f, 1f);
+                rect.pivot = new Vector2(0.5f, 1f);
+                rect.anchoredPosition = new Vector2(0f, -20f);
+                rect.sizeDelta = new Vector2(400f, 60f);
+            }
+
             LoadLevel(_levelNumber);
         }
 
@@ -139,6 +164,7 @@ namespace ChromaVale.Presentation.Views
                       $"{_level.MergeOrbs?.Length ?? 0} orbs, " +
                       $"{_level.RestorationTargets?.Length ?? 0} targets, " +
                       $"par={_level.ParMoves}");
+            UpdateHUD();
         }
 
         // ── Grid Building ──
@@ -162,8 +188,43 @@ namespace ChromaVale.Presentation.Views
                 }
             }
 
-            // TODO: Create grid background tiles (simple quads or sprites)
-            // For now, just set up the camera to frame the board
+            // Create grid background tiles
+            _gridTiles = new GameObject[_level.Width, _level.Height];
+            for (int x = 0; x < _level.Width; x++)
+            {
+                for (int y = 0; y < _level.Height; y++)
+                {
+                    Vector3 pos = GridToWorld(x, y);
+                    var tile = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    tile.name = $"Tile_{x}_{y}";
+                    tile.transform.SetParent(transform, false);
+                    tile.transform.position = pos;
+                    tile.transform.localScale = Vector3.one * _tileSize * 0.95f;
+                    // Quad primitives ship with a MeshRenderer + BoxCollider, not a
+                    // SpriteRenderer — strip those so the sprite tint/sortingOrder
+                    // below are what actually renders (a default material would draw
+                    // white regardless of sr.color).
+                    var mr = tile.GetComponent<MeshRenderer>();
+                    if (mr != null) Destroy(mr);
+                    var col = tile.GetComponent<Collider>();
+                    if (col != null) Destroy(col);
+                    var sr = tile.GetComponent<SpriteRenderer>();
+                    if (sr == null) sr = tile.AddComponent<SpriteRenderer>();
+                    if (sr.sprite == null) sr.sprite = CreateWhiteSprite();
+                    // Check if this cell is an obstacle
+                    bool isObstacle = false;
+                    if (_level.Obstacles != null)
+                    {
+                        foreach (var obs in _level.Obstacles)
+                        {
+                            if (obs.X == x && obs.Y == y) { isObstacle = true; break; }
+                        }
+                    }
+                    sr.color = isObstacle ? new Color(0.03f, 0.04f, 0.05f) : new Color(0.08f, 0.10f, 0.12f);
+                    sr.sortingOrder = -2; // behind everything
+                    _gridTiles[x, y] = tile;
+                }
+            }
             SetupCamera();
         }
 
@@ -607,6 +668,7 @@ namespace ChromaVale.Presentation.Views
                     }
                     break;
             }
+            UpdateHUD();
         }
 
         private void HandleLevelComplete(LevelResult result)
@@ -614,9 +676,20 @@ namespace ChromaVale.Presentation.Views
             Debug.Log($"[MergeBoardView] Level Complete! Moves: {result.MovesUsed}, " +
                       $"Par: {result.Par}, Stars: {result.Stars}");
 
+            UpdateHUD();
+            if (_hudText != null) _hudText.text += $"    ★ {result.Stars}";
+
             // TODO: Show win popup, offer next level / retry
             // For now, auto-advance after 2 seconds
             Invoke(nameof(NextLevel), 2f);
+        }
+
+        private void UpdateHUD()
+        {
+            if (_hudText == null) return;
+            int moves = _board?.MoveCount ?? 0;
+            int par = _level?.ParMoves ?? 0;
+            _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}";
         }
 
         private void NextLevel()
@@ -682,6 +755,16 @@ namespace ChromaVale.Presentation.Views
                 _board.OnLevelComplete -= HandleLevelComplete;
             }
 
+            // Destroy all grid tiles
+            if (_gridTiles != null)
+            {
+                foreach (var tile in _gridTiles)
+                {
+                    if (tile != null) Destroy(tile);
+                }
+                _gridTiles = null;
+            }
+
             // Destroy all orb visuals
             foreach (var kvp in _orbVisuals)
             {
@@ -713,6 +796,18 @@ namespace ChromaVale.Presentation.Views
         private Color GetOrbColor(OrbColor color)
         {
             return OrbColors.TryGetValue(color, out var c) ? c : Color.white;
+        }
+
+        private static Sprite _whiteSprite;
+
+        private Sprite CreateWhiteSprite()
+        {
+            if (_whiteSprite == null)
+            {
+                var tex = Texture2D.whiteTexture;
+                _whiteSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 1f);
+            }
+            return _whiteSprite;
         }
 
         private Sprite CreateDefaultSprite(OrbColor color)
