@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using ChromaVale.Domain.Progression;
+using ChromaVale.Infrastructure.Audio;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -199,6 +200,10 @@ namespace ChromaVale.Presentation.Views
 
         private void OnLevelSelected(int level)
         {
+            // Audio: UI button tap
+            if (AudioServiceInstaller.Instance != null)
+                AudioServiceInstaller.Instance.PlaySound("button_tap");
+
             Debug.Log($"[LevelSelectView] Level {level} selected");
 
             // Hide level select, show board

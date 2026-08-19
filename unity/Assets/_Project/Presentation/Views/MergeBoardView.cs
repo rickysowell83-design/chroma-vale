@@ -39,6 +39,7 @@ using ChromaVale.Domain.PuzzleBoard;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using ChromaVale.Domain.Progression;
+using ChromaVale.Infrastructure.Audio;
 using TMPro;
 using UnityEngine.UI;
 
@@ -170,6 +171,9 @@ namespace ChromaVale.Presentation.Views
                       $"{_level.RestorationTargets?.Length ?? 0} targets, " +
                       $"par={_level.ParMoves}");
             UpdateHUD();
+            // Audio: level loaded
+            if (AudioServiceInstaller.Instance != null)
+                AudioServiceInstaller.Instance.PlaySound("level_start");
         }
 
         // ── Grid Building ──
@@ -285,6 +289,8 @@ namespace ChromaVale.Presentation.Views
 
                         // Lock flash (procedural fallback until target_lock_flash_strip.png arrives)
                         PlayTargetLockFlash(x, y);
+                        if (AudioServiceInstaller.Instance != null)
+                            AudioServiceInstaller.Instance.PlaySound("lock_flash");
                         Debug.Log($"[MergeBoardView] Target locked at ({x},{y}) — {orb.Color} T{orb.Tier}");
                         break;
                     }
@@ -748,6 +754,8 @@ namespace ChromaVale.Presentation.Views
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
                         PlaySpawnAnimation(change.Position.X, change.Position.Y);
+                        if (AudioServiceInstaller.Instance != null)
+                            AudioServiceInstaller.Instance.PlaySound("spawn");
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
                     }
                     break;
@@ -764,6 +772,8 @@ namespace ChromaVale.Presentation.Views
                                        change.NewOrb.Color, change.NewOrb.Tier);
                         PlayMergeAnimation(change.Position.X, change.Position.Y,
                                            GetOrbColor(change.NewOrb.Color));
+                        if (AudioServiceInstaller.Instance != null)
+                            AudioServiceInstaller.Instance.PlaySound("merge");
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
                     }
                     break;
@@ -847,6 +857,10 @@ namespace ChromaVale.Presentation.Views
 
         private void HandleLevelComplete(LevelResult result)
         {
+            // Audio: level complete fanfare
+            if (AudioServiceInstaller.Instance != null)
+                AudioServiceInstaller.Instance.PlaySound("win_fanfare");
+
             Debug.Log($"[MergeBoardView] Level Complete! Moves: {result.MovesUsed}, " +
                       $"Par: {result.Par}, Stars: {result.Stars}");
 
