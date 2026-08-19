@@ -634,12 +634,6 @@ namespace ChromaVale.Presentation.Views
 
         private void HandleBoardChanged(BoardChange change)
         {
-            // TODO: Animate the change using design constants:
-            //   Merge:  640ms (8 frames × 80ms) — squash → flash → settle
-            //   Spawn:  480ms (8 frames × 60ms) — scale-in + overshoot settle
-            //   Flash color = RESULT orb color, not input
-            // For now, sync visuals immediately + check target locks
-
             switch (change.Type)
             {
                 case ChangeType.OrbAdded:
@@ -647,6 +641,7 @@ namespace ChromaVale.Presentation.Views
                     {
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
+                        PlaySpawnAnimation(change.Position.X, change.Position.Y);
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
                     }
                     break;
@@ -661,11 +656,87 @@ namespace ChromaVale.Presentation.Views
                     {
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
+                        PlayMergeAnimation(change.Position.X, change.Position.Y,
+                                           GetOrbColor(change.NewOrb.Color));
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
                     }
                     break;
             }
             UpdateHUD();
+        }
+
+        // ── Merge/Spawn Animations (design constants: merge 640ms, spawn 480ms) ──
+
+        private void PlaySpawnAnimation(int x, int y)
+        {
+            if (!_orbVisuals.TryGetValue((x, y), out var sr) || sr == null) return;
+            StartCoroutine(SpawnRoutine(sr, sr.transform.localScale));
+        }
+
+        private void PlayMergeAnimation(int x, int y, Color flashColor)
+        {
+            if (!_orbVisuals.TryGetValue((x, y), out var sr) || sr == null) return;
+            StartCoroutine(MergeRoutine(sr, sr.transform.localScale, flashColor));
+        }
+
+        private System.Collections.IEnumerator SpawnRoutine(SpriteRenderer sr, Vector3 baseScale)
+        {
+            // 8 frames × 60ms = 480ms: scale-in + overshoot settle (easeOutBack)
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            float t = 0f;
+            while (t < SpawnAnimDuration)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / SpawnAnimDuration);
+                // easeOutBack: 0 → overshoot past 1 → settle at 1
+                float f = k - 1f;
+                float s = 1f + c3 * f * f * f + c1 * f * f;
+                sr.transform.localScale = baseScale * s;
+                yield return null;
+            }
+            sr.transform.localScale = baseScale;
+        }
+
+        private System.Collections.IEnumerator MergeRoutine(SpriteRenderer sr, Vector3 baseScale, Color flashColor)
+        {
+            // 8 frames × 80ms = 640ms: squash → flash → settle
+            // Flash color = RESULT orb color (already set on sr), brightened.
+            float t = 0f;
+            while (t < MergeAnimDuration)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / MergeAnimDuration);
+
+                if (k < 0.4f)
+                {
+                    // Phase 1 (0–40%): squash — flatten vertically, bulge horizontally
+                    float sq = Mathf.Sin((k / 0.4f) * Mathf.PI);
+                    sr.transform.localScale = new Vector3(
+                        baseScale.x * (1f + 0.35f * sq),
+                        baseScale.y * (1f - 0.35f * sq),
+                        baseScale.z);
+                }
+                else if (k < 0.75f)
+                {
+                    // Phase 2 (40–75%): flash — brighten toward white (result hue kept)
+                    float fk = (k - 0.4f) / 0.35f;
+                    sr.color = Color.Lerp(flashColor, Color.white, fk * 0.75f);
+                    float pop = 1f + 0.18f * Mathf.Sin(fk * Mathf.PI);
+                    sr.transform.localScale = baseScale * pop;
+                }
+                else
+                {
+                    // Phase 3 (75–100%): settle back to base scale/color
+                    float sk = (k - 0.75f) / 0.25f;
+                    float e = sk * sk * (3f - 2f * sk); // smoothstep
+                    sr.transform.localScale = Vector3.Lerp(baseScale * 1.18f, baseScale, e);
+                    sr.color = Color.Lerp(Color.white, flashColor, e);
+                }
+                yield return null;
+            }
+            sr.transform.localScale = baseScale;
+            sr.color = flashColor;
         }
 
         private void HandleLevelComplete(LevelResult result)
