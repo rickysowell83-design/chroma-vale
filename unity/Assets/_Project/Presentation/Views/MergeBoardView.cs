@@ -91,6 +91,9 @@ namespace ChromaVale.Presentation.Views
         private Coroutine _snapBackCoroutine;
         private Vector3 _draggedBaseScale = Vector3.one;
         private Sprite _lockFlashSprite;
+        private Sprite[] _snapBackFrames;
+        private Sprite[] _targetPulseFrames;
+        private Sprite[] _lockFlashFrames;
         private readonly Dictionary<(int x, int y), Coroutine> _targetPulseRoutines = new();
 
         // ── Colors for orbs (should match DESIGN_CANON CMY primaries) ──
@@ -292,37 +295,70 @@ namespace ChromaVale.Presentation.Views
         // ── Target animations (procedural fallback until strips arrive) ──
 
         /// <summary>
-        /// Idle pulse loop: 4 frames × 120ms = 480ms, scale 1.0 → 1.05 → 1.0 → 0.98 → loop.
-        /// TODO: replace with target_idle_pulse_strip.png when artist delivers.
+        /// Idle pulse loop: 4 frames × 120ms = 480ms.  Uses target_idle_pulse_strip.png
+        /// frames when available (breathing glow); falls back to scale keyframes.
         /// </summary>
         private System.Collections.IEnumerator TargetIdlePulseRoutine(Transform targetTransform, SpriteRenderer sr)
         {
-            Vector3 baseScale = targetTransform.localScale;
-            float[] keyframes = { 1.00f, 1.05f, 1.00f, 0.98f };
-            float frameDuration = TargetPulseDuration / 4f; // 120ms
-            float frameTimer = 0f;
-            int frame = 0;
+            if (_targetPulseFrames == null)
+                _targetPulseFrames = LoadStripFrames("target_idle_pulse_strip");
+            bool useStrip = _targetPulseFrames != null;
 
-            while (targetTransform != null)
+            if (useStrip)
             {
-                frameTimer += Time.deltaTime;
-                if (frameTimer >= frameDuration)
+                // Strip path: swap frames; strip alpha bakes the pulse, so tint full color.
+                Color tint = sr.color;
+                tint.a = 1f;
+                sr.color = tint;
+                sr.sprite = _targetPulseFrames[0];
+
+                float frameDuration = TargetPulseDuration / _targetPulseFrames.Length; // 120ms
+                float frameTimer = 0f;
+                int frame = 0;
+
+                while (targetTransform != null)
                 {
-                    frameTimer = 0f;
-                    frame = (frame + 1) % keyframes.Length;
-                    targetTransform.localScale = baseScale * keyframes[frame];
+                    frameTimer += Time.deltaTime;
+                    if (frameTimer >= frameDuration)
+                    {
+                        frameTimer = 0f;
+                        frame = (frame + 1) % _targetPulseFrames.Length;
+                        sr.sprite = _targetPulseFrames[frame];
+                    }
+                    yield return null;
                 }
-                yield return null;
+            }
+            else
+            {
+                // Fallback: scale keyframes 1.0 → 1.05 → 1.0 → 0.98
+                Vector3 baseScale = targetTransform.localScale;
+                float[] keyframes = { 1.00f, 1.05f, 1.00f, 0.98f };
+                float frameDuration = TargetPulseDuration / 4f; // 120ms
+                float frameTimer = 0f;
+                int frame = 0;
+
+                while (targetTransform != null)
+                {
+                    frameTimer += Time.deltaTime;
+                    if (frameTimer >= frameDuration)
+                    {
+                        frameTimer = 0f;
+                        frame = (frame + 1) % keyframes.Length;
+                        targetTransform.localScale = baseScale * keyframes[frame];
+                    }
+                    yield return null;
+                }
             }
         }
 
         /// <summary>
         /// Green ring expand+fade on target lock.  4 frames × 50ms = 200ms.
-        /// TODO: replace with target_lock_flash_strip.png when artist delivers.
+        /// Uses target_lock_flash_strip.png when available; falls back to procedural ring.
         /// </summary>
         private void PlayTargetLockFlash(int x, int y)
         {
-            if (_lockFlashSprite == null) _lockFlashSprite = CreateRingSprite();
+            if (_lockFlashFrames == null)
+                _lockFlashFrames = LoadStripFrames("target_lock_flash_strip");
 
             var worldPos = GridToWorld(x, y);
             var go = new GameObject($"LockFlash_{x}_{y}");
@@ -330,8 +366,17 @@ namespace ChromaVale.Presentation.Views
             go.transform.position = worldPos;
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _lockFlashSprite;
-            sr.color = new Color(0.20f, 1f, 0.40f, 0.95f); // green ring
+            if (_lockFlashFrames != null)
+            {
+                sr.sprite = _lockFlashFrames[0];
+                sr.color = new Color(0.20f, 1f, 0.40f, 1f); // green tint; strip bakes the fade
+            }
+            else
+            {
+                if (_lockFlashSprite == null) _lockFlashSprite = CreateRingSprite();
+                sr.sprite = _lockFlashSprite;
+                sr.color = new Color(0.20f, 1f, 0.40f, 0.95f); // green ring
+            }
             sr.sortingOrder = 1; // above orbs
 
             StartCoroutine(TargetLockFlashRoutine(go));
@@ -343,16 +388,36 @@ namespace ChromaVale.Presentation.Views
             var sr = flashGo.GetComponent<SpriteRenderer>();
             Color startColor = sr.color;
             Vector3 startScale = flashGo.transform.localScale;
+            bool useStrip = _lockFlashFrames != null;
+
+            float frameDuration = TargetLockDuration / 4f; // 50ms
+            float frameTimer = 0f;
+            int frame = 0;
 
             while (t < TargetLockDuration)
             {
                 t += Time.deltaTime;
-                float k = Mathf.Clamp01(t / TargetLockDuration);
-                float e = k * k * (3f - 2f * k);
-                flashGo.transform.localScale = startScale * Mathf.Lerp(0.8f, 1.6f, e);
-                Color c = startColor;
-                c.a = Mathf.Lerp(startColor.a, 0f, e);
-                sr.color = c;
+
+                if (useStrip)
+                {
+                    // Strip path: advance frames — expansion + fade are baked into the art.
+                    frameTimer += Time.deltaTime;
+                    if (frameTimer >= frameDuration)
+                    {
+                        frameTimer = 0f;
+                        frame = (frame + 1) % _lockFlashFrames.Length;
+                        sr.sprite = _lockFlashFrames[frame];
+                    }
+                }
+                else
+                {
+                    float k = Mathf.Clamp01(t / TargetLockDuration);
+                    float e = k * k * (3f - 2f * k);
+                    flashGo.transform.localScale = startScale * Mathf.Lerp(0.8f, 1.6f, e);
+                    Color c = startColor;
+                    c.a = Mathf.Lerp(startColor.a, 0f, e);
+                    sr.color = c;
+                }
                 yield return null;
             }
 
@@ -586,6 +651,7 @@ namespace ChromaVale.Presentation.Views
 
         private void StartSnapBack(GameObject orbVisual, Vector3 origin, Vector3 baseScale)
         {
+            if (_snapBackFrames == null) _snapBackFrames = LoadStripFrames("snap_back_strip");
             StopSnapBack();
             _snapBackCoroutine = StartCoroutine(SnapBackRoutine(orbVisual, origin, baseScale));
         }
@@ -599,13 +665,31 @@ namespace ChromaVale.Presentation.Views
             }
         }
 
+        /// <summary>
+        /// Loads the 4 frames of a UI animation strip from Resources.
+        /// Strips live at Assets/_Project/Resources/UI/AnimationStrips/.
+        /// Returns null when the strip is missing (caller falls back to procedural).
+        /// </summary>
+        private Sprite[] LoadStripFrames(string stripName)
+        {
+            var frames = Resources.LoadAll<Sprite>($"UI/AnimationStrips/{stripName}");
+            return frames != null && frames.Length >= 4 ? frames : null;
+        }
+
         private System.Collections.IEnumerator SnapBackRoutine(GameObject orbVisual, Vector3 origin, Vector3 baseScale)
         {
-            // 4 frames × 60ms = 240ms: quick "nope" — shrink + fade back to origin
+            // Strip-first: snap_back_strip.png (4 frames × 60ms = 240ms) — pulsing glow
+            // overlaid on the orb while it returns to origin.  Fallback: shrink + fade.
+            var sr = orbVisual.GetComponent<SpriteRenderer>();
+            Sprite originalSprite = sr != null ? sr.sprite : null;
+            Color startColor = sr != null ? sr.color : Color.white;
+            bool useStrip = sr != null && _snapBackFrames != null;
+
             float t = 0f;
             Vector3 startPos = orbVisual.transform.position;
-            var sr = orbVisual.GetComponent<SpriteRenderer>();
-            Color startColor = sr != null ? sr.color : Color.white;
+            float frameDuration = SnapBackDuration / 4f; // 60ms
+            float frameTimer = 0f;
+            int frame = 0;
 
             while (t < SnapBackDuration)
             {
@@ -613,12 +697,30 @@ namespace ChromaVale.Presentation.Views
                 float k = Mathf.Clamp01(t / SnapBackDuration);
                 float e = k * k * (3f - 2f * k); // smoothstep
                 orbVisual.transform.position = Vector3.Lerp(startPos, origin, e);
-                orbVisual.transform.localScale = baseScale * (1f - 0.3f * e);
-                if (sr != null)
+
+                if (useStrip)
                 {
-                    Color c = startColor;
-                    c.a = Mathf.Lerp(startColor.a, 0f, e);
-                    sr.color = c;
+                    // Advance through the strip frames; tint with the orb color.
+                    frameTimer += Time.deltaTime;
+                    if (frameTimer >= frameDuration)
+                    {
+                        frameTimer = 0f;
+                        frame = (frame + 1) % _snapBackFrames.Length;
+                        sr.sprite = _snapBackFrames[frame];
+                        Color c = startColor;
+                        c.a = 1f;
+                        sr.color = c;
+                    }
+                }
+                else
+                {
+                    orbVisual.transform.localScale = baseScale * (1f - 0.3f * e);
+                    if (sr != null)
+                    {
+                        Color c = startColor;
+                        c.a = Mathf.Lerp(startColor.a, 0f, e);
+                        sr.color = c;
+                    }
                 }
                 yield return null;
             }
@@ -626,7 +728,11 @@ namespace ChromaVale.Presentation.Views
             // Restore original state
             orbVisual.transform.position = origin;
             orbVisual.transform.localScale = baseScale;
-            if (sr != null) sr.color = startColor;
+            if (sr != null)
+            {
+                sr.sprite = originalSprite;
+                sr.color = startColor;
+            }
             _snapBackCoroutine = null;
         }
 
