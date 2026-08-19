@@ -52,7 +52,7 @@ namespace ChromaVale.Tests
 
             Assert.AreEqual(5, level.Width, "Level 4 grid width");
             Assert.AreEqual(5, level.Height, "Level 4 grid height");
-            Assert.AreEqual(4, level.ParMoves, "Level 4 par moves");
+            Assert.AreEqual(6, level.ParMoves, "Level 4 par moves (raised from 4 to give color-mix discovery breathing room)");
 
             Assert.AreEqual(8, level.MergeOrbs.Length, "Level 4 orb count");
             Assert.AreEqual(4, level.MergeOrbs.Count(o => o.Color == OrbColor.Cyan), "Level 4 Cyan orbs");

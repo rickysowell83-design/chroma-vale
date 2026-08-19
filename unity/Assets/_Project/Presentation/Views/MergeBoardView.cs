@@ -97,6 +97,10 @@ namespace ChromaVale.Presentation.Views
         private Sprite[] _lockFlashFrames;
         private readonly Dictionary<(int x, int y), Coroutine> _targetPulseRoutines = new();
 
+        // ── Onboarding cue (level 1 first-merge hint) ──
+        private TextMeshProUGUI _onboardingOverlay;
+        private bool _onboardingCueShown;
+
         // ── Colors for orbs (should match DESIGN_CANON CMY primaries) ──
         private static readonly Dictionary<OrbColor, Color> OrbColors = new()
         {
@@ -171,6 +175,8 @@ namespace ChromaVale.Presentation.Views
                       $"{_level.RestorationTargets?.Length ?? 0} targets, " +
                       $"par={_level.ParMoves}");
             UpdateHUD();
+            ShowOnboardingCue(levelNumber);
+
             // Audio: level loaded
             if (AudioServiceInstaller.Instance != null)
                 AudioServiceInstaller.Instance.PlaySound("level_start");
@@ -765,6 +771,8 @@ namespace ChromaVale.Presentation.Views
                     break;
 
                 case ChangeType.OrbTransformed:
+                    // First successful merge dismisses the onboarding hint (if shown)
+                    HideOnboardingCue();
                     RemoveOrbVisual(change.Position.X, change.Position.Y);
                     if (change.NewOrb != null)
                     {
@@ -857,6 +865,9 @@ namespace ChromaVale.Presentation.Views
 
         private void HandleLevelComplete(LevelResult result)
         {
+            // Dismiss onboarding hint if it was still showing
+            HideOnboardingCue();
+
             // Audio: level complete fanfare
             if (AudioServiceInstaller.Instance != null)
                 AudioServiceInstaller.Instance.PlaySound("win_fanfare");
@@ -886,6 +897,62 @@ namespace ChromaVale.Presentation.Views
             int moves = _board?.MoveCount ?? 0;
             int par = _level?.ParMoves ?? 0;
             _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}";
+        }
+
+        // ── Onboarding hint (Level 1 first-merge cue) ──
+
+        private void ShowOnboardingCue(int levelNumber)
+        {
+            if (levelNumber != 1) return;          // Only level 1
+            if (_onboardingCueShown) return;        // Only before the first merge
+            var saveManager = SaveGameManager.Instance;
+            if (saveManager != null && saveManager.GetStarsForLevel(1) > 0)
+                return;                              // Already beaten before → skip
+
+            if (_onboardingOverlay == null)
+                _onboardingOverlay = BuildOnboardingOverlay();
+            if (_onboardingOverlay != null)
+                _onboardingOverlay.gameObject.SetActive(true);
+        }
+
+        private void HideOnboardingCue()
+        {
+            if (_onboardingOverlay != null)
+                _onboardingOverlay.gameObject.SetActive(false);
+            _onboardingCueShown = true; // Treat the cue as consumed once the board starts changing
+        }
+
+        private TextMeshProUGUI BuildOnboardingOverlay()
+        {
+            // Reuse the HUD canvas (ScreenSpaceOverlay) so text renders on top of the board.
+            var parent = _hudText != null ? _hudText.transform.parent : null;
+            var canvasGo = parent != null ? parent.gameObject : null;
+            if (canvasGo == null)
+            {
+                canvasGo = new GameObject("HUDCanvas");
+                var canvas = canvasGo.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            }
+
+            var go = new GameObject("OnboardingCue");
+            go.transform.SetParent(canvasGo.transform, false);
+
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = "Merge two matching orbs to restore color!";
+            tmp.fontSize = 30;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+            tmp.raycastTarget = false;
+
+            var rect = tmp.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.18f);
+            rect.anchorMax = new Vector2(0.5f, 0.18f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(700f, 90f);
+
+            return tmp;
         }
 
         private void NextLevel()
