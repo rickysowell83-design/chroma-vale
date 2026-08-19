@@ -637,7 +637,7 @@ namespace ChromaVale.Presentation.Views
         private void UpdateHoverHighlight(Vector3 worldPos)
         {
             var gridPos = WorldToGrid(worldPos);
-            if (gridPos.HasValue && gridPos.Value != _dragSource && IsAdjacent(_dragSource, gridPos.Value))
+            if (gridPos.HasValue && gridPos.Value != _dragSource)
             {
                 var orb = _board.GetOrbAt(new GridPosition(gridPos.Value.x, gridPos.Value.y));
                 if (orb != null)
@@ -664,11 +664,6 @@ namespace ChromaVale.Presentation.Views
             }
         }
 
-        private static bool IsAdjacent((int x, int y) a, (int x, int y) b)
-        {
-            return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
-        }
-
         // ── Snap-back animation (procedural fallback until snap_back_strip.png) ──
 
         private void StartSnapBack(GameObject orbVisual, Vector3 origin, Vector3 baseScale)
@@ -682,6 +677,21 @@ namespace ChromaVale.Presentation.Views
         {
             if (_snapBackCoroutine != null)
             {
+                // Restore the orb visual BEFORE killing the coroutine: StopCoroutine
+                // skips the routine's cleanup tail, so a mid-flight snap-back would
+                // otherwise leave the orb stuck faded/shrunk at an interpolated spot.
+                if (_draggedOrbVisual != null)
+                {
+                    _draggedOrbVisual.transform.position = _dragOriginalPos;
+                    _draggedOrbVisual.transform.localScale = _draggedBaseScale;
+                    var sr = _draggedOrbVisual.GetComponent<SpriteRenderer>();
+                    if (sr != null)
+                    {
+                        var c = sr.color;
+                        c.a = 1f;
+                        sr.color = c;
+                    }
+                }
                 StopCoroutine(_snapBackCoroutine);
                 _snapBackCoroutine = null;
             }

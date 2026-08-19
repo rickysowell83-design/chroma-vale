@@ -485,7 +485,7 @@ namespace ChromaVale.Tests
         // ── Adjacency ────────────────────────────────────────────────────
 
         [Test]
-        public void TryMergeAt_NonAdjacent_ReturnsFalse()
+        public void TryMergeAt_NonAdjacent_FreeDrag_ReturnsTrue()
         {
             var ctl = NewBoard(5, 5, 5, null, new[]
             {
@@ -493,20 +493,23 @@ namespace ChromaVale.Tests
                 new MergeOrbPlacement(2, 0, OrbColor.Cyan, OrbTier.T1),
             });
 
-            // Gap of 1 cell between source and target → not adjacent.
-            Assert.IsFalse(ctl.TryMergeAt(P(0, 0), P(2, 0)));
-            Assert.AreEqual(0, ctl.MoveCount);
+            // Free-drag (playtest fix 2026-08-19): any cell to any cell merges,
+            // even with a gap — otherwise T2+T2 merges after a row merge land on
+            // non-adjacent cells and the level is unsolvable.
+            Assert.IsTrue(ctl.TryMergeAt(P(0, 0), P(2, 0)));
+            Assert.AreEqual(1, ctl.MoveCount);
         }
 
         [Test]
-        public void TryMergeAt_SameCell_NotAdjacent()
+        public void TryMergeAt_SameCell_ReturnsFalse()
         {
             var ctl = NewBoard(3, 3, 5, null, new[]
             {
                 new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
             });
 
-            // Merging cell to itself: dx+dy = 0, not 1.
+            // Dropping an orb on its own cell is a snap-back (UI), never a merge —
+            // free-drag must not allow an orb to self-upgrade in place.
             Assert.IsFalse(ctl.TryMergeAt(P(0, 0), P(0, 0)));
         }
 

@@ -83,10 +83,16 @@ namespace ChromaVale.Domain.PuzzleBoard
         {
             if (source == null || target == null) return false;
 
-            // 1. Bounds + adjacency (orthogonal only for now — extendable to diagonal).
+            // 1. Bounds check. Free-drag (playtest fix 2026-08-19): any cell to
+            //    any cell merges — adjacency removed so T2+T2 merges separated by
+            //    an empty cell after a row merge still work.
             if (!IsInBounds(source.X, source.Y) || !IsInBounds(target.X, target.Y))
                 return false;
-            if (!IsAdjacent(source, target))
+
+            // 1b. No self-merge: dropping an orb onto its own cell is a snap-back
+            //     (UI) case, never a merge. Without this guard, CanMerge(a,a) is
+            //     true and the orb silently upgrades itself in place.
+            if (source.X == target.X && source.Y == target.Y)
                 return false;
 
             var sourceOrb = _cells[source.X, source.Y];
@@ -165,13 +171,6 @@ namespace ChromaVale.Domain.PuzzleBoard
             if (moves <= par) return 3;
             if (moves <= par * 1.5) return 2;
             return 1;
-        }
-
-        private bool IsAdjacent(GridPosition a, GridPosition b)
-        {
-            int dx = Math.Abs(a.X - b.X);
-            int dy = Math.Abs(a.Y - b.Y);
-            return dx + dy == 1; // orthogonal 4-neighbour only
         }
 
         private bool IsInBounds(int x, int y)
