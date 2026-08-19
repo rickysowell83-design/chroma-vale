@@ -97,5 +97,6 @@
       "y": 5
     }
   ],
-  "obstacles": []
+  "obstacles": [],
+  "displayName": "Double Chain"
 }
