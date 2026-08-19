@@ -157,7 +157,7 @@ namespace ChromaVale.Presentation.Views
             var numGo = new GameObject("Number");
             numGo.transform.SetParent(go.transform, false);
             var numText = numGo.AddComponent<TextMeshProUGUI>();
-            numText.text = unlocked ? level.ToString() : "🔒";
+            numText.text = unlocked ? level.ToString() : "Locked";
             numText.fontSize = 36;
             numText.alignment = TextAlignmentOptions.Center;
             var numRect = numGo.GetComponent<RectTransform>();
