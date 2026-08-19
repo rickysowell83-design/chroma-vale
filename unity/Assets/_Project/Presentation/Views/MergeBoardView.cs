@@ -195,22 +195,17 @@ namespace ChromaVale.Presentation.Views
                 for (int y = 0; y < _level.Height; y++)
                 {
                     Vector3 pos = GridToWorld(x, y);
-                    var tile = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                    tile.name = $"Tile_{x}_{y}";
+                    // NOTE: Card snippet used CreatePrimitive(Quad), but Unity forbids
+                    // SpriteRenderer on a GameObject that already has a MeshFilter
+                    // (conflicts with the Quad's MeshFilter), and the default quad
+                    // material would render white. Plain GO + SpriteRenderer + white
+                    // sprite gives the intended dark tile that tints via sr.color.
+                    var tile = new GameObject($"Tile_{x}_{y}");
                     tile.transform.SetParent(transform, false);
                     tile.transform.position = pos;
                     tile.transform.localScale = Vector3.one * _tileSize * 0.95f;
-                    // Quad primitives ship with a MeshRenderer + BoxCollider, not a
-                    // SpriteRenderer — strip those so the sprite tint/sortingOrder
-                    // below are what actually renders (a default material would draw
-                    // white regardless of sr.color).
-                    var mr = tile.GetComponent<MeshRenderer>();
-                    if (mr != null) Destroy(mr);
-                    var col = tile.GetComponent<Collider>();
-                    if (col != null) Destroy(col);
-                    var sr = tile.GetComponent<SpriteRenderer>();
-                    if (sr == null) sr = tile.AddComponent<SpriteRenderer>();
-                    if (sr.sprite == null) sr.sprite = CreateWhiteSprite();
+                    var sr = tile.AddComponent<SpriteRenderer>();
+                    sr.sprite = CreateWhiteSprite();
                     // Check if this cell is an obstacle
                     bool isObstacle = false;
                     if (_level.Obstacles != null)
