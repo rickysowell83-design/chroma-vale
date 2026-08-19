@@ -119,10 +119,17 @@ namespace ChromaVale.Presentation.Views
 
         // ── Lifecycle ──
 
-        private void Start()
+        private void Awake()
         {
+            // Initialize in Awake (not Start) so this works even when the
+            // GameObject starts inactive — LevelSelectView activates it and
+            // calls LoadLevel() before Start() would fire.
             _levelRepo = new MergeLevelRepository();
             _maxLevel = _levelRepo.LevelCount;
+        }
+
+        private void Start()
+        {
             _levelNumber = Mathf.Clamp(_startLevel, 1, _maxLevel);
 
             // If no HUD text is wired in the inspector, build a minimal screen-space
@@ -145,7 +152,10 @@ namespace ChromaVale.Presentation.Views
                 rect.sizeDelta = new Vector2(400f, 60f);
             }
 
-            LoadLevel(_levelNumber);
+            // Only auto-load in Start if no level was loaded externally
+            // (LevelSelectView calls LoadLevel directly before Start fires)
+            if (_level == null)
+                LoadLevel(_levelNumber);
         }
 
         public void LoadLevel(int levelNumber)
