@@ -191,9 +191,11 @@ private void SetupCamera()
                 // ── 3-point lighting (§3.2) ──
                 SetupLighting();
 
-                // Enable the cyberpunk backdrop (was disabled in flat mode)
-                var backdrop = GameObject.Find("CyberpunkBackdrop");
-                if (backdrop != null) backdrop.SetActive(true);
+                // ── Backdrop (§1.5 / 3d8600d) ──
+                // The legacy "CyberpunkBackdrop" GameObject is intentionally NOT
+                // activated here: it is dead code from the old art style. The
+                // warm-cream camera background (ChromaPalette.PCB_Substrate) plus
+                // the EnvironmentBackdrop gradient quad are the board backdrop.
             }
         }
 
