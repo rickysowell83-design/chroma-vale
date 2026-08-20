@@ -145,11 +145,26 @@ namespace ChromaVale.Domain.PuzzleBoard
                 return;
             }
 
+            // Position-agnostic win (genre standard: Merge Dragons / EverMerge —
+            // produce the required orb anywhere, don't park it on a specific cell).
+            // Fixes levels whose targets sit at unreachable far corners like (3,3).
             foreach (var t in _targets)
             {
-                if (!IsInBounds(t.X, t.Y)) { _complete = false; return; }
-                var orb = _cells[t.X, t.Y];
-                if (orb == null || orb.Color != t.Color || orb.Tier != t.Tier)
+                bool found = false;
+                for (int y = 0; y < Height; y++)
+                {
+                    for (int x = 0; x < Width; x++)
+                    {
+                        var orb = _cells[x, y];
+                        if (orb != null && orb.Color == t.Color && orb.Tier == t.Tier)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                }
+                if (!found)
                 {
                     _complete = false;
                     return;

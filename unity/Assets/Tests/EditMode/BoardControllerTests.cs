@@ -286,16 +286,39 @@ namespace ChromaVale.Tests
                 new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
                 new MergeOrbPlacement(1, 0, OrbColor.Cyan, OrbTier.T1),
             };
-            // Target is at a cell we won't reach.
+            // Purple T2 cannot be produced from two cyan T1s — win must NOT trigger.
             var targets = new[]
             {
-                new RestorationTarget(3, 3, OrbColor.Green, OrbTier.T2),
+                new RestorationTarget(3, 3, OrbColor.Purple, OrbTier.T2),
             };
 
             var ctl = NewBoard(5, 5, 5, targets, orbs);
             ctl.TryMergeAt(P(0, 0), P(1, 0));
 
             Assert.IsFalse(ctl.IsLevelComplete);
+        }
+
+        [Test]
+        public void WinCondition_PositionAgnostic_TargetAtCorner_OrbElsewhere_StillWins()
+        {
+            var orbs = new[]
+            {
+                new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(1, 0, OrbColor.Cyan, OrbTier.T1),
+            };
+            // Target sits at a corner cell (3,3) that stays empty — the produced
+            // T2 orb lands at (1,0). Position-agnostic CheckWin must still win.
+            var targets = new[]
+            {
+                new RestorationTarget(3, 3, OrbColor.Cyan, OrbTier.T2),
+            };
+
+            var ctl = NewBoard(4, 4, 3, targets, orbs);
+
+            bool success = ctl.TryMergeAt(P(0, 0), P(1, 0));
+
+            Assert.IsTrue(success);
+            Assert.IsTrue(ctl.IsLevelComplete);
         }
 
         // ── Star Rating ─────────────────────────────────────────────────

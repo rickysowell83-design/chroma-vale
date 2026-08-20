@@ -90,6 +90,7 @@ namespace ChromaVale.Presentation.Views
         private Vector2 _lastPointerScreenPos; // Latest pointer position (screen space)
         private (int x, int y)? _hoverCell;    // Cell currently highlighted by hover
         private Coroutine _snapBackCoroutine;
+        private GameObject _snapBackOrb;        // survives nulling of _draggedOrbVisual (Bug 2: double-click fade)
         private Vector3 _draggedBaseScale = Vector3.one;
         private Sprite _lockFlashSprite;
         private Sprite[] _snapBackFrames;
@@ -670,6 +671,7 @@ namespace ChromaVale.Presentation.Views
         {
             if (_snapBackFrames == null) _snapBackFrames = LoadStripFrames("snap_back_strip");
             StopSnapBack();
+            _snapBackOrb = orbVisual;
             _snapBackCoroutine = StartCoroutine(SnapBackRoutine(orbVisual, origin, baseScale));
         }
 
@@ -680,11 +682,11 @@ namespace ChromaVale.Presentation.Views
                 // Restore the orb visual BEFORE killing the coroutine: StopCoroutine
                 // skips the routine's cleanup tail, so a mid-flight snap-back would
                 // otherwise leave the orb stuck faded/shrunk at an interpolated spot.
-                if (_draggedOrbVisual != null)
+                if (_snapBackOrb != null)
                 {
-                    _draggedOrbVisual.transform.position = _dragOriginalPos;
-                    _draggedOrbVisual.transform.localScale = _draggedBaseScale;
-                    var sr = _draggedOrbVisual.GetComponent<SpriteRenderer>();
+                    _snapBackOrb.transform.position = _dragOriginalPos;
+                    _snapBackOrb.transform.localScale = _draggedBaseScale;
+                    var sr = _snapBackOrb.GetComponent<SpriteRenderer>();
                     if (sr != null)
                     {
                         var c = sr.color;
@@ -694,6 +696,7 @@ namespace ChromaVale.Presentation.Views
                 }
                 StopCoroutine(_snapBackCoroutine);
                 _snapBackCoroutine = null;
+                _snapBackOrb = null;
             }
         }
 
@@ -1176,7 +1179,8 @@ namespace ChromaVale.Presentation.Views
         private float BaseOrbScale(int x, int y)
         {
             var orb = _board != null ? _board.GetOrbAt(new GridPosition(x, y)) : null;
-            return orb == null ? 1f : 0.8f + ((int)orb.Tier - 1) * 0.05f;
+            // Tier differentiation: 0.15f step → T1=0.80, T2=0.95, T3=1.10, T4=1.25, T5=1.40
+            return orb == null ? 1f : 0.8f + ((int)orb.Tier - 1) * 0.15f;
         }
 
         private void ClearBoard()
