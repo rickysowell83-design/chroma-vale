@@ -6,14 +6,9 @@ using System;
 namespace ChromaVale.Core.GameLogic
 {
     /// <summary>
-    /// The 11 playable orb colors in Chroma Vale.
+    /// The 7 playable orb colors in Chroma Vale (3 primaries + 3 secondaries + Brown).
     /// Maps to the legacy ColorMixer int values for adjacent mixing (Cyan=0, Magenta=1, Yellow=2,
-    /// Purple=6, Green=7, Orange=8, Brown=9). Teal/Vermilion/Amber/Slate are the Chroma Merge
-    /// expansion (tertiary colors).
-    ///
-    /// Design pin: Slate's recipe is Cyan+Purple (2C+M), chosen as the only remaining primary+secondary
-    /// pair consistent with the tertiary pattern (base + adjacent secondary). If the designer intends
-    /// a different recipe, update MixColors in MergeRules.cs.
+    /// Purple=6, Green=7, Orange=8, Brown=9).
     /// </summary>
     public enum OrbColor
     {
@@ -29,12 +24,6 @@ namespace ChromaVale.Core.GameLogic
 
         // --- Neutral ---
         Brown = 9,
-
-        // --- Tertiaries (Chroma Merge expansion) ---
-        Teal = 10,
-        Vermilion = 11,
-        Amber = 12,
-        Slate = 13,
     }
 
     /// <summary>
@@ -61,11 +50,8 @@ namespace ChromaVale.Core.GameLogic
         /// <summary>True if this orb is a secondary color (Purple, Green, Orange).</summary>
         public bool IsSecondary => Color is OrbColor.Purple or OrbColor.Green or OrbColor.Orange;
 
-        /// <summary>True if this orb is a tertiary color (Teal, Vermilion, Amber, Slate).</summary>
-        public bool IsTertiary => Color is OrbColor.Teal or OrbColor.Vermilion or OrbColor.Amber or OrbColor.Slate;
-
-        /// <summary>True if this orb is any mixed color (secondary or tertiary).</summary>
-        public bool IsMixed => IsSecondary || IsTertiary;
+        /// <summary>True if this orb is any mixed color (secondary).</summary>
+        public bool IsMixed => IsSecondary;
 
         /// <summary>True if this orb is Brown (dead / cleared).</summary>
         public bool IsBrown => Color is OrbColor.Brown;

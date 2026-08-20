@@ -130,10 +130,6 @@ namespace ChromaVale.Presentation.Views
             { OrbColor.Green,     new Color(0.098f, 0.8f, 0.098f) }, // #19CC19
             { OrbColor.Orange,    new Color(1f, 0.498f, 0f) },     // #FF7F00
             { OrbColor.Brown,     new Color(0.4f, 0.2f, 0.05f) },  // #66330D
-            { OrbColor.Teal,      new Color(0f, 0.5f, 0.5f) },
-            { OrbColor.Vermilion, new Color(0.886f, 0.2f, 0.2f) },
-            { OrbColor.Amber,     new Color(0.937f, 0.6f, 0f) },
-            { OrbColor.Slate,     new Color(0.424f, 0.459f, 0.49f) }, // #6C757D
         };
 
         // ── Lifecycle ──
@@ -696,9 +692,9 @@ namespace ChromaVale.Presentation.Views
         ///   T1/T3/T4/T5 → T{tier}/{color}/{color}_T{tier}_{suffix}.png
         ///   T2           → T2/{color}_T2_idle.png (flat)
         /// Suffixes: T1/T2=_idle, T3=_faceted, T4=_runed, T5=_prism (brown=_cracked).
-        /// Tertiary colors (Teal/Vermilion/Amber/Slate) have no art yet → null, and
-        /// callers keep the procedural circle fallback. Results are cached; a null
-        /// result is cached too so missing art is only probed once.
+        /// Tertiary colors removed (canon 6-color compliance). Callers keep
+        /// the procedural circle fallback for any missing art. Results are
+        /// cached; a null result is cached too so missing art is only probed once.
         /// </summary>
         private Sprite LoadOrbSprite(OrbColor color, int tier)
         {

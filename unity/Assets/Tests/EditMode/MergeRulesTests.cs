@@ -8,7 +8,7 @@ using ChromaVale.Core.GameLogic;
 namespace ChromaVale.Tests
 {
     /// <summary>
-    /// Comprehensive test suite for MergeRules (11-color merge system).
+    /// Comprehensive test suite for MergeRules (7-color merge system, canon 6 + Brown).
     /// Covers every defined mixing recipe, Brown rules, tier merges,
     /// boundary conditions, and CanMerge semantics.
     /// </summary>
@@ -58,10 +58,6 @@ namespace ChromaVale.Tests
         [TestCase(OrbColor.Green, OrbTier.T1, OrbTier.T2)]
         [TestCase(OrbColor.Orange, OrbTier.T1, OrbTier.T2)]
         [TestCase(OrbColor.Brown, OrbTier.T1, OrbTier.T2)] // Brown+Brown=Clear, but brown+brown same-color is before brown check... wait no, brown check comes first. Let me test brown separately.
-        [TestCase(OrbColor.Teal, OrbTier.T1, OrbTier.T2)]
-        [TestCase(OrbColor.Vermilion, OrbTier.T2, OrbTier.T3)]
-        [TestCase(OrbColor.Amber, OrbTier.T3, OrbTier.T4)]
-        [TestCase(OrbColor.Slate, OrbTier.T1, OrbTier.T2)]
         public void TryMerge_SameColor_ReturnsTierMerge(OrbColor color, OrbTier fromTier, OrbTier expectedTier)
         {
             // Skip Brown — it follows different rules
@@ -101,10 +97,6 @@ namespace ChromaVale.Tests
         [TestCase(OrbColor.Purple)]
         [TestCase(OrbColor.Green)]
         [TestCase(OrbColor.Orange)]
-        [TestCase(OrbColor.Teal)]
-        [TestCase(OrbColor.Vermilion)]
-        [TestCase(OrbColor.Amber)]
-        [TestCase(OrbColor.Slate)]
         public void TryMerge_BrownPlusNonBrown_ReturnsInvalid(OrbColor nonBrown)
         {
             var r = MergeRules.TryMerge(Primary(OrbColor.Brown), Primary(nonBrown));
@@ -142,39 +134,38 @@ namespace ChromaVale.Tests
             Assert.AreEqual(OrbColor.Orange, r.ResultOrb!.Color);
         }
 
-        // ── Primary + Secondary → Tertiary recipes ─────────────────────
+        // ── Primary + Secondary → Brown (former tertiary recipes) ──────
 
         [Test]
-        public void Mix_CyanPlusGreen_ReturnsTeal()
+        public void Mix_CyanPlusGreen_ReturnsBrown()
         {
             var r = Merge(OrbColor.Cyan, OrbColor.Green);
-            Assert.AreEqual(MergeOutcome.ColorMix, r.Outcome);
-            Assert.AreEqual(OrbColor.Teal, r.ResultOrb!.Color);
+            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
+            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
         }
 
         [Test]
-        public void Mix_MagentaPlusOrange_ReturnsVermilion()
+        public void Mix_MagentaPlusOrange_ReturnsBrown()
         {
             var r = Merge(OrbColor.Magenta, OrbColor.Orange);
-            Assert.AreEqual(MergeOutcome.ColorMix, r.Outcome);
-            Assert.AreEqual(OrbColor.Vermilion, r.ResultOrb!.Color);
+            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
+            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
         }
 
         [Test]
-        public void Mix_YellowPlusOrange_ReturnsAmber()
+        public void Mix_YellowPlusOrange_ReturnsBrown()
         {
             var r = Merge(OrbColor.Yellow, OrbColor.Orange);
-            Assert.AreEqual(MergeOutcome.ColorMix, r.Outcome);
-            Assert.AreEqual(OrbColor.Amber, r.ResultOrb!.Color);
+            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
+            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
         }
 
         [Test]
-        // DESIGN PIN: Cyan+Purple=Slate — documented in OrbData.cs
-        public void Mix_CyanPlusPurple_ReturnsSlate()
+        public void Mix_CyanPlusPurple_ReturnsBrown()
         {
             var r = Merge(OrbColor.Cyan, OrbColor.Purple);
-            Assert.AreEqual(MergeOutcome.ColorMix, r.Outcome);
-            Assert.AreEqual(OrbColor.Slate, r.ResultOrb!.Color);
+            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
+            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
         }
 
         // ── Primary + Secondary → Brown (all-3-primaries / undefined) ──
@@ -245,40 +236,6 @@ namespace ChromaVale.Tests
             Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
         }
 
-        // ── Tertiary + anything → Brown ────────────────────────────────
-
-        [Test]
-        public void Mix_TertiaryPlusPrimary_ReturnsBrown(
-            [Values(OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor tertiary,
-            [Values(OrbColor.Cyan, OrbColor.Magenta, OrbColor.Yellow)] OrbColor primary)
-        {
-            var r = Merge(tertiary, primary);
-            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
-            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
-        }
-
-        [Test]
-        public void Mix_TertiaryPlusSecondary_ReturnsBrown(
-            [Values(OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor tertiary,
-            [Values(OrbColor.Purple, OrbColor.Green, OrbColor.Orange)] OrbColor secondary)
-        {
-            var r = Merge(tertiary, secondary);
-            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
-            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
-        }
-
-        [Test]
-        public void Mix_TertiaryPlusTertiary_ReturnsBrown(
-            [Values(OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor a,
-            [Values(OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor b)
-        {
-            // Skip same-color (that would be tier merge, caught earlier)
-            if (a == b) return;
-            var r = Merge(a, b);
-            Assert.AreEqual(MergeOutcome.BrownProduction, r.Outcome);
-            Assert.AreEqual(OrbColor.Brown, r.ResultOrb!.Color);
-        }
-
         // ── Mixing preserves tier of source orbs ───────────────────────
 
         [Test]
@@ -296,9 +253,9 @@ namespace ChromaVale.Tests
         [Test]
         public void Mix_IsSymmetric(
             [Values(OrbColor.Cyan, OrbColor.Magenta, OrbColor.Yellow, OrbColor.Purple, OrbColor.Green, OrbColor.Orange,
-                    OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor a,
+                    OrbColor.Brown)] OrbColor a,
             [Values(OrbColor.Cyan, OrbColor.Magenta, OrbColor.Yellow, OrbColor.Purple, OrbColor.Green, OrbColor.Orange,
-                    OrbColor.Teal, OrbColor.Vermilion, OrbColor.Amber, OrbColor.Slate)] OrbColor b)
+                    OrbColor.Brown)] OrbColor b)
         {
             if (a == b) return; // same color → tier merge, not color mix
             var r1 = Merge(a, b);
