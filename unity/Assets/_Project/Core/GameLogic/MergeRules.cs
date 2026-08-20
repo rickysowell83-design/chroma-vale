@@ -46,7 +46,11 @@ namespace ChromaVale.Core.GameLogic
         /// Returns true if merging these two orbs would produce any valid outcome
         /// (tier merge, color mix, brown production, or brown clear).
         /// </summary>
-        public static bool CanMerge(OrbData? a, OrbData? b)
+        /// <param name="mixingEnabled">
+        /// When false, cross-color merges are rejected (tutorial gate — only
+        /// same-color tier merges allowed). Defaults to true.
+        /// </param>
+        public static bool CanMerge(OrbData? a, OrbData? b, bool mixingEnabled = true)
         {
             if (a is null || b is null) return false;
             if (a.Tier != b.Tier) return false;
@@ -59,6 +63,10 @@ namespace ChromaVale.Core.GameLogic
             if (a.Color == b.Color && a.Tier == OrbTier.T5)
                 return false;
 
+            // Mixing gate: when disabled, cross-color pairs cannot merge.
+            if (!mixingEnabled && a.Color != b.Color)
+                return false;
+
             return true;
         }
 
@@ -66,7 +74,11 @@ namespace ChromaVale.Core.GameLogic
         /// Attempt to merge two orbs. Both must be non-null and same tier.
         /// Returns a MergeResult describing the outcome.
         /// </summary>
-        public static MergeResult TryMerge(OrbData? source, OrbData? target)
+        /// <param name="mixingEnabled">
+        /// When false, cross-color merges are rejected (tutorial gate — only
+        /// same-color tier merges allowed). Defaults to true.
+        /// </param>
+        public static MergeResult TryMerge(OrbData? source, OrbData? target, bool mixingEnabled = true)
         {
             if (source is null) return Invalid;
             if (target is null) return Invalid;
@@ -98,7 +110,12 @@ namespace ChromaVale.Core.GameLogic
                 return Invalid; // T5 capped
             }
 
-            // 4. Different colors, same tier → color mix
+            // 4. Mixing gate: when disabled, cross-color merges are rejected.
+            //    (Brown rules and same-color tier merges above still apply.)
+            if (!mixingEnabled)
+                return Invalid;
+
+            // 5. Different colors, same tier → color mix
             var mixed = MixColors(source.Color, target.Color);
 
             if (mixed == OrbColor.Brown)

@@ -75,6 +75,7 @@ namespace ChromaVale.Core.GameLogic
                     Height = GetGridDimension(root, "height"),
                     ParMoves = GetInt32(root, "parMoves"),
                     DisplayName = GetString(root, "displayName") ?? $"Level {levelNumber}",
+                    MixingEnabled = GetBool(root, "mixingEnabled", true),
                     Obstacles = ParseObstacles(root),
                     MergeOrbs = ParseOrbs(root.GetProperty("orbs")),
                     RestorationTargets = ParseTargets(root.GetProperty("targets")),
@@ -105,6 +106,16 @@ namespace ChromaVale.Core.GameLogic
                 return value.GetString();
             }
             return null;
+        }
+
+        private static bool GetBool(JsonElement element, string property, bool defaultValue)
+        {
+            if (element.TryGetProperty(property, out JsonElement value) &&
+                (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False))
+            {
+                return value.GetBoolean();
+            }
+            return defaultValue;
         }
 
         private static MergeOrbPlacement[] ParseOrbs(JsonElement array)

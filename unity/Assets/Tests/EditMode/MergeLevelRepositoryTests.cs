@@ -109,9 +109,58 @@ namespace ChromaVale.Tests
         }
 
         [Test]
+        public void GetMergeLevel_FixturesWithoutKey_DefaultMixingEnabledTrue()
+        {
+            // Current validator fixtures carry no "mixingEnabled" key —
+            // backward-compatible default must be true (mixing allowed).
+            for (int i = 1; i <= 10; i++)
+            {
+                LevelData level = _repository.GetMergeLevel(i);
+                Assert.IsTrue(level.MixingEnabled, $"Level {i} should default MixingEnabled to true when the key is absent");
+            }
+        }
+
+        [Test]
+        public void GetMergeLevel_MixingEnabledFalse_ParsesFalse()
+        {
+            var repo = new MergeLevelRepository(new InlineJsonProvider(
+                "{\"grid\":{\"width\":3,\"height\":3},\"parMoves\":2,\"displayName\":\"Gate\","
+                + "\"mixingEnabled\":false,\"orbs\":[],\"targets\":[]}"));
+
+            LevelData level = repo.GetMergeLevel(1);
+
+            Assert.IsFalse(level.MixingEnabled, "explicit \"mixingEnabled\":false must parse to false");
+        }
+
+        [Test]
+        public void GetMergeLevel_MixingEnabledTrue_ParsesTrue()
+        {
+            var repo = new MergeLevelRepository(new InlineJsonProvider(
+                "{\"grid\":{\"width\":3,\"height\":3},\"parMoves\":2,\"displayName\":\"Gate\","
+                + "\"mixingEnabled\":true,\"orbs\":[],\"targets\":[]}"));
+
+            LevelData level = repo.GetMergeLevel(1);
+
+            Assert.IsTrue(level.MixingEnabled, "explicit \"mixingEnabled\":true must parse to true");
+        }
+
+        [Test]
         public void LevelCount_Is10()
         {
             Assert.AreEqual(10, _repository.LevelCount);
+        }
+
+        /// <summary>
+        /// Minimal provider that returns a single canned JSON string for any level
+        /// number — lets tests exercise parse paths without touching fixtures.
+        /// </summary>
+        private sealed class InlineJsonProvider : ILevelJsonProvider
+        {
+            private readonly string _json;
+
+            public InlineJsonProvider(string json) => _json = json;
+
+            public string GetLevelJson(int levelNumber) => _json;
         }
     }
 }

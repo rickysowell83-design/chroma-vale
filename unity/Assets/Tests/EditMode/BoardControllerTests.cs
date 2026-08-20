@@ -21,13 +21,15 @@ namespace ChromaVale.Tests
 
         private static LevelData MakeLevel(int w, int h, int par,
             RestorationTarget[]? targets = null,
-            MergeOrbPlacement[]? orbs = null)
+            MergeOrbPlacement[]? orbs = null,
+            bool mixingEnabled = true)
         {
             return new LevelData
             {
                 Width = w,
                 Height = h,
                 ParMoves = par,
+                MixingEnabled = mixingEnabled,
                 RestorationTargets = targets ?? Array.Empty<RestorationTarget>(),
                 MergeOrbs = orbs ?? Array.Empty<MergeOrbPlacement>(),
                 Sources = Array.Empty<LevelSource>(),
@@ -43,10 +45,11 @@ namespace ChromaVale.Tests
 
         private static BoardController NewBoard(int w, int h, int par,
             RestorationTarget[]? targets = null,
-            MergeOrbPlacement[]? orbs = null)
+            MergeOrbPlacement[]? orbs = null,
+            bool mixingEnabled = true)
         {
             var ctl = new BoardController();
-            ctl.Initialize(MakeLevel(w, h, par, targets, orbs));
+            ctl.Initialize(MakeLevel(w, h, par, targets, orbs, mixingEnabled));
             return ctl;
         }
 
@@ -199,6 +202,70 @@ namespace ChromaVale.Tests
             Assert.IsNotNull(merged);
             Assert.AreEqual(OrbColor.Purple, merged!.Color);
             Assert.AreEqual(OrbTier.T1, merged.Tier);
+        }
+
+        // ── TryMergeAt — Mixing Gate (mixingEnabled=false) ──────────────
+
+        [Test]
+        public void TryMergeAt_MixingDisabled_CrossColor_ReturnsFalseAndUnchanged()
+        {
+            var ctl = NewBoard(4, 4, 5, null, new[]
+            {
+                new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(1, 0, OrbColor.Magenta, OrbTier.T1),
+            }, mixingEnabled: false);
+
+            bool success = ctl.TryMergeAt(P(0, 0), P(1, 0));
+
+            Assert.IsFalse(success);
+            Assert.AreEqual(0, ctl.MoveCount);
+
+            // Both orbs still in place, untouched.
+            var a = ctl.GetOrbAt(P(0, 0));
+            var b = ctl.GetOrbAt(P(1, 0));
+            Assert.IsNotNull(a);
+            Assert.IsNotNull(b);
+            Assert.AreEqual(OrbColor.Cyan, a!.Color);
+            Assert.AreEqual(OrbColor.Magenta, b!.Color);
+        }
+
+        [Test]
+        public void TryMergeAt_MixingDisabled_SameColor_StillMerges()
+        {
+            var ctl = NewBoard(4, 4, 5, null, new[]
+            {
+                new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(1, 0, OrbColor.Cyan, OrbTier.T1),
+            }, mixingEnabled: false);
+
+            bool success = ctl.TryMergeAt(P(0, 0), P(1, 0));
+
+            Assert.IsTrue(success);
+            Assert.AreEqual(1, ctl.MoveCount);
+
+            var merged = ctl.GetOrbAt(P(1, 0));
+            Assert.IsNotNull(merged);
+            Assert.AreEqual(OrbColor.Cyan, merged!.Color);
+            Assert.AreEqual(OrbTier.T2, merged.Tier);
+        }
+
+        [Test]
+        public void TryMergeAt_MixingEnabled_CrossColor_StillMixes()
+        {
+            // Explicit true = legacy default behavior.
+            var ctl = NewBoard(4, 4, 5, null, new[]
+            {
+                new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(1, 0, OrbColor.Magenta, OrbTier.T1),
+            }, mixingEnabled: true);
+
+            bool success = ctl.TryMergeAt(P(0, 0), P(1, 0));
+
+            Assert.IsTrue(success);
+            Assert.AreEqual(1, ctl.MoveCount);
+            var merged = ctl.GetOrbAt(P(1, 0));
+            Assert.IsNotNull(merged);
+            Assert.AreEqual(OrbColor.Purple, merged!.Color);
         }
 
         // ── TryMergeAt — Brown Production ────────────────────────────────

@@ -26,6 +26,7 @@ namespace ChromaVale.Domain.PuzzleBoard
         private RestorationTarget[] _targets = Array.Empty<RestorationTarget>();
         private int _par;
         private bool _complete;
+        private bool _mixingEnabled = true;
 
         /// <summary>Board width (set on Initialize).</summary>
         public int Width { get; private set; }
@@ -59,6 +60,7 @@ namespace ChromaVale.Domain.PuzzleBoard
 
             _targets = levelData.RestorationTargets ?? Array.Empty<RestorationTarget>();
             _par = levelData.ParMoves;
+            _mixingEnabled = levelData.MixingEnabled;
             MoveCount = 0;
             _complete = false;
 
@@ -99,10 +101,10 @@ namespace ChromaVale.Domain.PuzzleBoard
             var targetOrb = _cells[target.X, target.Y];
 
             // 2. Ask Core rules whether this pair merges at all.
-            if (!MergeRules.CanMerge(sourceOrb, targetOrb))
+            if (!MergeRules.CanMerge(sourceOrb, targetOrb, _mixingEnabled))
                 return false;
 
-            var result = MergeRules.TryMerge(sourceOrb, targetOrb);
+            var result = MergeRules.TryMerge(sourceOrb, targetOrb, _mixingEnabled);
             if (result.Outcome == MergeOutcome.Invalid)
                 return false;
 

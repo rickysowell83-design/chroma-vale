@@ -309,5 +309,67 @@ namespace ChromaVale.Tests
         {
             Assert.IsFalse(MergeRules.CanMerge(null, Primary(OrbColor.Cyan)));
         }
+
+        // ── Mixing gate (mixingEnabled=false) ──────────────────────────
+
+        [Test]
+        public void CanMerge_MixingDisabled_CrossColor_ReturnsFalse()
+        {
+            Assert.IsFalse(MergeRules.CanMerge(
+                Primary(OrbColor.Cyan), Primary(OrbColor.Magenta), mixingEnabled: false));
+        }
+
+        [Test]
+        public void CanMerge_MixingDisabled_SameColor_ReturnsTrue()
+        {
+            Assert.IsTrue(MergeRules.CanMerge(
+                Primary(OrbColor.Cyan), Primary(OrbColor.Cyan), mixingEnabled: false));
+        }
+
+        [Test]
+        public void CanMerge_MixingDisabled_BrownPlusBrown_ReturnsTrue()
+        {
+            // Brown+Brown is a clear, not a color mix — allowed even with mixing disabled.
+            Assert.IsTrue(MergeRules.CanMerge(
+                Primary(OrbColor.Brown), Primary(OrbColor.Brown), mixingEnabled: false));
+        }
+
+        [Test]
+        public void TryMerge_MixingDisabled_CrossColor_ReturnsInvalid()
+        {
+            var r = MergeRules.TryMerge(
+                Primary(OrbColor.Cyan), Primary(OrbColor.Magenta), mixingEnabled: false);
+            Assert.AreEqual(MergeOutcome.Invalid, r.Outcome);
+            Assert.IsFalse(r.ConsumesSource);
+            Assert.IsFalse(r.ConsumesTarget);
+        }
+
+        [Test]
+        public void TryMerge_MixingDisabled_SameColor_ReturnsTierMerge()
+        {
+            var r = MergeRules.TryMerge(
+                Primary(OrbColor.Cyan), Primary(OrbColor.Cyan), mixingEnabled: false);
+            Assert.AreEqual(MergeOutcome.TierMerge, r.Outcome);
+            Assert.AreEqual(OrbTier.T2, r.ResultOrb!.Tier);
+        }
+
+        [Test]
+        public void TryMerge_MixingDisabled_BrownPlusBrown_StillClears()
+        {
+            // Brown rules override the mixing gate.
+            var r = MergeRules.TryMerge(
+                Primary(OrbColor.Brown, OrbTier.T3), Primary(OrbColor.Brown, OrbTier.T3), mixingEnabled: false);
+            Assert.AreEqual(MergeOutcome.BrownClear, r.Outcome);
+        }
+
+        [Test]
+        public void TryMerge_MixingEnabled_CrossColor_StillMixes()
+        {
+            // Explicit true behaves like the legacy default (backward compatible).
+            var r = MergeRules.TryMerge(
+                Primary(OrbColor.Cyan), Primary(OrbColor.Magenta), mixingEnabled: true);
+            Assert.AreEqual(MergeOutcome.ColorMix, r.Outcome);
+            Assert.AreEqual(OrbColor.Purple, r.ResultOrb!.Color);
+        }
     }
 }

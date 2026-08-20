@@ -77,6 +77,12 @@ namespace ChromaVale.Core.GameLogic
         /// <summary>Par move count for star rating (merge mode; 0 = unset).</summary>
         public int ParMoves;
 
+        /// <summary>
+        /// When false, only same-color merges are allowed on this level
+        /// (tutorial gate; cross-color mixing disabled). Default true.
+        /// </summary>
+        public bool MixingEnabled = true;
+
         // ═══════════════════════════════════════════════════════════════
         // WORLD 1: "First Light" — Learning to Route (Levels 1-5)
         // ═══════════════════════════════════════════════════════════════
