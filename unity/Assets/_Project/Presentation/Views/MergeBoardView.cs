@@ -581,7 +581,7 @@ namespace ChromaVale.Presentation.Views
         {
             var file = OrbSpriteFileName(color, tier);
             if (file == null) return null;
-            return Resources.Load<Sprite>($"Sprites/Orbs/{OrbSpriteFolder(color, tier)}/{file}");
+            return Resources.Load<Sprite>($"Orbs/{OrbSpriteFolder(color, tier)}/{file}");
         }
 
 #if UNITY_EDITOR
