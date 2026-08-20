@@ -929,8 +929,51 @@ namespace ChromaVale.Presentation.Views
             int moves = _board?.MoveCount ?? 0;
             int par = _level?.ParMoves ?? 0;
             int targetsTotal = _level?.RestorationTargets?.Length ?? 0;
-            int targetsDone = _lockedTargets.Count;
-            _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}    Targets: {targetsDone}/{targetsTotal}";
+            int targetsDone = 0;
+            if (_board != null && _level?.RestorationTargets != null)
+            {
+                foreach (var t in _level.RestorationTargets)
+                {
+                    bool found = false;
+                    for (int y = 0; y < _level.Height; y++)
+                    {
+                        for (int x = 0; x < _level.Width; x++)
+                        {
+                            var orb = _board.GetOrbAt(new GridPosition(x, y));
+                            if (orb != null && orb.Color == t.Color && orb.Tier == t.Tier)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) break;
+                    }
+                    if (found) targetsDone++;
+                }
+            }
+            var targetDesc = BuildTargetDescription();
+            _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}    Targets: {targetsDone}/{targetsTotal}{targetDesc}";
+        }
+
+        private string BuildTargetDescription()
+        {
+            if (_level?.RestorationTargets == null || _level.RestorationTargets.Length == 0)
+                return "";
+            var parts = new System.Text.StringBuilder("    Create: ");
+            var groups = new Dictionary<(OrbColor, OrbTier), int>();
+            foreach (var t in _level.RestorationTargets)
+            {
+                var key = (t.Color, t.Tier);
+                groups[key] = groups.TryGetValue(key, out var v) ? v + 1 : 1;
+            }
+            bool first = true;
+            foreach (var kvp in groups)
+            {
+                if (!first) parts.Append(", ");
+                parts.Append($"{kvp.Value}x {kvp.Key.Item1} T{(int)kvp.Key.Item2}");
+                first = false;
+            }
+            return parts.ToString();
         }
 
         // ── Level Intro Banner (animated slide-in on level load) ──
@@ -1373,48 +1416,15 @@ namespace ChromaVale.Presentation.Views
             return OrbColors.TryGetValue(color, out var c) ? c : Color.white;
         }
 
-        // Designer saturation ramp: 7 colors × 5 tiers, hardcoded from
-        // Resources/UI/tier_saturation_ramp.json (T1 = 80% sat → T5 = 100% sat).
-        private static readonly Dictionary<(string color, int tier), Color> TierColorRamp = new() {
-            // Coral
-            {("Coral",1), new Color(0.91f,0.22f,0.22f)}, {("Coral",2), new Color(0.94f,0.26f,0.26f)},
-            {("Coral",3), new Color(0.96f,0.31f,0.31f)}, {("Coral",4), new Color(0.98f,0.37f,0.37f)},
-            {("Coral",5), new Color(1.0f,0.42f,0.42f)},
-            // Teal
-            {("Teal",1), new Color(0.24f,0.64f,0.61f)}, {("Teal",2), new Color(0.25f,0.69f,0.66f)},
-            {("Teal",3), new Color(0.25f,0.75f,0.71f)}, {("Teal",4), new Color(0.27f,0.78f,0.74f)},
-            {("Teal",5), new Color(0.31f,0.80f,0.77f)},
-            // Mint
-            {("Mint",1), new Color(0.36f,0.90f,0.36f)}, {("Mint",2), new Color(0.41f,0.93f,0.41f)},
-            {("Mint",3), new Color(0.47f,0.95f,0.47f)}, {("Mint",4), new Color(0.53f,0.97f,0.53f)},
-            {("Mint",5), new Color(0.60f,0.98f,0.60f)},
-            // Lavender
-            {("Lavender",1), new Color(0.59f,0.40f,0.73f)}, {("Lavender",2), new Color(0.62f,0.45f,0.76f)},
-            {("Lavender",3), new Color(0.66f,0.49f,0.79f)}, {("Lavender",4), new Color(0.69f,0.53f,0.82f)},
-            {("Lavender",5), new Color(0.73f,0.58f,0.84f)},
-            // Amber
-            {("Amber",1), new Color(0.90f,0.64f,0.14f)}, {("Amber",2), new Color(0.93f,0.67f,0.17f)},
-            {("Amber",3), new Color(0.96f,0.70f,0.21f)}, {("Amber",4), new Color(0.98f,0.73f,0.25f)},
-            {("Amber",5), new Color(1.0f,0.76f,0.30f)},
-            // Rose
-            {("Rose",1), new Color(0.92f,0.31f,0.52f)}, {("Rose",2), new Color(0.95f,0.36f,0.56f)},
-            {("Rose",3), new Color(0.97f,0.42f,0.60f)}, {("Rose",4), new Color(0.99f,0.47f,0.65f)},
-            {("Rose",5), new Color(1.0f,0.54f,0.69f)},
-            // Sky
-            {("Sky",1), new Color(0.24f,0.59f,0.84f)}, {("Sky",2), new Color(0.28f,0.63f,0.87f)},
-            {("Sky",3), new Color(0.33f,0.66f,0.89f)}, {("Sky",4), new Color(0.37f,0.69f,0.92f)},
-            {("Sky",5), new Color(0.42f,0.73f,0.94f)},
-        };
-
-        /// <summary>
-        /// Tier-aware color lookup. OrbColor enum has 11 values but the ramp only
-        /// covers 7 color names (Coral/Teal/Mint/Lavender/Amber/Rose/Sky), so names
-        /// without a ramp entry fall back to the base palette — never white.
-        /// </summary>
+        // Programmatic tier ramp: keep the base hue/saturation/lightness, then
+        // raise saturation per tier (T1 = 0.80 sat → T5 = 1.00 sat) via HSV, so
+        // every OrbColor in the enum resolves without a hand-maintained ramp.
         private Color GetOrbColor(OrbColor color, OrbTier tier)
         {
-            var key = (color.ToString(), (int)tier);
-            return TierColorRamp.TryGetValue(key, out var c) ? c : GetOrbColor(color);
+            var baseColor = GetOrbColor(color);
+            Color.RGBToHSV(baseColor, out float h, out float s, out float v);
+            s = Mathf.Clamp01(s * (0.80f + 0.05f * ((int)tier - 1)));
+            return Color.HSVToRGB(h, s, v);
         }
 
         /// <summary>
