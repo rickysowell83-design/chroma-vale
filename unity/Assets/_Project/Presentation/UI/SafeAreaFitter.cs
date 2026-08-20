@@ -13,6 +13,7 @@ namespace ChromaVale.Presentation.UI
     /// (normalized anchors, zero offsets), so UI children never sit under a
     /// notch, cutout, or rounded corner.
     /// </summary>
+    [RequireComponent(typeof(RectTransform))]
     [DisallowMultipleComponent]
     public sealed class SafeAreaFitter : MonoBehaviour
     {

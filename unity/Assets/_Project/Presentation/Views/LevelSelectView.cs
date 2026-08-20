@@ -47,7 +47,7 @@ namespace ChromaVale.Presentation.Views
             {
                 if (_safeArea == null && _canvas != null)
                 {
-                    var safeGo = new GameObject("SafeArea");
+                    var safeGo = new GameObject("SafeArea", typeof(RectTransform));
                     safeGo.transform.SetParent(_canvas.transform, false);
                     safeGo.AddComponent<SafeAreaFitter>();
                     _safeArea = safeGo.transform;
