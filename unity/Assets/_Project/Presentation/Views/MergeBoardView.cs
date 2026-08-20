@@ -1082,25 +1082,59 @@ namespace ChromaVale.Presentation.Views
                         if (isTaughtAction)
                             HideOnboardingCue();
                     }
-                    RemoveOrbVisual(change.Position.X, change.Position.Y);
+                    // Bug 3 fix: source orb shrinks out instead of vanishing instantly.
+                    // Shrink-fade must happen BEFORE SpawnOrbVisual, and the dict key
+                    // must be removed before spawn so the new orb can claim it.
+                    if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var sourceSr) && sourceSr != null)
+                    {
+                        var sourceGo = sourceSr.gameObject;
+                        sourceGo.transform.DOScale(Vector3.zero, 0.2f).SetEase(Ease.InQuad)
+                            .OnComplete(() =>
+                            {
+                                if (sourceGo != null) Destroy(sourceGo);
+                            });
+                        _orbVisuals.Remove((change.Position.X, change.Position.Y));
+                    }
+                    else
+                    {
+                        RemoveOrbVisual(change.Position.X, change.Position.Y);
+                    }
                     if (change.NewOrb != null)
                     {
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
 
-                        // Merge growth animation: new orb grows into its tier form
-                        // from 30% scale (OutBack overshoot punch) with a luminance
-                        // flash — same silhouette, just bigger + brighter.
+                        // Merge animation: punch + glow + settle.
+                        // Phase 1: instant shrink to 30%
+                        // Phase 2: grow with overshoot punch (0.4s total — readable)
+                        // Phase 3: visible glow flash in the orb's own hue (NOT
+                        //          white * 1.5, which clamps back to white = invisible)
                         if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var newSr) && newSr != null)
                         {
                             var go = newSr.gameObject;
                             var targetScale = go.transform.localScale;
-                            go.transform.localScale = targetScale * 0.3f; // start small
-                            go.transform.DOScale(targetScale, 0.25f).SetEase(Ease.OutBack);
-                            // Luminance flash: briefly boost color then settle
-                            var baseColor = newSr.color;
-                            newSr.color = Color.white * 1.5f; // flash bright
-                            newSr.DOColor(baseColor, 0.3f).SetDelay(0.1f);
+
+                            // Phase 1: instant shrink to 30%
+                            go.transform.localScale = targetScale * 0.3f;
+
+                            // Phase 2: grow with overshoot punch (0.2s out + 0.2s settle)
+                            go.transform.DOScale(targetScale * 1.2f, 0.2f).SetEase(Ease.OutQuad)
+                                .OnComplete(() =>
+                                {
+                                    if (go != null)
+                                        go.transform.DOScale(targetScale, 0.2f).SetEase(Ease.OutBack);
+                                });
+
+                            // Phase 3: visible glow flash — boost the orb's own color
+                            var orbColor = GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier);
+                            var flashColor = new Color(
+                                Mathf.Min(1f, orbColor.r * 1.8f + 0.3f),
+                                Mathf.Min(1f, orbColor.g * 1.8f + 0.3f),
+                                Mathf.Min(1f, orbColor.b * 1.8f + 0.3f),
+                                1f);
+                            var baseColor = newSr.color; // white for art orbs; orb color for fallback
+                            newSr.color = flashColor;
+                            newSr.DOColor(baseColor, 0.4f).SetDelay(0.15f); // settle back to base
                         }
 
                         if (AudioServiceInstaller.Instance != null)
