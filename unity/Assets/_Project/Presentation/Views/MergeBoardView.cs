@@ -111,13 +111,15 @@ namespace ChromaVale.Presentation.Views
         private Sprite _regionBgSprite;
         private const float RestorationDesatDuration = 0.35f;
         private const float RestorationBloomDuration = 1.5f;
-        private static readonly Color RegionBgDesaturated = new Color(0.32f, 0.32f, 0.32f, 1f);
+        private static readonly Color RegionBgDesaturated = new Color(0.85f, 0.82f, 0.75f, 1f);
         private Sprite[] _snapBackFrames;
         private Sprite[] _lockFlashFrames;
         private readonly Dictionary<(int x, int y), Coroutine> _targetPulseRoutines = new();
 
-        // ── Onboarding cue (level 1 first-merge hint) ──
+        // ── Onboarding cue (level-specific first-time hints) ──
         private TextMeshProUGUI _onboardingOverlay;
+        private GameObject _onboardingCueRoot;   // chip root (bg + text) — pulse target
+        private Tween _onboardingPulseTween;     // killed on hide to avoid leaks
         private bool _onboardingCueShown;
 
         // ── Colors for orbs (should match DESIGN_CANON CMY primaries) ──
@@ -213,6 +215,9 @@ namespace ChromaVale.Presentation.Views
                       $"par={_level.ParMoves}");
             UpdateHUD();
             ShowLevelIntroBanner(levelNumber);
+            // Each level gets its own first-time cue: reset the flag so the L4/L8
+            // cues can still appear after L1's cue was dismissed earlier in the session.
+            _onboardingCueShown = false;
             ShowOnboardingCue(levelNumber);
 
             // Audio: level loaded
@@ -268,7 +273,7 @@ namespace ChromaVale.Presentation.Views
                             if (obs.X == x && obs.Y == y) { isObstacle = true; break; }
                         }
                     }
-                    sr.color = isObstacle ? new Color(0.03f, 0.04f, 0.05f) : new Color(0.08f, 0.10f, 0.12f);
+                    sr.color = isObstacle ? new Color(0.15f, 0.12f, 0.10f) : ChromaPalette.PCB_Substrate;
                     sr.sortingOrder = -2; // behind everything
                     _gridTiles[x, y] = tile;
                 }
@@ -480,6 +485,8 @@ namespace ChromaVale.Presentation.Views
             if (cam == null) return;
 
             cam.orthographic = true;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = ChromaPalette.PCB_Substrate;
             float boardWidth = _level.Width * _tileSize;
             float boardHeight = _level.Height * _tileSize;
             float pad = _tileSize * 0.8f;
@@ -1049,18 +1056,53 @@ namespace ChromaVale.Presentation.Views
 
                 case ChangeType.OrbRemoved:
                     RemoveOrbVisual(change.Position.X, change.Position.Y);
+                    // L8 teaches Brown+Brown clearing. A BrownClear emits TWO
+                    // OrbRemoved changes and NO OrbTransformed (no orb is produced),
+                    // so the taught action must be detected here. Brown can only
+                    // merge with Brown, so any Brown removal IS the taught action.
+                    if (_levelNumber == 8 && change.OldOrb != null && change.OldOrb.Color == OrbColor.Brown)
+                        HideOnboardingCue();
                     break;
 
                 case ChangeType.OrbTransformed:
-                    // First successful merge dismisses the onboarding hint (if shown)
-                    HideOnboardingCue();
+                    // Onboarding cue persists until the CORRECT taught action:
+                    //   L1: first same-color merge (cyan T1+T1 → cyan T2)
+                    //   L4: first cross-color mix producing Purple (cyan+magenta)
+                    //   L8: Brown+Brown clear — detected in OrbRemoved above (no NewOrb)
+                    //   Other levels: hide on any merge (legacy behavior)
+                    if (change.NewOrb != null)
+                    {
+                        bool isTaughtAction = _levelNumber switch
+                        {
+                            1 => change.NewOrb.Tier == OrbTier.T2,
+                            4 => change.NewOrb.Color == OrbColor.Purple,
+                            8 => false, // BrownClear never emits OrbTransformed
+                            _ => true,
+                        };
+                        if (isTaughtAction)
+                            HideOnboardingCue();
+                    }
                     RemoveOrbVisual(change.Position.X, change.Position.Y);
                     if (change.NewOrb != null)
                     {
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
-                        PlayMergeAnimation(change.Position.X, change.Position.Y,
-                                           GetOrbColor(change.NewOrb.Color));
+
+                        // Merge growth animation: new orb grows into its tier form
+                        // from 30% scale (OutBack overshoot punch) with a luminance
+                        // flash — same silhouette, just bigger + brighter.
+                        if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var newSr) && newSr != null)
+                        {
+                            var go = newSr.gameObject;
+                            var targetScale = go.transform.localScale;
+                            go.transform.localScale = targetScale * 0.3f; // start small
+                            go.transform.DOScale(targetScale, 0.25f).SetEase(Ease.OutBack);
+                            // Luminance flash: briefly boost color then settle
+                            var baseColor = newSr.color;
+                            newSr.color = Color.white * 1.5f; // flash bright
+                            newSr.DOColor(baseColor, 0.3f).SetDelay(0.1f);
+                        }
+
                         if (AudioServiceInstaller.Instance != null)
                             AudioServiceInstaller.Instance.PlaySound("merge");
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
@@ -1369,9 +1411,9 @@ namespace ChromaVale.Presentation.Views
 
         private static readonly Dictionary<int, string> OnboardingTexts = new()
         {
-            { 1, "Drag matching orbs together to merge them!" },
-            { 4, "New: Drag DIFFERENT colors together to mix! Cyan + Magenta = Purple" },
-            { 8, "Brown orbs are waste — merge two Browns to clear them!" },
+            { 1, "Drag two same-color Lumies together!" },
+            { 4, "Mix colors! Cyan + Magenta = Purple" },
+            { 8, "Two Browns = cleared!" },
         };
 
         private void ShowOnboardingCue(int levelNumber)
@@ -1388,15 +1430,53 @@ namespace ChromaVale.Presentation.Views
                 _onboardingOverlay = BuildOnboardingOverlay(cueText);
             else
                 _onboardingOverlay.text = cueText;  // Reuse overlay, swap text
-            if (_onboardingOverlay != null)
+
+            if (_onboardingCueRoot != null)
+                _onboardingCueRoot.SetActive(true);
+            else if (_onboardingOverlay != null)
                 _onboardingOverlay.gameObject.SetActive(true);
+
+            StartOnboardingPulse();
         }
 
         private void HideOnboardingCue()
         {
-            if (_onboardingOverlay != null)
+            StopOnboardingPulse();
+            if (_onboardingCueRoot != null)
+                _onboardingCueRoot.SetActive(false);
+            else if (_onboardingOverlay != null)
                 _onboardingOverlay.gameObject.SetActive(false);
             _onboardingCueShown = true;
+        }
+
+        // Subtle idle pulse (scale 1.0 ↔ 1.05 yoyo loop) so the cue draws the
+        // eye without covering the board — same design language as target pulse.
+        private void StartOnboardingPulse()
+        {
+            StopOnboardingPulse();
+            if (_onboardingCueRoot == null) return;
+            _onboardingCueRoot.transform.localScale = Vector3.one;
+            _onboardingPulseTween = _onboardingCueRoot.transform
+                .DOScale(1.05f, 0.7f)
+                .SetLoops(-1, LoopType.Yoyo)
+                .SetEase(Ease.InOutSine);
+        }
+
+        private void StopOnboardingPulse()
+        {
+            if (_onboardingPulseTween != null)
+            {
+                _onboardingPulseTween.Kill();
+                _onboardingPulseTween = null;
+            }
+            if (_onboardingCueRoot != null)
+                _onboardingCueRoot.transform.localScale = Vector3.one;
+        }
+
+        private void OnDestroy()
+        {
+            // Kill the idle pulse so DOTween doesn't keep a stale tween running.
+            StopOnboardingPulse();
         }
 
         private TextMeshProUGUI BuildOnboardingOverlay(string cueText = null)
@@ -1413,23 +1493,49 @@ namespace ChromaVale.Presentation.Views
                 ConfigureCanvasScaler(canvas);
             }
 
-            var go = new GameObject("OnboardingCue");
-            go.transform.SetParent(canvasGo.transform, false);
+            // Chip root (background + text). The idle pulse tweens this whole node.
+            var rootGo = new GameObject("OnboardingCue");
+            rootGo.transform.SetParent(canvasGo.transform, false);
+            _onboardingCueRoot = rootGo;
+
+            // Semi-transparent dark chip so the cue reads over any board color.
+            var bgGo = new GameObject("Background");
+            bgGo.transform.SetParent(rootGo.transform, false);
+            var bg = bgGo.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.55f);
+            bg.raycastTarget = false;
+            var bgRect = bg.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = new Vector2(-24f, -12f);   // bleed slightly past text
+            bgRect.offsetMax = new Vector2(24f, 12f);
+
+            // Text fills the chip, wrapped and centered.
+            var go = new GameObject("Text");
+            go.transform.SetParent(rootGo.transform, false);
 
             var tmp = go.AddComponent<TextMeshProUGUI>();
             tmp.text = cueText;
             tmp.fontSize = 28;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = new Color(1f, 1f, 1f, 0.9f);
+            tmp.color = new Color(1f, 1f, 1f, 1f);
             tmp.raycastTarget = false;
 
             var rect = tmp.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.15f);
-            rect.anchorMax = new Vector2(0.5f, 0.15f);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(800f, 80f);
+
+            // Center-bottom of the screen (thumb-reach zone, clear of the grid).
+            var rootRect = rootGo.GetComponent<RectTransform>();
+            rootRect.anchorMin = new Vector2(0.5f, 0.15f);
+            rootRect.anchorMax = new Vector2(0.5f, 0.15f);
+            rootRect.pivot = new Vector2(0.5f, 0.5f);
+            rootRect.anchoredPosition = Vector2.zero;
+            rootRect.sizeDelta = new Vector2(800f, 80f);
 
             return tmp;
         }
