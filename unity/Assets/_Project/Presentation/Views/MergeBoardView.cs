@@ -59,6 +59,10 @@ namespace ChromaVale.Presentation.Views
         [Header("Prefabs")]
         [SerializeField] private GameObject _orbPrefab; // Orb_T1.prefab — SpriteRenderer
 
+        // Sprite cache: artist orb art per (color, tier). Loaded lazily and cached;
+        // null entries mean "no art for this combo" → procedural circle fallback.
+        private readonly Dictionary<(OrbColor, int), Sprite> _orbSpriteCache = new();
+
         [Header("HUD")]
         [SerializeField] private TextMeshProUGUI _hudText;
 
@@ -479,6 +483,9 @@ namespace ChromaVale.Presentation.Views
         {
             Vector3 worldPos = GridToWorld(x, y);
 
+            // Artist art per (color, tier); null → procedural circle fallback.
+            var artSprite = LoadOrbSprite(color, (int)tier);
+
             GameObject orbGo;
             if (_orbPrefab != null)
             {
@@ -491,14 +498,30 @@ namespace ChromaVale.Presentation.Views
                 orbGo.transform.SetParent(transform, false);
                 orbGo.transform.position = worldPos;
                 var sr = orbGo.AddComponent<SpriteRenderer>();
-                sr.sprite = CreateDefaultSprite(color);
-                sr.color = GetOrbColor(color);
+                if (artSprite != null)
+                {
+                    sr.sprite = artSprite;
+                    sr.color = Color.white; // art carries its own tier color
+                }
+                else
+                {
+                    sr.sprite = CreateDefaultSprite(color);
+                    sr.color = GetOrbColor(color);
+                }
             }
 
             var spriteRenderer = orbGo.GetComponent<SpriteRenderer>();
             if (spriteRenderer != null)
             {
-                spriteRenderer.color = GetOrbColor(color, tier);
+                if (artSprite != null)
+                {
+                    spriteRenderer.sprite = artSprite;
+                    spriteRenderer.color = Color.white; // art carries its own tier color
+                }
+                else
+                {
+                    spriteRenderer.color = GetOrbColor(color, tier);
+                }
                 // Designer spec: multiplicative 20% per tier (T1=1.0x → T5=2.07x)
                 orbGo.transform.localScale = Vector3.one * TierScale(tier);
             }
@@ -508,6 +531,68 @@ namespace ChromaVale.Presentation.Views
 
             _orbVisuals[(x, y)] = spriteRenderer;
         }
+
+        // ── Orb Sprite Loading ──
+
+        /// <summary>
+        /// Loads the artist sprite for (color, tier) from the orb sprite collection
+        /// under Assets/_Project/Sprites/Orbs/. Path shape varies by tier:
+        ///   T1/T3/T4/T5 → T{tier}/{color}/{color}_T{tier}_{suffix}.png
+        ///   T2           → T2/{color}_T2_idle.png (flat)
+        /// Suffixes: T1/T2=_idle, T3=_faceted, T4=_runed, T5=_prism (brown=_cracked).
+        /// Tertiary colors (Teal/Vermilion/Amber/Slate) have no art yet → null, and
+        /// callers keep the procedural circle fallback. Results are cached; a null
+        /// result is cached too so missing art is only probed once.
+        /// </summary>
+        private Sprite LoadOrbSprite(OrbColor color, int tier)
+        {
+            var key = (color, tier);
+            if (_orbSpriteCache.TryGetValue(key, out var cached)) return cached;
+
+            var sprite = TryLoadOrbSpriteResources(color, tier);
+#if UNITY_EDITOR
+            if (sprite == null) sprite = TryLoadOrbSpriteAssetDatabase(color, tier);
+#endif
+            _orbSpriteCache[key] = sprite;
+            return sprite;
+        }
+
+        private static string OrbSpriteFileName(OrbColor color, int tier)
+        {
+            var name = color.ToString().ToLowerInvariant();
+            switch (tier)
+            {
+                case 1: return $"{name}_T1_idle";
+                case 2: return $"{name}_T2_idle";
+                case 3: return $"{name}_T3_faceted";
+                case 4: return $"{name}_T4_runed";
+                case 5: return color == OrbColor.Brown ? "brown_T5_cracked" : $"{name}_T5_prism";
+                default: return null;
+            }
+        }
+
+        private static string OrbSpriteFolder(OrbColor color, int tier)
+        {
+            // T2 idle art is flat in the T2 folder; all other tiers use a color subfolder.
+            return tier == 2 ? $"T{tier}" : $"T{tier}/{color.ToString().ToLowerInvariant()}";
+        }
+
+        private Sprite TryLoadOrbSpriteResources(OrbColor color, int tier)
+        {
+            var file = OrbSpriteFileName(color, tier);
+            if (file == null) return null;
+            return Resources.Load<Sprite>($"Sprites/Orbs/{OrbSpriteFolder(color, tier)}/{file}");
+        }
+
+#if UNITY_EDITOR
+        private Sprite TryLoadOrbSpriteAssetDatabase(OrbColor color, int tier)
+        {
+            var file = OrbSpriteFileName(color, tier);
+            if (file == null) return null;
+            var path = $"Assets/_Project/Sprites/Orbs/{OrbSpriteFolder(color, tier)}/{file}.png";
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+#endif
 
         private void RemoveOrbVisual(int x, int y)
         {
@@ -1471,8 +1556,9 @@ namespace ChromaVale.Presentation.Views
 
         private Sprite CreateDefaultSprite(OrbColor color)
         {
-            // Create a simple circle sprite procedurally
-            int resolution = 64;
+            // Create a simple circle sprite procedurally. Resolution/PPU match the
+            // artist's 256px orb art so fallback orbs are the same world size.
+            int resolution = 256;
             var tex = new Texture2D(resolution, resolution);
             var pixels = new Color[resolution * resolution];
             float center = resolution / 2f;
@@ -1487,7 +1573,7 @@ namespace ChromaVale.Presentation.Views
             }
             tex.SetPixels(pixels);
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 64f);
+            return Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 256f);
         }
 
         private Sprite CreateRingSprite()
