@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "id": "cv_06",
+  "name": "Tier + Mix",
+  "grid": {
+    "width": 6,
+    "height": 5
+  },
+  "parMoves": 7,
+  "difficulty": "Medium",
+  "teaches": "Mix THEN merge",
+  "orbs": [
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 2,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 4,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 5,
+      "y": 0
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 2,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 3,
+      "y": 1
+    }
+  ],
+  "targets": [
+    {
+      "color": "purple",
+      "tier": 2,
+      "x": 5,
+      "y": 4
+    }
+  ],
+  "obstacles": [],
+  "displayName": "Taller Now"
+}

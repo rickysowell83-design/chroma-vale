@@ -1,29 +1,37 @@
 // SPDX-License-Identifier: MIT
-// Chroma Vale — MergeLevelRepository: loads validator-authored merge level JSON fixtures
-// (tools/MergeLevelValidator/tests/fixtures/level_01..10.json, relative to the repo root)
-// into LevelData objects with MergeOrbs, RestorationTargets, and ParMoves populated.
+// Chroma Vale — MergeLevelRepository: loads merge level definitions from raw
+// JSON supplied through an injected ILevelJsonProvider (game: TextAssets in
+// Resources/Levels; tests: validator fixture files on disk) into LevelData
+// objects with MergeOrbs, RestorationTargets, and ParMoves populated.
 // Pure C# — no Unity dependencies (compiles headless via testrunner).
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text.Json;
 
 namespace ChromaVale.Core.GameLogic
 {
     /// <summary>
-    /// Loads merge-mode level definitions from the validator JSON fixtures and maps them
+    /// Loads merge-mode level definitions from level fixture JSON and maps them
     /// into <see cref="LevelData"/> with MergeOrbs, RestorationTargets, and ParMoves populated.
     /// Legacy pipe-flow routing fields (Sources, Targets, SignalGates, ...) are left null/default —
     /// these are merge-only levels.
     /// </summary>
     public sealed class MergeLevelRepository : ILevelRepository
     {
-        /// <summary>Fixture directory, relative to the repo root.</summary>
-        public const string FixturesDirectory = "tools/MergeLevelValidator/tests/fixtures";
+        private readonly ILevelJsonProvider _jsonProvider;
 
         /// <inheritdoc />
         public int LevelCount => 10;
+
+        /// <summary>
+        /// Creates a repository that loads level JSON through
+        /// <paramref name="jsonProvider"/> (no filesystem access of its own).
+        /// </summary>
+        public MergeLevelRepository(ILevelJsonProvider jsonProvider)
+        {
+            _jsonProvider = jsonProvider ?? throw new ArgumentNullException(nameof(jsonProvider));
+        }
 
         /// <inheritdoc />
         public LevelData GetLevel(int levelNumber) => GetMergeLevel(levelNumber);
@@ -43,16 +51,19 @@ namespace ChromaVale.Core.GameLogic
                     $"Merge level number must be between 1 and {LevelCount}.");
             }
 
-            string fixturePath = LocateFixture(levelNumber);
             string json;
             try
             {
-                json = File.ReadAllText(fixturePath);
+                json = _jsonProvider.GetLevelJson(levelNumber);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is InvalidOperationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
             {
                 throw new InvalidOperationException(
-                    $"Failed to read merge level fixture '{fixturePath}'.", ex);
+                    $"Failed to load merge level {levelNumber} fixture from its JSON provider.", ex);
             }
 
             using (JsonDocument doc = JsonDocument.Parse(json))
@@ -69,29 +80,6 @@ namespace ChromaVale.Core.GameLogic
                     RestorationTargets = ParseTargets(root.GetProperty("targets")),
                 };
             }
-        }
-
-        private static string LocateFixture(int levelNumber)
-        {
-            string fileName = $"level_{levelNumber:00}.json";
-
-            foreach (string start in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
-            {
-                DirectoryInfo dir = new DirectoryInfo(start);
-                while (dir != null)
-                {
-                    string candidate = Path.Combine(dir.FullName, FixturesDirectory, fileName);
-                    if (File.Exists(candidate))
-                    {
-                        return candidate;
-                    }
-                    dir = dir.Parent;
-                }
-            }
-
-            throw new InvalidOperationException(
-                $"Merge level fixture '{fileName}' not found under '{FixturesDirectory}' relative to the repo root " +
-                $"(searched from '{Environment.CurrentDirectory}' and '{AppContext.BaseDirectory}').");
         }
 
         private static int GetGridDimension(JsonElement root, string dimension)

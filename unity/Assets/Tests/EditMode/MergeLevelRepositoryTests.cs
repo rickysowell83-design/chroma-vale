@@ -20,7 +20,7 @@ namespace ChromaVale.Tests
         [SetUp]
         public void SetUp()
         {
-            _repository = new MergeLevelRepository();
+            _repository = new MergeLevelRepository(new TestFixtureJsonProvider());
         }
 
         [Test]

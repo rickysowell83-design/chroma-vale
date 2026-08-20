@@ -41,8 +41,12 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using ChromaVale.Domain.Progression;
 using ChromaVale.Infrastructure.Audio;
+using ChromaVale.Infrastructure.LevelData;
 using TMPro;
 using UnityEngine.UI;
+using ChromaVale.Presentation.UI;
+using DG.Tweening;
+using ChromaVale.Presentation.Views.Components;
 
 namespace ChromaVale.Presentation.Views
 {
@@ -98,6 +102,16 @@ namespace ChromaVale.Presentation.Views
         private GameObject _snapBackOrb;        // survives nulling of _draggedOrbVisual (Bug 2: double-click fade)
         private Vector3 _draggedBaseScale = Vector3.one;
         private Sprite _lockFlashSprite;
+
+        // ── Restoration payoff ──
+        // The region background starts desaturated (the vale has lost its color) and
+        // blooms back to full saturation when the level completes.
+        private ParticleFxService _particleFx;
+        private SpriteRenderer _regionBackground;
+        private Sprite _regionBgSprite;
+        private const float RestorationDesatDuration = 0.35f;
+        private const float RestorationBloomDuration = 1.5f;
+        private static readonly Color RegionBgDesaturated = new Color(0.32f, 0.32f, 0.32f, 1f);
         private Sprite[] _snapBackFrames;
         private Sprite[] _lockFlashFrames;
         private readonly Dictionary<(int x, int y), Coroutine> _targetPulseRoutines = new();
@@ -129,8 +143,13 @@ namespace ChromaVale.Presentation.Views
             // Initialize in Awake (not Start) so this works even when the
             // GameObject starts inactive — LevelSelectView activates it and
             // calls LoadLevel() before Start() would fire.
-            _levelRepo = new MergeLevelRepository();
+            _levelRepo = new MergeLevelRepository(new ResourcesLevelJsonProvider());
             _maxLevel = _levelRepo.LevelCount;
+
+            // Restoration burst service (self-initializes in its own Awake).
+            var fxGo = new GameObject("ParticleFxService");
+            fxGo.transform.SetParent(transform, false);
+            _particleFx = fxGo.AddComponent<ParticleFxService>();
         }
 
         private void Start()
@@ -144,8 +163,15 @@ namespace ChromaVale.Presentation.Views
                 var canvasGo = new GameObject("HUDCanvas");
                 var canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                ConfigureCanvasScaler(canvas);
+
+                // Notch-safe container: HUD content stays inside Screen.safeArea.
+                var safeGo = new GameObject("SafeArea");
+                safeGo.transform.SetParent(canvasGo.transform, false);
+                safeGo.AddComponent<SafeAreaFitter>();
+
                 var tmpGo = new GameObject("HUDText");
-                tmpGo.transform.SetParent(canvasGo.transform, false);
+                tmpGo.transform.SetParent(safeGo.transform, false);
                 _hudText = tmpGo.AddComponent<TextMeshProUGUI>();
                 _hudText.fontSize = 24;
                 _hudText.alignment = TextAlignmentOptions.Top;
@@ -252,6 +278,7 @@ namespace ChromaVale.Presentation.Views
                 }
             }
             SetupCamera();
+            CreateRegionBackground();
         }
 
         /// <summary>
@@ -465,6 +492,135 @@ namespace ChromaVale.Presentation.Views
             float widthSize = ((boardWidth / 2f) + pad) / aspect;
             cam.orthographicSize = Mathf.Max(heightSize, widthSize);
             cam.transform.position = new Vector3(0f, 0f, -10f);
+        }
+
+        // ── Restoration Payoff (region background grayscale → color on level complete) ──
+
+        /// <summary>Maps the 10 merge levels to the four named vale regions.</summary>
+        private static string RegionNameForLevel(int level)
+        {
+            if (level <= 3) return "forest";
+            if (level <= 6) return "garden";
+            if (level <= 8) return "lake";
+            return "village";
+        }
+
+        /// <summary>Procedural fallback tint when the artist region PNG can't load.</summary>
+        private static Color RegionAccentColor(string region)
+        {
+            switch (region)
+            {
+                case "forest":  return new Color(0.06f, 0.38f, 0.14f);
+                case "garden":  return new Color(0.10f, 0.44f, 0.32f);
+                case "lake":    return new Color(0.08f, 0.26f, 0.56f);
+                case "village": return new Color(0.46f, 0.33f, 0.11f);
+                default:        return new Color(0.15f, 0.20f, 0.32f);
+            }
+        }
+
+        /// <summary>Target tint for the "fully restored" state: white when artist art
+        /// is showing (the PNG carries its own color), otherwise the region accent.</summary>
+        private Color RegionBgFullColor
+        {
+            get
+            {
+                if (_regionBgSprite != null) return Color.white;
+                return RegionAccentColor(RegionNameForLevel(_levelNumber));
+            }
+        }
+
+        /// <summary>Creates (or re-initializes) the region background behind the grid.
+        /// Starts desaturated — the vale has lost its color; VisualizeRestoration()
+        /// blooms it back on level complete.</summary>
+        private void CreateRegionBackground()
+        {
+            if (_regionBackground == null)
+            {
+                var go = new GameObject("RegionBackground");
+                go.transform.SetParent(transform, false);
+                go.transform.position = new Vector3(0f, 0f, 1f);
+                _regionBackground = go.AddComponent<SpriteRenderer>();
+                _regionBackground.sortingOrder = -10; // behind grid tiles (-2) and orbs (0)
+            }
+
+            _regionBackground.DOKill();
+            _regionBackground.sprite = LoadRegionBackgroundSprite() ?? CreateWhiteSprite();
+            SizeRegionBackground();
+            _regionBackground.color = RegionBgDesaturated;
+        }
+
+        /// <summary>Scales the background to cover the camera's framed view (the
+        /// camera was just configured by SetupCamera, so reuse its ortho size).</summary>
+        private void SizeRegionBackground()
+        {
+            if (_regionBackground == null || _regionBackground.sprite == null) return;
+            var cam = Camera.main;
+            float aspect = Screen.width > 0 ? (float)Screen.width / Screen.height : 1.7778f;
+            float orthoSize = cam != null && cam.orthographicSize > 0.01f
+                ? cam.orthographicSize
+                : (Mathf.Max(_level.Height * _tileSize, _level.Width * _tileSize) / 2f) + _tileSize;
+
+            Vector2 spriteUnits = new Vector2(
+                _regionBackground.sprite.rect.width / Mathf.Max(_regionBackground.sprite.pixelsPerUnit, 0.01f),
+                _regionBackground.sprite.rect.height / Mathf.Max(_regionBackground.sprite.pixelsPerUnit, 0.01f));
+            float coverW = orthoSize * aspect * 2.1f;
+            float coverH = orthoSize * 2.1f;
+            _regionBackground.transform.localScale = new Vector3(
+                coverW / Mathf.Max(spriteUnits.x, 0.01f),
+                coverH / Mathf.Max(spriteUnits.y, 0.01f),
+                1f);
+        }
+
+        /// <summary>Loads the current region's artist background PNG. The PNGs live
+        /// outside Resources, so editor runs load them via AssetDatabase; builds fall
+        /// back to the procedural region-tinted plane.</summary>
+        private Sprite LoadRegionBackgroundSprite()
+        {
+            var region = RegionNameForLevel(_levelNumber);
+            if (string.IsNullOrEmpty(region)) return null;
+            var expectedName = $"region_{region}_bg_1080";
+            if (_regionBgSprite != null && _regionBgSprite.name == expectedName) return _regionBgSprite;
+            _regionBgSprite = null;
+#if UNITY_EDITOR
+            var tex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(
+                $"Assets/_Project/Sprites/Backgrounds/{expectedName}.png")
+                      ?? UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(
+                $"Assets/_Project/Sprites/Regions/{expectedName}.png");
+            if (tex != null)
+            {
+                _regionBgSprite = Sprite.Create(tex,
+                    new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                _regionBgSprite.name = expectedName;
+            }
+#endif
+            return _regionBgSprite;
+        }
+
+        /// <summary>
+        /// Restoration payoff (called from HandleLevelComplete):
+        /// 1) desaturates the region background (DOTween DOColor → grayscale),
+        /// 2) blooms it back to full saturation over 1.5s,
+        /// 3) fires the restoration particle burst at the board center.
+        /// </summary>
+        public void VisualizeRestoration()
+        {
+            if (_regionBackground == null) CreateRegionBackground();
+            if (_regionBackground == null) return;
+
+            // 1) Drain color: quick desaturate dip so the bloom reads as a payoff.
+            _regionBackground.DOKill();
+            _regionBackground.DOColor(RegionBgDesaturated, RestorationDesatDuration)
+                .SetEase(Ease.InQuad)
+                .OnComplete(() =>
+                {
+                    if (_regionBackground == null) return;
+                    // 2) Bloom back to full saturation over 1.5s — the vale wakes up.
+                    _regionBackground.DOColor(RegionBgFullColor, RestorationBloomDuration)
+                        .SetEase(Ease.OutCubic);
+                });
+
+            // 3) Particle burst at board center (spark → ignition → ring → sustain).
+            if (_particleFx != null) _particleFx.RestorationPulse(Vector3.zero);
         }
 
         // ── Orb Spawning ──
@@ -989,6 +1145,9 @@ namespace ChromaVale.Presentation.Views
             if (AudioServiceInstaller.Instance != null)
                 AudioServiceInstaller.Instance.PlaySound("win_fanfare");
 
+            // Restoration payoff: region background grayscale → full color + particle burst.
+            VisualizeRestoration();
+
             Debug.Log($"[MergeBoardView] Level Complete! Moves: {result.MovesUsed}, " +
                       $"Par: {result.Par}, Stars: {result.Stars}");
 
@@ -1065,6 +1224,18 @@ namespace ChromaVale.Presentation.Views
 
         private GameObject _introBanner;
 
+        /// <summary>Configures a screen-space overlay canvas for mobile: scale with
+        /// screen size at a 1080×1920 portrait reference resolution.</summary>
+        private static void ConfigureCanvasScaler(Canvas canvas)
+        {
+            if (canvas == null) return;
+            var scaler = canvas.GetComponent<CanvasScaler>();
+            if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
         private void ShowLevelIntroBanner(int levelNumber)
         {
             if (_introBanner != null) Destroy(_introBanner);
@@ -1074,6 +1245,7 @@ namespace ChromaVale.Presentation.Views
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 50;
             bannerGo.AddComponent<GraphicRaycaster>();
+            ConfigureCanvasScaler(canvas);
 
             // Semi-transparent panel
             var panelGo = new GameObject("BannerPanel");
@@ -1217,6 +1389,7 @@ namespace ChromaVale.Presentation.Views
                 canvasGo = new GameObject("HUDCanvas");
                 var canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                ConfigureCanvasScaler(canvas);
             }
 
             var go = new GameObject("OnboardingCue");
@@ -1266,6 +1439,7 @@ namespace ChromaVale.Presentation.Views
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 100;
             popupGo.AddComponent<GraphicRaycaster>();
+            ConfigureCanvasScaler(canvas);
 
             // Semi-transparent backdrop
             var backdropGo = new GameObject("Backdrop");

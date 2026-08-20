@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using ChromaVale.Domain.Progression;
 using ChromaVale.Infrastructure.Audio;
+using ChromaVale.Presentation.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -37,6 +38,23 @@ namespace ChromaVale.Presentation.Views
 
         private readonly List<GameObject> _buttons = new();
         private int _totalLevels = 10; // L1-L10 for vertical slice
+        private Transform _safeArea;
+
+        // Notch-safe container under the canvas; children stay inside Screen.safeArea.
+        private Transform SafeAreaRoot
+        {
+            get
+            {
+                if (_safeArea == null && _canvas != null)
+                {
+                    var safeGo = new GameObject("SafeArea");
+                    safeGo.transform.SetParent(_canvas.transform, false);
+                    safeGo.AddComponent<SafeAreaFitter>();
+                    _safeArea = safeGo.transform;
+                }
+                return _safeArea;
+            }
+        }
 
         private void Start()
         {
@@ -51,6 +69,7 @@ namespace ChromaVale.Presentation.Views
                 var scaler = canvasGo.GetComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
                 scaler.referenceResolution = new Vector2(1080, 1920);
+                scaler.matchWidthOrHeight = 0.5f;
             }
 
             // Auto-find board view if not assigned
@@ -82,7 +101,7 @@ namespace ChromaVale.Presentation.Views
 
             // Title
             var titleGo = new GameObject("Title");
-            titleGo.transform.SetParent(_canvas.transform, false);
+            titleGo.transform.SetParent(SafeAreaRoot, false);
             var titleText = titleGo.AddComponent<TextMeshProUGUI>();
             titleText.text = "Chroma Vale";
             titleText.fontSize = 48;
@@ -97,7 +116,7 @@ namespace ChromaVale.Presentation.Views
             // Subtitle with total stars
             int totalStars = saveManager != null ? saveManager.TotalChromaStars : 0;
             var subGo = new GameObject("Subtitle");
-            subGo.transform.SetParent(_canvas.transform, false);
+            subGo.transform.SetParent(SafeAreaRoot, false);
             var subText = subGo.AddComponent<TextMeshProUGUI>();
             subText.text = $"Total Stars: {totalStars} / {_totalLevels * 3}";
             subText.fontSize = 24;
@@ -111,7 +130,7 @@ namespace ChromaVale.Presentation.Views
 
             // Grid container
             var gridGo = new GameObject("LevelGrid");
-            gridGo.transform.SetParent(_canvas.transform, false);
+            gridGo.transform.SetParent(SafeAreaRoot, false);
             var gridRect = gridGo.AddComponent<RectTransform>();
             gridRect.anchorMin = new Vector2(0.5f, 0.5f);
             gridRect.anchorMax = new Vector2(0.5f, 0.5f);
