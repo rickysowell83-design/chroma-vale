@@ -1073,6 +1073,8 @@ namespace ChromaVale.Presentation.Views
             float t = 0f;
             while (t < SpawnAnimDuration)
             {
+                // Guard: sr may be destroyed by a later change in the same batch
+                if (sr == null) yield break;
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / SpawnAnimDuration);
                 // easeOutBack: 0 → overshoot past 1 → settle at 1
@@ -1081,6 +1083,7 @@ namespace ChromaVale.Presentation.Views
                 sr.transform.localScale = baseScale * s;
                 yield return null;
             }
+            if (sr == null) yield break;
             sr.transform.localScale = baseScale;
         }
 
@@ -1091,6 +1094,8 @@ namespace ChromaVale.Presentation.Views
             float t = 0f;
             while (t < MergeAnimDuration)
             {
+                // Guard: sr may be destroyed by a later change in the same batch
+                if (sr == null) yield break;
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / MergeAnimDuration);
 
@@ -1121,6 +1126,7 @@ namespace ChromaVale.Presentation.Views
                 }
                 yield return null;
             }
+            if (sr == null) yield break;
             sr.transform.localScale = baseScale;
             sr.color = flashColor;
         }
