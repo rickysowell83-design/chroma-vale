@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "id": "cv_08",
-  "name": "The Brown Trap",
+  "name": "The Brown Lesson",
   "grid": {
-    "width": 6,
-    "height": 6
+    "width": 5,
+    "height": 5
   },
-  "parMoves": 9,
-  "difficulty": "Medium",
-  "teaches": "Brown = clearable waste",
+  "parMoves": 6,
+  "difficulty": "Easy",
+  "teaches": "Brown = clearable waste; opportunity cost visible",
   "orbs": [
     {
       "color": "cyan",
@@ -25,41 +25,35 @@
     {
       "color": "cyan",
       "tier": 1,
-      "x": 2,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 3,
-      "y": 0
-    },
-    {
-      "color": "magenta",
-      "tier": 1,
-      "x": 4,
-      "y": 0
-    },
-    {
-      "color": "magenta",
-      "tier": 1,
-      "x": 5,
-      "y": 0
-    },
-    {
-      "color": "purple",
-      "tier": 1,
       "x": 0,
       "y": 1
     },
     {
-      "color": "purple",
+      "color": "cyan",
       "tier": 1,
       "x": 1,
       "y": 1
     },
     {
-      "color": "brown",
+      "color": "purple",
+      "tier": 1,
+      "x": 3,
+      "y": 0
+    },
+    {
+      "color": "purple",
+      "tier": 1,
+      "x": 3,
+      "y": 1
+    },
+    {
+      "color": "purple",
+      "tier": 1,
+      "x": 2,
+      "y": 2
+    },
+    {
+      "color": "green",
       "tier": 1,
       "x": 2,
       "y": 1
@@ -67,36 +61,37 @@
     {
       "color": "brown",
       "tier": 1,
-      "x": 3,
-      "y": 1
-    },
-    {
-      "color": "yellow",
-      "tier": 1,
-      "x": 4,
-      "y": 1
-    },
-    {
-      "color": "yellow",
-      "tier": 1,
-      "x": 5,
-      "y": 1
+      "x": 2,
+      "y": 3
     }
   ],
   "targets": [
     {
       "color": "cyan",
       "tier": 3,
-      "x": 5,
-      "y": 5
+      "x": 4,
+      "y": 4
     },
     {
       "color": "purple",
       "tier": 2,
-      "x": 4,
-      "y": 5
+      "x": 3,
+      "y": 4
     }
   ],
-  "obstacles": [],
-  "displayName": "The Brown Trap"
+  "obstacles": [
+    {
+      "x": 0,
+      "y": 4
+    },
+    {
+      "x": 4,
+      "y": 0
+    },
+    {
+      "x": 4,
+      "y": 4
+    }
+  ],
+  "displayName": "The Brown Lesson"
 }

@@ -6,9 +6,9 @@
     "width": 4,
     "height": 4
   },
-  "parMoves": 1,
+  "parMoves": 5,
   "difficulty": "Tutorial",
-  "teaches": "Tier merge",
+  "teaches": "Drag-to-merge, chain merging, target comprehension",
   "orbs": [
     {
       "color": "cyan",
@@ -33,12 +33,24 @@
       "tier": 1,
       "x": 3,
       "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 1
     }
   ],
   "targets": [
     {
       "color": "cyan",
-      "tier": 2,
+      "tier": 3,
       "x": 3,
       "y": 3
     }

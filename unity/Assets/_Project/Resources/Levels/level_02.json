@@ -6,9 +6,9 @@
     "width": 4,
     "height": 4
   },
-  "parMoves": 4,
+  "parMoves": 5,
   "difficulty": "Tutorial",
-  "teaches": "Chain merges",
+  "teaches": "Chain + surplus (not all orbs needed)",
   "orbs": [
     {
       "color": "cyan",
