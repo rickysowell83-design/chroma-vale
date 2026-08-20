@@ -174,7 +174,7 @@ private void SetupCamera()
 
                 cam.nearClipPlane = 0.3f;
                 cam.farClipPlane = 100f;
-                cam.backgroundColor = new Color(0.02f, 0.04f, 0.06f); // §3.4 — near-black void
+                cam.backgroundColor = ChromaPalette.PCB_Substrate; // §1.5 — warm cream #F8F4E8 (board backdrop)
                 cam.clearFlags = CameraClearFlags.SolidColor;
 
                 // PhysicsRaycaster for tile click detection
