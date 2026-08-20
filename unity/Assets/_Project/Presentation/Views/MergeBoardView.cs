@@ -850,6 +850,23 @@ namespace ChromaVale.Presentation.Views
 
             if (gridPos.HasValue && gridPos.Value != _dragSource)
             {
+                // Distance check: don't merge if the release is too far from the
+                // target cell center (prevents accidental merges on near-miss drags).
+                Vector3 targetCenter = GridToWorld(gridPos.Value.x, gridPos.Value.y);
+                float distToTarget = Vector2.Distance(
+                    new Vector2(worldPos.x, worldPos.y),
+                    new Vector2(targetCenter.x, targetCenter.y));
+                float mergeThreshold = _tileSize * 0.6f; // must be within 60% of cell size
+
+                if (distToTarget > mergeThreshold)
+                {
+                    // Too far — snap back, no merge attempt
+                    if (_draggedOrbVisual != null)
+                        StartSnapBack(_draggedOrbVisual, _dragOriginalPos, _draggedBaseScale);
+                    _draggedOrbVisual = null;
+                    return;
+                }
+
                 // Attempt merge: drag source → release target
                 var source = new GridPosition(_dragSource.x, _dragSource.y);
                 var target = new GridPosition(gridPos.Value.x, gridPos.Value.y);
@@ -988,11 +1005,13 @@ namespace ChromaVale.Presentation.Views
                 }
                 else
                 {
+                    // Shrink toward origin but NEVER fade to invisible — if interrupted,
+                    // the orb must remain visible.
                     orbVisual.transform.localScale = baseScale * (1f - 0.3f * e);
                     if (sr != null)
                     {
                         Color c = startColor;
-                        c.a = Mathf.Lerp(startColor.a, 0f, e);
+                        c.a = Mathf.Lerp(startColor.a, 0.3f, e); // min 30% alpha, never fully invisible
                         sr.color = c;
                     }
                 }
