@@ -34,6 +34,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ChromaVale.Core.GameLogic;
 using ChromaVale.Domain.PuzzleBoard;
 using UnityEngine;
@@ -94,7 +95,6 @@ namespace ChromaVale.Presentation.Views
         private Vector3 _draggedBaseScale = Vector3.one;
         private Sprite _lockFlashSprite;
         private Sprite[] _snapBackFrames;
-        private Sprite[] _targetPulseFrames;
         private Sprite[] _lockFlashFrames;
         private readonly Dictionary<(int x, int y), Coroutine> _targetPulseRoutines = new();
 
@@ -186,6 +186,7 @@ namespace ChromaVale.Presentation.Views
                       $"{_level.RestorationTargets?.Length ?? 0} targets, " +
                       $"par={_level.ParMoves}");
             UpdateHUD();
+            ShowLevelIntroBanner(levelNumber);
             ShowOnboardingCue(levelNumber);
 
             // Audio: level loaded
@@ -250,11 +251,10 @@ namespace ChromaVale.Presentation.Views
         }
 
         /// <summary>
-        /// Creates a restoration target cell visual.  Pulses subtly (idle state)
-        /// so the player sees where orbs need to go.  When a correct (color, tier)
-        /// orb is placed, the target locks with a green flash.
-        /// TODO: wire target_idle_pulse_strip.png (4-frame loop, 480ms) and
-        /// target_lock_flash_strip.png (4-frame, 200ms) when artist delivers them.
+        /// Creates a restoration target cell visual.  Shows a GHOST ORB PREVIEW
+        /// (faded full-color orb at correct tier scale) with a pulsing dashed ring
+        /// outline so the player sees exactly what to create and where.  When a
+        /// correct (color, tier) orb is placed, the target locks with a green flash.
         /// </summary>
         private void CreateTargetVisual(int x, int y, OrbColor color, OrbTier tier)
         {
@@ -263,16 +263,40 @@ namespace ChromaVale.Presentation.Views
             go.transform.SetParent(transform, false);
             go.transform.position = worldPos;
 
+            // Ghost orb preview — faded full-color orb at correct tier scale
             var sr = go.AddComponent<SpriteRenderer>();
-            // Fallback: semi-transparent colored circle until strips arrive
             sr.sprite = CreateDefaultSprite(color);
-            sr.color = new Color(GetOrbColor(color).r, GetOrbColor(color).g, GetOrbColor(color).b, 0.25f);
+            Color ghostColor = GetOrbColor(color, tier);
+            sr.color = new Color(ghostColor.r, ghostColor.g, ghostColor.b, 0.35f);
             sr.sortingOrder = -1; // behind orbs
+            // Scale ghost to match the tier (so T2 target reads larger than T1)
+            go.transform.localScale = Vector3.one * TierScale(tier);
 
             _targetVisuals[(x, y)] = sr;
 
-            // Idle pulse (procedural fallback until target_idle_pulse_strip.png arrives)
-            _targetPulseRoutines[(x, y)] = StartCoroutine(TargetIdlePulseRoutine(go.transform, sr));
+            // Ring outline — dashed circle around the target slot
+            var ringGo = new GameObject($"TargetRing_{x}_{y}");
+            ringGo.transform.SetParent(go.transform, false);
+            ringGo.transform.localPosition = Vector3.zero;
+            ringGo.transform.localScale = Vector3.one * 1.15f;
+            var ringSr = ringGo.AddComponent<SpriteRenderer>();
+            ringSr.sprite = CreateRingSprite();
+            ringSr.color = new Color(ghostColor.r, ghostColor.g, ghostColor.b, 0.5f);
+            ringSr.sortingOrder = 0; // above ghost, below real orbs
+
+            // Tier pip overlay on ghost (so player knows which tier to create)
+            AttachPipOverlay(go, tier);
+            // Fade the pips too
+            var pipSr = go.transform.Find("PipOverlay")?.GetComponent<SpriteRenderer>();
+            if (pipSr != null)
+            {
+                var pc = pipSr.color;
+                pc.a = 0.4f;
+                pipSr.color = pc;
+            }
+
+            // Idle pulse (procedural — breathing glow on ring + ghost)
+            _targetPulseRoutines[(x, y)] = StartCoroutine(TargetIdlePulseRoutine(go.transform, sr, ringSr));
         }
 
         /// <summary>
@@ -318,59 +342,35 @@ namespace ChromaVale.Presentation.Views
         // ── Target animations (procedural fallback until strips arrive) ──
 
         /// <summary>
-        /// Idle pulse loop: 4 frames × 120ms = 480ms.  Uses target_idle_pulse_strip.png
-        /// frames when available (breathing glow); falls back to scale keyframes.
+        /// Idle pulse loop: breathing glow on ghost orb + ring outline.
+        /// Ghost alpha oscillates 0.25↔0.45, ring scale oscillates 1.0↔1.1,
+        /// ring alpha oscillates 0.35↔0.55 — synced sine wave, 480ms cycle.
         /// </summary>
-        private System.Collections.IEnumerator TargetIdlePulseRoutine(Transform targetTransform, SpriteRenderer sr)
+        private System.Collections.IEnumerator TargetIdlePulseRoutine(
+            Transform targetTransform, SpriteRenderer ghostSr, SpriteRenderer ringSr)
         {
-            if (_targetPulseFrames == null)
-                _targetPulseFrames = LoadStripFrames("target_idle_pulse_strip");
-            bool useStrip = _targetPulseFrames != null;
+            Color ghostBase = ghostSr.color;
+            Color ringBase = ringSr.color;
+            Vector3 ringBaseScale = ringSr.transform.localScale;
 
-            if (useStrip)
+            while (targetTransform != null && ghostSr != null && ringSr != null)
             {
-                // Strip path: swap frames; strip alpha bakes the pulse, so tint full color.
-                Color tint = sr.color;
-                tint.a = 1f;
-                sr.color = tint;
-                sr.sprite = _targetPulseFrames[0];
+                float phase = (Time.time % TargetPulseDuration) / TargetPulseDuration;
+                float wave = Mathf.Sin(phase * Mathf.PI * 2f); // -1 → +1 → -1
 
-                float frameDuration = TargetPulseDuration / _targetPulseFrames.Length; // 120ms
-                float frameTimer = 0f;
-                int frame = 0;
+                // Ghost breathing: alpha 0.25 ↔ 0.45
+                Color gc = ghostBase;
+                gc.a = Mathf.Lerp(0.25f, 0.45f, (wave + 1f) * 0.5f);
+                ghostSr.color = gc;
 
-                while (targetTransform != null)
-                {
-                    frameTimer += Time.deltaTime;
-                    if (frameTimer >= frameDuration)
-                    {
-                        frameTimer = 0f;
-                        frame = (frame + 1) % _targetPulseFrames.Length;
-                        sr.sprite = _targetPulseFrames[frame];
-                    }
-                    yield return null;
-                }
-            }
-            else
-            {
-                // Fallback: scale keyframes 1.0 → 1.05 → 1.0 → 0.98
-                Vector3 baseScale = targetTransform.localScale;
-                float[] keyframes = { 1.00f, 1.05f, 1.00f, 0.98f };
-                float frameDuration = TargetPulseDuration / 4f; // 120ms
-                float frameTimer = 0f;
-                int frame = 0;
+                // Ring breathing: scale 1.0 ↔ 1.1, alpha 0.35 ↔ 0.55
+                float ringPulse = Mathf.Lerp(1.0f, 1.1f, (wave + 1f) * 0.5f);
+                ringSr.transform.localScale = ringBaseScale * ringPulse;
+                Color rc = ringBase;
+                rc.a = Mathf.Lerp(0.35f, 0.55f, (wave + 1f) * 0.5f);
+                ringSr.color = rc;
 
-                while (targetTransform != null)
-                {
-                    frameTimer += Time.deltaTime;
-                    if (frameTimer >= frameDuration)
-                    {
-                        frameTimer = 0f;
-                        frame = (frame + 1) % keyframes.Length;
-                        targetTransform.localScale = baseScale * keyframes[frame];
-                    }
-                    yield return null;
-                }
+                yield return null;
             }
         }
 
@@ -498,11 +498,13 @@ namespace ChromaVale.Presentation.Views
             var spriteRenderer = orbGo.GetComponent<SpriteRenderer>();
             if (spriteRenderer != null)
             {
-                spriteRenderer.color = GetOrbColor(color);
-                // Scale based on tier (T1=0.8, T2=0.85, T3=0.9, T4=0.95, T5=1.0)
-                float scale = 0.8f + ((int)tier - 1) * 0.05f;
-                orbGo.transform.localScale = Vector3.one * scale;
+                spriteRenderer.color = GetOrbColor(color, tier);
+                // Designer spec: multiplicative 20% per tier (T1=1.0x → T5=2.07x)
+                orbGo.transform.localScale = Vector3.one * TierScale(tier);
             }
+
+            // Designer spec: tier pip overlay (1–5 dots, bottom-center of orb)
+            AttachPipOverlay(orbGo, tier);
 
             _orbVisuals[(x, y)] = spriteRenderer;
         }
@@ -891,6 +893,13 @@ namespace ChromaVale.Presentation.Views
             // Dismiss onboarding hint if it was still showing
             HideOnboardingCue();
 
+            // Dismiss intro banner if still showing
+            if (_introBanner != null)
+            {
+                Destroy(_introBanner);
+                _introBanner = null;
+            }
+
             // Audio: level complete fanfare
             if (AudioServiceInstaller.Instance != null)
                 AudioServiceInstaller.Instance.PlaySound("win_fanfare");
@@ -899,14 +908,14 @@ namespace ChromaVale.Presentation.Views
                       $"Par: {result.Par}, Stars: {result.Stars}");
 
             UpdateHUD();
-            if (_hudText != null) _hudText.text += $"    ★ {result.Stars}";
+            if (_hudText != null) _hudText.text += $"    Stars: {result.Stars}";
 
             // Record stars in save data
             var saveManager = SaveGameManager.Instance;
             if (saveManager != null)
             {
                 saveManager.RecordLevelComplete(_levelNumber, result.Stars);
-                Debug.Log($"[MergeBoardView] Recorded {_levelNumber} → {result.Stars}★ " +
+                Debug.Log($"[MergeBoardView] Recorded {_levelNumber} -> {result.Stars} stars " +
                           $"(total: {saveManager.TotalChromaStars})");
             }
 
@@ -919,7 +928,120 @@ namespace ChromaVale.Presentation.Views
             if (_hudText == null) return;
             int moves = _board?.MoveCount ?? 0;
             int par = _level?.ParMoves ?? 0;
-            _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}";
+            int targetsTotal = _level?.RestorationTargets?.Length ?? 0;
+            int targetsDone = _lockedTargets.Count;
+            _hudText.text = $"Level {_levelNumber}    Moves: {moves}/{par}    Targets: {targetsDone}/{targetsTotal}";
+        }
+
+        // ── Level Intro Banner (animated slide-in on level load) ──
+
+        private GameObject _introBanner;
+
+        private void ShowLevelIntroBanner(int levelNumber)
+        {
+            if (_introBanner != null) Destroy(_introBanner);
+
+            var bannerGo = new GameObject("LevelIntroBanner");
+            var canvas = bannerGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 50;
+            bannerGo.AddComponent<GraphicRaycaster>();
+
+            // Semi-transparent panel
+            var panelGo = new GameObject("BannerPanel");
+            panelGo.transform.SetParent(bannerGo.transform, false);
+            var panel = panelGo.AddComponent<Image>();
+            panel.color = new Color(0.12f, 0.14f, 0.18f, 0.85f);
+            panel.raycastTarget = false;
+            var panelRect = panelGo.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(600f, 120f);
+            panelRect.anchoredPosition = Vector2.zero;
+
+            // Title text — "Level N — Match the targets!"
+            var titleGo = new GameObject("BannerTitle");
+            titleGo.transform.SetParent(panelGo.transform, false);
+            var titleText = titleGo.AddComponent<TextMeshProUGUI>();
+            titleText.text = $"Level {levelNumber} — Match the targets!";
+            titleText.fontSize = 32;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.alignment = TextAlignmentOptions.Center;
+            titleText.color = new Color(1f, 0.84f, 0.28f, 1f); // warm gold
+            titleText.raycastTarget = false;
+            var titleRect = titleGo.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            titleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            titleRect.pivot = new Vector2(0.5f, 0.5f);
+            titleRect.sizeDelta = new Vector2(580f, 80f);
+            titleRect.anchoredPosition = Vector2.zero;
+
+            _introBanner = bannerGo;
+            StartCoroutine(IntroBannerAnimation(panelRect));
+        }
+
+        private System.Collections.IEnumerator IntroBannerAnimation(RectTransform panelRect)
+        {
+            // Slide in from above: y offset +300 → 0 over 300ms (easeOutCubic)
+            float duration = 0.3f;
+            float t = 0f;
+            Vector2 startPos = new Vector2(0f, 300f);
+            Vector2 endPos = Vector2.zero;
+            panelRect.anchoredPosition = startPos;
+
+            while (t < duration)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / duration);
+                // easeOutCubic: 1 - (1-k)^3
+                float e = 1f - Mathf.Pow(1f - k, 3f);
+                panelRect.anchoredPosition = Vector2.Lerp(startPos, endPos, e);
+                yield return null;
+            }
+            panelRect.anchoredPosition = endPos;
+
+            // Hold for 1.5s
+            yield return new WaitForSeconds(1.5f);
+
+            // Fade out over 400ms
+            var images = _introBanner?.GetComponentsInChildren<Image>();
+            var texts = _introBanner?.GetComponentsInChildren<TextMeshProUGUI>();
+            float fadeT = 0f;
+            float fadeDur = 0.4f;
+            // Capture initial alphas
+            var imgAlphas = images?.Select(img => img.color.a).ToArray() ?? Array.Empty<float>();
+            var txtAlphas = texts?.Select(txt => txt.color.a).ToArray() ?? Array.Empty<float>();
+
+            while (fadeT < fadeDur)
+            {
+                fadeT += Time.deltaTime;
+                float k = Mathf.Clamp01(fadeT / fadeDur);
+                float a = Mathf.Lerp(1f, 0f, k);
+                if (images != null)
+                    for (int i = 0; i < images.Length; i++)
+                    {
+                        if (images[i] != null)
+                        {
+                            var c = images[i].color;
+                            c.a = imgAlphas[i] * a;
+                            images[i].color = c;
+                        }
+                    }
+                if (texts != null)
+                    for (int i = 0; i < texts.Length; i++)
+                    {
+                        if (texts[i] != null)
+                        {
+                            var c = texts[i].color;
+                            c.a = txtAlphas[i] * a;
+                            texts[i].color = c;
+                        }
+                    }
+                yield return null;
+            }
+
+            if (_introBanner != null) Destroy(_introBanner);
         }
 
         // ── Onboarding hints (level-specific first-time cues) ──
@@ -1179,8 +1301,17 @@ namespace ChromaVale.Presentation.Views
         private float BaseOrbScale(int x, int y)
         {
             var orb = _board != null ? _board.GetOrbAt(new GridPosition(x, y)) : null;
-            // Tier differentiation: 0.15f step → T1=0.80, T2=0.95, T3=1.10, T4=1.25, T5=1.40
-            return orb == null ? 1f : 0.8f + ((int)orb.Tier - 1) * 0.15f;
+            return orb == null ? 1f : TierScale(orb.Tier);
+        }
+
+        /// <summary>
+        /// Designer-locked tier scale: multiplicative 20% per tier
+        /// (T1=1.0x, T2=1.2x, T3=1.44x, T4=1.73x, T5=2.07x) applied to the
+        /// T1 base of 0.8 so higher tiers read at a glance.
+        /// </summary>
+        private float TierScale(OrbTier tier)
+        {
+            return 0.8f * Mathf.Pow(1.2f, (int)tier - 1);
         }
 
         private void ClearBoard()
@@ -1228,11 +1359,92 @@ namespace ChromaVale.Presentation.Views
 
             _isDragging = false;
             _draggedOrbVisual = null;
+
+            // Destroy intro banner if still visible
+            if (_introBanner != null)
+            {
+                Destroy(_introBanner);
+                _introBanner = null;
+            }
         }
 
         private Color GetOrbColor(OrbColor color)
         {
             return OrbColors.TryGetValue(color, out var c) ? c : Color.white;
+        }
+
+        // Designer saturation ramp: 7 colors × 5 tiers, hardcoded from
+        // Resources/UI/tier_saturation_ramp.json (T1 = 80% sat → T5 = 100% sat).
+        private static readonly Dictionary<(string color, int tier), Color> TierColorRamp = new() {
+            // Coral
+            {("Coral",1), new Color(0.91f,0.22f,0.22f)}, {("Coral",2), new Color(0.94f,0.26f,0.26f)},
+            {("Coral",3), new Color(0.96f,0.31f,0.31f)}, {("Coral",4), new Color(0.98f,0.37f,0.37f)},
+            {("Coral",5), new Color(1.0f,0.42f,0.42f)},
+            // Teal
+            {("Teal",1), new Color(0.24f,0.64f,0.61f)}, {("Teal",2), new Color(0.25f,0.69f,0.66f)},
+            {("Teal",3), new Color(0.25f,0.75f,0.71f)}, {("Teal",4), new Color(0.27f,0.78f,0.74f)},
+            {("Teal",5), new Color(0.31f,0.80f,0.77f)},
+            // Mint
+            {("Mint",1), new Color(0.36f,0.90f,0.36f)}, {("Mint",2), new Color(0.41f,0.93f,0.41f)},
+            {("Mint",3), new Color(0.47f,0.95f,0.47f)}, {("Mint",4), new Color(0.53f,0.97f,0.53f)},
+            {("Mint",5), new Color(0.60f,0.98f,0.60f)},
+            // Lavender
+            {("Lavender",1), new Color(0.59f,0.40f,0.73f)}, {("Lavender",2), new Color(0.62f,0.45f,0.76f)},
+            {("Lavender",3), new Color(0.66f,0.49f,0.79f)}, {("Lavender",4), new Color(0.69f,0.53f,0.82f)},
+            {("Lavender",5), new Color(0.73f,0.58f,0.84f)},
+            // Amber
+            {("Amber",1), new Color(0.90f,0.64f,0.14f)}, {("Amber",2), new Color(0.93f,0.67f,0.17f)},
+            {("Amber",3), new Color(0.96f,0.70f,0.21f)}, {("Amber",4), new Color(0.98f,0.73f,0.25f)},
+            {("Amber",5), new Color(1.0f,0.76f,0.30f)},
+            // Rose
+            {("Rose",1), new Color(0.92f,0.31f,0.52f)}, {("Rose",2), new Color(0.95f,0.36f,0.56f)},
+            {("Rose",3), new Color(0.97f,0.42f,0.60f)}, {("Rose",4), new Color(0.99f,0.47f,0.65f)},
+            {("Rose",5), new Color(1.0f,0.54f,0.69f)},
+            // Sky
+            {("Sky",1), new Color(0.24f,0.59f,0.84f)}, {("Sky",2), new Color(0.28f,0.63f,0.87f)},
+            {("Sky",3), new Color(0.33f,0.66f,0.89f)}, {("Sky",4), new Color(0.37f,0.69f,0.92f)},
+            {("Sky",5), new Color(0.42f,0.73f,0.94f)},
+        };
+
+        /// <summary>
+        /// Tier-aware color lookup. OrbColor enum has 11 values but the ramp only
+        /// covers 7 color names (Coral/Teal/Mint/Lavender/Amber/Rose/Sky), so names
+        /// without a ramp entry fall back to the base palette — never white.
+        /// </summary>
+        private Color GetOrbColor(OrbColor color, OrbTier tier)
+        {
+            var key = (color.ToString(), (int)tier);
+            return TierColorRamp.TryGetValue(key, out var c) ? c : GetOrbColor(color);
+        }
+
+        /// <summary>
+        /// Pip overlay (1–5 tier pips, bottom-center of orb). The pip PNGs are
+        /// artist-owned; they currently import as Default texture, so Sprite.Create
+        /// only succeeds when the texture is readable. Falls back silently otherwise.
+        /// </summary>
+        private void AttachPipOverlay(GameObject orbVisual, OrbTier tier)
+        {
+            if (orbVisual == null) return;
+
+            var path = $"UI/PipOverlays/tier_pips_T{(int)tier}";
+            var sprite = Resources.Load<Sprite>(path);
+            if (sprite == null)
+            {
+                // Imported as Default (textureType 0): wrap in Sprite.Create if readable.
+                var tex = Resources.Load<Texture2D>(path);
+                if (tex == null || !tex.isReadable) return;
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
+            if (sprite == null) return;
+
+            var go = new GameObject("PipOverlay");
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = 5; // above orb
+            sr.color = new Color(1f, 1f, 1f, 0.7f); // semi-transparent
+            go.transform.SetParent(orbVisual.transform, false);
+            go.transform.localScale = Vector3.one;
+            go.transform.localPosition = new Vector3(0f, -0.5f, 0f); // bottom-center, adjust to orb size
         }
 
         private static Sprite _whiteSprite;
