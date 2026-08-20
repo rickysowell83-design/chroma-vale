@@ -115,7 +115,7 @@ namespace ChromaVale.Presentation.Views.Components
                     _baseMaterial.SetFloat("_Metallic", 0.15f);
                     _baseMaterial.SetFloat("_Smoothness", 0.35f);
                     _baseMaterial.EnableKeyword("_EMISSION");
-                    _baseMaterial.SetColor("_EmissionColor", new Color(0.08f, 0.15f, 0.08f));
+                    _baseMaterial.SetColor("_EmissionColor", new Color(0.0f, 0.0f, 0.0f)); // No emission on base slab — warm-cream base color only
                     _baseMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
                 return _baseMaterial;

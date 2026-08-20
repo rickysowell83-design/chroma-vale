@@ -56,7 +56,7 @@ namespace ChromaVale.Presentation.Views.Components
                     tv.SetSlabMaterial(tileMat);
                 }
 
-                tv.Color = ChromaPalette.DarkTile;
+                tv.Color = ChromaPalette.PCB_Substrate; // §1.5 — warm cream tiles match board backdrop
 
                 // ── Burnt-out microchip at obstacle cells ──
                 if (cell.Type == CellType.Obstacle)
