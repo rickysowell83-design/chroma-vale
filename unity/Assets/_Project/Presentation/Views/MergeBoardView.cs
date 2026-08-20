@@ -1368,8 +1368,11 @@ namespace ChromaVale.Presentation.Views
             yield return new WaitForSeconds(1.5f);
 
             // Fade out over 400ms
-            var images = _introBanner?.GetComponentsInChildren<Image>();
-            var texts = _introBanner?.GetComponentsInChildren<TextMeshProUGUI>();
+            // NOTE: Use explicit == null (Unity's overloaded operator), NOT ?.
+            // A destroyed GameObject is not C#-null, so ?. would still call into it.
+            if (_introBanner == null) yield break;
+            var images = _introBanner.GetComponentsInChildren<Image>();
+            var texts = _introBanner.GetComponentsInChildren<TextMeshProUGUI>();
             float fadeT = 0f;
             float fadeDur = 0.4f;
             // Capture initial alphas
