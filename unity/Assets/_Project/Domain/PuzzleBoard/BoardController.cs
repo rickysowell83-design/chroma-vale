@@ -176,8 +176,8 @@ namespace ChromaVale.Domain.PuzzleBoard
         }
 
         /// <summary>
-        /// Star rating per GDD §5.5: 3★ if moves ≤ par, 2★ if moves ≤ par × 1.5,
-        /// otherwise 1★. 3★ is never a progression gate (vanity only).
+        /// Star rating per GDD §5.5: 3 stars if moves <= par, 2 stars if moves <= par * 1.5,
+        /// otherwise 1 star. 3 stars is never a progression gate (vanity only).
         /// Designer ruling (2026-08-19): GDD ×1.5 formula is canon — the earlier
         /// par+2 threshold in the card spec was an error and is NOT used.
         /// </summary>

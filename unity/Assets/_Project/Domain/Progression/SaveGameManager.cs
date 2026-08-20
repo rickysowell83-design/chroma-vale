@@ -139,7 +139,7 @@ namespace ChromaVale.Domain.Progression
                 _persistence.SaveInt(starKey, stars);
                 int starDelta = stars - previousStars;
                 TotalChromaStars += starDelta;
-                Debug.Log($"[SaveGameManager] Level {level}: {previousStars}★ → {stars}★ (+{starDelta})");
+                Debug.Log($"[SaveGameManager] Level {level}: {previousStars} -> {stars} stars (+{starDelta})");
             }
 
             // Unlock the next level if this is the highest completed

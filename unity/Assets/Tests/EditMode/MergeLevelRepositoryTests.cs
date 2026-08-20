@@ -30,7 +30,7 @@ namespace ChromaVale.Tests
 
             Assert.AreEqual(4, level.Width, "Level 1 grid width");
             Assert.AreEqual(4, level.Height, "Level 1 grid height");
-            Assert.AreEqual(3, level.ParMoves, "Level 1 par moves");
+            Assert.AreEqual(1, level.ParMoves, "Level 1 par moves");
 
             Assert.AreEqual(4, level.MergeOrbs.Length, "Level 1 orb count");
             Assert.IsTrue(
