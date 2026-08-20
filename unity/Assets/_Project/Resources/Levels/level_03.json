@@ -1,95 +1,31 @@
 {
   "schemaVersion": 2,
   "id": "cv_03",
-  "name": "Space Race",
+  "name": "Close Quarters",
+  "mixingEnabled": false,
   "grid": {
     "width": 5,
     "height": 5
   },
-  "parMoves": 5,
+  "parMoves": 7,
   "difficulty": "Tutorial",
-  "teaches": "Board management \u2014 choose which 4 of 12 to use",
+  "teaches": "Scarcity — 3 targets, only 2 surplus orbs; every merge matters",
   "orbs": [
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 2,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 3,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 4,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 2,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 3,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 4,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 2
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 2
-    }
+    {"color": "cyan", "tier": 1, "x": 0, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 2, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 3, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 4, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 0, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 2, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 3, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 4, "y": 1}
   ],
   "targets": [
-    {
-      "color": "cyan",
-      "tier": 3,
-      "x": 4,
-      "y": 4
-    }
+    {"color": "cyan", "tier": 3, "x": 2, "y": 4},
+    {"color": "cyan", "tier": 2, "x": 0, "y": 4},
+    {"color": "cyan", "tier": 2, "x": 4, "y": 4}
   ],
   "obstacles": [],
   "displayName": "Close Quarters"

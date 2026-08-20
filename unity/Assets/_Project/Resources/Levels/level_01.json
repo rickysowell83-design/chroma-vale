@@ -2,59 +2,25 @@
   "schemaVersion": 2,
   "id": "cv_01",
   "name": "First Bloom",
+  "mixingEnabled": false,
   "grid": {
     "width": 4,
     "height": 4
   },
   "parMoves": 5,
   "difficulty": "Tutorial",
-  "teaches": "Drag-to-merge, chain merging, target comprehension",
+  "teaches": "Drag-to-merge + first chain (guided)",
   "orbs": [
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 2,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 3,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 1
-    }
+    {"color": "cyan", "tier": 1, "x": 0, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 2, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 3, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 0, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 1}
   ],
   "targets": [
-    {
-      "color": "cyan",
-      "tier": 3,
-      "x": 3,
-      "y": 3
-    }
+    {"color": "cyan", "tier": 3, "x": 3, "y": 3}
   ],
   "obstacles": [],
-  "displayName": "First Light"
+  "displayName": "First Bloom"
 }
