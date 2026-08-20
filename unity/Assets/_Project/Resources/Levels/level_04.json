@@ -2,6 +2,7 @@
   "schemaVersion": 2,
   "id": "cv_04",
   "name": "Color Born",
+  "mixingEnabled": true,
   "grid": {
     "width": 5,
     "height": 5

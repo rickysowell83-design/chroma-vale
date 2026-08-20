@@ -7,7 +7,7 @@
     "width": 5,
     "height": 5
   },
-  "parMoves": 7,
+  "parMoves": 8,
   "difficulty": "Tutorial",
   "teaches": "Scarcity — 3 targets, only 2 surplus orbs; every merge matters",
   "orbs": [
@@ -20,7 +20,9 @@
     {"color": "cyan", "tier": 1, "x": 1, "y": 1},
     {"color": "cyan", "tier": 1, "x": 2, "y": 1},
     {"color": "cyan", "tier": 1, "x": 3, "y": 1},
-    {"color": "cyan", "tier": 1, "x": 4, "y": 1}
+    {"color": "cyan", "tier": 1, "x": 4, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 0, "y": 2},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 2}
   ],
   "targets": [
     {"color": "cyan", "tier": 3, "x": 2, "y": 4},
