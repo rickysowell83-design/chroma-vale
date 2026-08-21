@@ -182,6 +182,10 @@ namespace ChromaVale.Domain.PuzzleBoard
             // Position-agnostic win (genre standard: Merge Dragons / EverMerge —
             // produce the required orb anywhere, don't park it on a specific cell).
             // Fixes levels whose targets sit at unreachable far corners like (3,3).
+            // Each target must match a DIFFERENT orb — track consumed cells so
+            // duplicate targets (e.g. 2x Cyan T2) can't both match the same orb
+            // and produce a false win with fewer orbs than the level requires.
+            var consumed = new System.Collections.Generic.HashSet<(int x, int y)>();
             foreach (var t in _targets)
             {
                 bool found = false;
@@ -189,9 +193,11 @@ namespace ChromaVale.Domain.PuzzleBoard
                 {
                     for (int x = 0; x < Width; x++)
                     {
+                        if (consumed.Contains((x, y))) continue;
                         var orb = _cells[x, y];
                         if (orb != null && orb.Color == t.Color && orb.Tier == t.Tier)
                         {
+                            consumed.Add((x, y));
                             found = true;
                             break;
                         }

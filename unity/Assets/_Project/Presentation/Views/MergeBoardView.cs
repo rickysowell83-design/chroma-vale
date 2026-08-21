@@ -173,6 +173,7 @@ namespace ChromaVale.Presentation.Views
                 _hudText = tmpGo.AddComponent<TextMeshProUGUI>();
                 _hudText.fontSize = 24;
                 _hudText.alignment = TextAlignmentOptions.Top;
+                _hudText.color = new Color(0.08f, 0.06f, 0.04f, 1f); // dark warm-brown — readable on warm-cream bg
                 var rect = _hudText.GetComponent<RectTransform>();
                 rect.anchorMin = new Vector2(0.5f, 1f);
                 rect.anchorMax = new Vector2(0.5f, 1f);
@@ -191,6 +192,14 @@ namespace ChromaVale.Presentation.Views
         {
             // Clear previous board state
             ClearBoard();
+
+            // Track which level we're actually on. LoadLevel is the single
+            // entry point for level-select replays AND in-game next/replay,
+            // but only Start() and NextLevel() updated _levelNumber before —
+            // a replay from level select left it stale, corrupting
+            // RecordLevelComplete, the HUD, region restoration and the
+            // Replay button target. (fix: t_47eb8003 b3)
+            _levelNumber = levelNumber;
 
             _level = _levelRepo.GetMergeLevel(levelNumber);
 
