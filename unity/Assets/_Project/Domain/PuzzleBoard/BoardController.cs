@@ -47,6 +47,13 @@ namespace ChromaVale.Domain.PuzzleBoard
         public event Action<LevelResult>? OnLevelComplete;
 
         /// <summary>
+        /// Engine-free diagnostic hook (temporary, task t_e36536c3). The
+        /// presentation layer subscribes and forwards to Debug.Log. Kept as
+        /// plain System.Action so the headless testrunner stays compile-clean.
+        /// </summary>
+        public event Action<string>? OnDiagnostic;
+
+        /// <summary>
         /// Populates the grid from level data (orbs, targets, par) and resets
         /// the move counter. Out-of-bounds orb placements are skipped.
         /// </summary>
@@ -101,10 +108,19 @@ namespace ChromaVale.Domain.PuzzleBoard
             var targetOrb = _cells[target.X, target.Y];
 
             // 2. Ask Core rules whether this pair merges at all.
-            if (!MergeRules.CanMerge(sourceOrb, targetOrb, _mixingEnabled))
+            var canMerge = MergeRules.CanMerge(sourceOrb, targetOrb, _mixingEnabled);
+            OnDiagnostic?.Invoke(
+                $"TryMergeAt src=({source.X},{source.Y}) {FmtOrb(sourceOrb)} " +
+                $"dst=({target.X},{target.Y}) {FmtOrb(targetOrb)} " +
+                $"canMerge={canMerge} mixing={_mixingEnabled}");
+            if (!canMerge)
                 return false;
 
             var result = MergeRules.TryMerge(sourceOrb, targetOrb, _mixingEnabled);
+            OnDiagnostic?.Invoke(
+                $"TryMergeAt outcome={result.Outcome} " +
+                $"resultOrb={FmtOrb(result.ResultOrb)} " +
+                $"consumesTarget={result.ConsumesTarget}");
             if (result.Outcome == MergeOutcome.Invalid)
                 return false;
 
@@ -147,6 +163,22 @@ namespace ChromaVale.Domain.PuzzleBoard
                 return;
             }
 
+            // TEMP-DIAG (t_e36536c3): target requirements + full board state
+            var req = string.Join(", ",
+                Array.ConvertAll(_targets, t => $"{t.Color}/{t.Tier}"));
+            var dump = new System.Text.StringBuilder();
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    var orb = _cells[x, y];
+                    if (orb != null)
+                        dump.Append($"({x},{y})={FmtOrb(orb)} ");
+                }
+            }
+            OnDiagnostic?.Invoke(
+                $"CheckWin(move={MoveCount}) targets=[{req}] board=[{dump}]");
+
             // Position-agnostic win (genre standard: Merge Dragons / EverMerge —
             // produce the required orb anywhere, don't park it on a specific cell).
             // Fixes levels whose targets sit at unreachable far corners like (3,3).
@@ -168,12 +200,14 @@ namespace ChromaVale.Domain.PuzzleBoard
                 }
                 if (!found)
                 {
+                    OnDiagnostic?.Invoke($"CheckWin MISSING target {t.Color}/{t.Tier}");
                     _complete = false;
                     return;
                 }
             }
 
             _complete = true;
+            OnDiagnostic?.Invoke($"CheckWin COMPLETE — all targets matched");
             OnLevelComplete?.Invoke(new LevelResult(MoveCount, _par, CalculateStars(MoveCount, _par)));
         }
 
@@ -193,6 +227,12 @@ namespace ChromaVale.Domain.PuzzleBoard
         private bool IsInBounds(int x, int y)
         {
             return x >= 0 && x < Width && y >= 0 && y < Height;
+        }
+
+        /// <summary>TEMP-DIAG (t_e36536c3): engine-free orb formatter.</summary>
+        private static string FmtOrb(OrbData? orb)
+        {
+            return orb == null ? "empty" : $"{orb.Color}/{orb.Tier}";
         }
 
         private void Emit(BoardChange change)

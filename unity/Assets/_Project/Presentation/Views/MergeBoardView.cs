@@ -196,6 +196,8 @@ namespace ChromaVale.Presentation.Views
 
             // Create BoardController and initialize
             _board = new BoardController();
+            // TEMP-DIAG (t_e36536c3): surface domain diagnostics in the Unity console
+            ((BoardController)_board).OnDiagnostic += msg => Debug.Log($"[BoardDiag] {msg}");
             _board.Initialize(_level);
 
             // Subscribe to board events
@@ -1089,6 +1091,7 @@ namespace ChromaVale.Presentation.Views
                     {
                         var sourceGo = sourceSr.gameObject;
                         sourceGo.transform.DOScale(Vector3.zero, 0.2f).SetEase(Ease.InQuad)
+                            .SetLink(sourceGo)
                             .OnComplete(() =>
                             {
                                 if (sourceGo != null) Destroy(sourceGo);
@@ -1119,10 +1122,11 @@ namespace ChromaVale.Presentation.Views
 
                             // Phase 2: grow with overshoot punch (0.2s out + 0.2s settle)
                             go.transform.DOScale(targetScale * 1.2f, 0.2f).SetEase(Ease.OutQuad)
+                                .SetLink(go)
                                 .OnComplete(() =>
                                 {
                                     if (go != null)
-                                        go.transform.DOScale(targetScale, 0.2f).SetEase(Ease.OutBack);
+                                        go.transform.DOScale(targetScale, 0.2f).SetEase(Ease.OutBack).SetLink(go);
                                 });
 
                             // Phase 3: visible glow flash — boost the orb's own color
@@ -1134,7 +1138,7 @@ namespace ChromaVale.Presentation.Views
                                 1f);
                             var baseColor = newSr.color; // white for art orbs; orb color for fallback
                             newSr.color = flashColor;
-                            newSr.DOColor(baseColor, 0.4f).SetDelay(0.15f); // settle back to base
+                            newSr.DOColor(baseColor, 0.4f).SetDelay(0.15f).SetLink(go); // settle back to base
                         }
 
                         if (AudioServiceInstaller.Instance != null)
