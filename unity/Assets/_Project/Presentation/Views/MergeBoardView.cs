@@ -1731,11 +1731,13 @@ namespace ChromaVale.Presentation.Views
         /// <summary>
         /// Designer-locked tier scale: multiplicative 20% per tier
         /// (T1=1.0x, T2=1.2x, T3=1.44x, T4=1.73x, T5=2.07x) applied to the
-        /// T1 base of 0.8 so higher tiers read at a glance.
+        /// T1 base of 0.6 so T1 fills ~50% of the 1.2 tile (mobile best
+        /// practice — collectible, not space-filling). T5 overflows slightly,
+        /// which is intended for the "ultimate" tier.
         /// </summary>
         private float TierScale(OrbTier tier)
         {
-            return 0.8f * Mathf.Pow(1.2f, (int)tier - 1);
+            return 0.6f * Mathf.Pow(1.2f, (int)tier - 1);
         }
 
         private void ClearBoard()
