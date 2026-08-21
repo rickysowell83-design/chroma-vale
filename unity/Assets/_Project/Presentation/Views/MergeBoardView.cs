@@ -91,8 +91,9 @@ namespace ChromaVale.Presentation.Views
         private GameObject[,] _gridTiles;
 
         // ── Orb visuals ──
-        // Maps grid position → SpriteRenderer instance for each orb on the board
-        private Dictionary<(int x, int y), SpriteRenderer> _orbVisuals = new();
+        // Maps grid position → OrbVisual instance for each orb on the board
+        // (GlassOrb shader: MeshRenderer + MaterialPropertyBlock — no material instances)
+        private Dictionary<(int x, int y), OrbVisual> _orbVisuals = new();
 
         // ── Input state ──
         private bool _wasPointerDown;          // Pointer pressed last frame (edge detection)
@@ -653,53 +654,24 @@ namespace ChromaVale.Presentation.Views
         {
             Vector3 worldPos = GridToWorld(x, y);
 
-            // Artist art per (color, tier); null → procedural circle fallback.
-            var artSprite = LoadOrbSprite(color, (int)tier);
+            // GlassOrb shader path: quad + MeshRenderer + MaterialPropertyBlock.
+            // No SpriteRenderer, no PNG sprites — the shader renders the orb
+            // procedurally from _BaseColor + _TierLevel.
+            GameObject orbGo = new GameObject($"Orb_{x}_{y}");
+            orbGo.transform.SetParent(transform, false);
+            orbGo.transform.position = worldPos;
 
-            GameObject orbGo;
-            if (_orbPrefab != null)
-            {
-                orbGo = Instantiate(_orbPrefab, worldPos, Quaternion.identity, transform);
-            }
-            else
-            {
-                // Fallback: create a simple quad with color
-                orbGo = new GameObject($"Orb_{x}_{y}");
-                orbGo.transform.SetParent(transform, false);
-                orbGo.transform.position = worldPos;
-                var sr = orbGo.AddComponent<SpriteRenderer>();
-                if (artSprite != null)
-                {
-                    sr.sprite = artSprite;
-                    sr.color = Color.white; // art carries its own tier color
-                }
-                else
-                {
-                    sr.sprite = CreateDefaultSprite(color);
-                    sr.color = GetOrbColor(color);
-                }
-            }
+            var orbVisual = orbGo.AddComponent<OrbVisual>();
+            Color orbColor = GetOrbColor(color, tier);
+            orbVisual.Configure(orbColor, (int)tier);
 
-            var spriteRenderer = orbGo.GetComponent<SpriteRenderer>();
-            if (spriteRenderer != null)
-            {
-                if (artSprite != null)
-                {
-                    spriteRenderer.sprite = artSprite;
-                    spriteRenderer.color = Color.white; // art carries its own tier color
-                }
-                else
-                {
-                    spriteRenderer.color = GetOrbColor(color, tier);
-                }
-                // Designer spec: multiplicative 20% per tier (T1=1.0x → T5=2.07x)
-                orbGo.transform.localScale = Vector3.one * TierScale(tier);
-            }
+            // Designer spec: multiplicative 20% per tier (T1=1.0x → T5=2.07x)
+            orbGo.transform.localScale = Vector3.one * TierScale(tier);
 
             // Designer spec: tier pip overlay (1–5 dots, bottom-center of orb)
             AttachPipOverlay(orbGo, tier);
 
-            _orbVisuals[(x, y)] = spriteRenderer;
+            _orbVisuals[(x, y)] = orbVisual;
         }
 
         // ── Orb Sprite Loading ──
@@ -960,13 +932,8 @@ namespace ChromaVale.Presentation.Views
                 {
                     _snapBackOrb.transform.position = _dragOriginalPos;
                     _snapBackOrb.transform.localScale = _draggedBaseScale;
-                    var sr = _snapBackOrb.GetComponent<SpriteRenderer>();
-                    if (sr != null)
-                    {
-                        var c = sr.color;
-                        c.a = 1f;
-                        sr.color = c;
-                    }
+                    var orbVis = _snapBackOrb.GetComponent<OrbVisual>();
+                    if (orbVis != null) orbVis.SetAlpha(1f);
                 }
                 StopCoroutine(_snapBackCoroutine);
                 _snapBackCoroutine = null;
@@ -989,10 +956,9 @@ namespace ChromaVale.Presentation.Views
         {
             // Strip-first: snap_back_strip.png (4 frames × 60ms = 240ms) — pulsing glow
             // overlaid on the orb while it returns to origin.  Fallback: shrink + fade.
-            var sr = orbVisual.GetComponent<SpriteRenderer>();
-            Sprite originalSprite = sr != null ? sr.sprite : null;
-            Color startColor = sr != null ? sr.color : Color.white;
-            bool useStrip = sr != null && _snapBackFrames != null;
+            var orbVis = orbVisual.GetComponent<OrbVisual>();
+            Color startColor = orbVis != null ? orbVis.GetColor() : Color.white;
+            bool useStrip = false; // GlassOrb shader — no sprite swapping
 
             float t = 0f;
             Vector3 startPos = orbVisual.transform.position;
@@ -1007,43 +973,21 @@ namespace ChromaVale.Presentation.Views
                 float e = k * k * (3f - 2f * k); // smoothstep
                 orbVisual.transform.position = Vector3.Lerp(startPos, origin, e);
 
-                if (useStrip)
+                // Shrink toward origin but NEVER fade to invisible — if interrupted,
+                // the orb must remain visible.
+                orbVisual.transform.localScale = baseScale * (1f - 0.3f * e);
+                if (orbVis != null)
                 {
-                    // Advance through the strip frames; tint with the orb color.
-                    frameTimer += Time.deltaTime;
-                    if (frameTimer >= frameDuration)
-                    {
-                        frameTimer = 0f;
-                        frame = (frame + 1) % _snapBackFrames.Length;
-                        sr.sprite = _snapBackFrames[frame];
-                        Color c = startColor;
-                        c.a = 1f;
-                        sr.color = c;
-                    }
+                    orbVis.SetAlpha(Mathf.Lerp(startColor.a, 0.3f, e)); // min 30% alpha
                 }
-                else
-                {
-                    // Shrink toward origin but NEVER fade to invisible — if interrupted,
-                    // the orb must remain visible.
-                    orbVisual.transform.localScale = baseScale * (1f - 0.3f * e);
-                    if (sr != null)
-                    {
-                        Color c = startColor;
-                        c.a = Mathf.Lerp(startColor.a, 0.3f, e); // min 30% alpha, never fully invisible
-                        sr.color = c;
-                    }
-                }
+
                 yield return null;
             }
 
             // Restore original state
             orbVisual.transform.position = origin;
             orbVisual.transform.localScale = baseScale;
-            if (sr != null)
-            {
-                sr.sprite = originalSprite;
-                sr.color = startColor;
-            }
+            if (orbVis != null) orbVis.SetColor(startColor);
             _snapBackCoroutine = null;
         }
 
@@ -1096,9 +1040,9 @@ namespace ChromaVale.Presentation.Views
                     // Bug 3 fix: source orb shrinks out instead of vanishing instantly.
                     // Shrink-fade must happen BEFORE SpawnOrbVisual, and the dict key
                     // must be removed before spawn so the new orb can claim it.
-                    if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var sourceSr) && sourceSr != null)
+                    if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var sourceOrb) && sourceOrb != null)
                     {
-                        var sourceGo = sourceSr.gameObject;
+                        var sourceGo = sourceOrb.gameObject;
                         sourceGo.transform.DOScale(Vector3.zero, 0.2f).SetEase(Ease.InQuad)
                             .SetLink(sourceGo)
                             .OnComplete(() =>
@@ -1121,9 +1065,9 @@ namespace ChromaVale.Presentation.Views
                         // Phase 2: grow with overshoot punch (0.4s total — readable)
                         // Phase 3: visible glow flash in the orb's own hue (NOT
                         //          white * 1.5, which clamps back to white = invisible)
-                        if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var newSr) && newSr != null)
+                        if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var newOrb) && newOrb != null)
                         {
-                            var go = newSr.gameObject;
+                            var go = newOrb.gameObject;
                             var targetScale = go.transform.localScale;
 
                             // Phase 1: instant shrink to 30%
@@ -1145,9 +1089,10 @@ namespace ChromaVale.Presentation.Views
                                 Mathf.Min(1f, orbColor.g * 1.8f + 0.3f),
                                 Mathf.Min(1f, orbColor.b * 1.8f + 0.3f),
                                 1f);
-                            var baseColor = newSr.color; // white for art orbs; orb color for fallback
-                            newSr.color = flashColor;
-                            newSr.DOColor(baseColor, 0.4f).SetDelay(0.15f).SetLink(go); // settle back to base
+                            var baseColor = newOrb.GetColor();
+                            newOrb.SetColor(flashColor);
+                            DOTween.To(() => newOrb.GetColor(), c => newOrb.SetColor(c), baseColor, 0.4f)
+                                .SetDelay(0.15f).SetLink(go);
                         }
 
                         if (AudioServiceInstaller.Instance != null)
@@ -1163,17 +1108,17 @@ namespace ChromaVale.Presentation.Views
 
         private void PlaySpawnAnimation(int x, int y)
         {
-            if (!_orbVisuals.TryGetValue((x, y), out var sr) || sr == null) return;
-            StartCoroutine(SpawnRoutine(sr, sr.transform.localScale));
+            if (!_orbVisuals.TryGetValue((x, y), out var orbVis) || orbVis == null) return;
+            StartCoroutine(SpawnRoutine(orbVis, orbVis.transform.localScale));
         }
 
         private void PlayMergeAnimation(int x, int y, Color flashColor)
         {
-            if (!_orbVisuals.TryGetValue((x, y), out var sr) || sr == null) return;
-            StartCoroutine(MergeRoutine(sr, sr.transform.localScale, flashColor));
+            if (!_orbVisuals.TryGetValue((x, y), out var orbVis) || orbVis == null) return;
+            StartCoroutine(MergeRoutine(orbVis, orbVis.transform.localScale, flashColor));
         }
 
-        private System.Collections.IEnumerator SpawnRoutine(SpriteRenderer sr, Vector3 baseScale)
+        private System.Collections.IEnumerator SpawnRoutine(OrbVisual orbVis, Vector3 baseScale)
         {
             // 8 frames × 60ms = 480ms: scale-in + overshoot settle (easeOutBack)
             const float c1 = 1.70158f;
@@ -1181,29 +1126,29 @@ namespace ChromaVale.Presentation.Views
             float t = 0f;
             while (t < SpawnAnimDuration)
             {
-                // Guard: sr may be destroyed by a later change in the same batch
-                if (sr == null) yield break;
+                // Guard: orbVis may be destroyed by a later change in the same batch
+                if (orbVis == null) yield break;
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / SpawnAnimDuration);
                 // easeOutBack: 0 → overshoot past 1 → settle at 1
                 float f = k - 1f;
                 float s = 1f + c3 * f * f * f + c1 * f * f;
-                sr.transform.localScale = baseScale * s;
+                orbVis.transform.localScale = baseScale * s;
                 yield return null;
             }
-            if (sr == null) yield break;
-            sr.transform.localScale = baseScale;
+            if (orbVis == null) yield break;
+            orbVis.transform.localScale = baseScale;
         }
 
-        private System.Collections.IEnumerator MergeRoutine(SpriteRenderer sr, Vector3 baseScale, Color flashColor)
+        private System.Collections.IEnumerator MergeRoutine(OrbVisual orbVis, Vector3 baseScale, Color flashColor)
         {
             // 8 frames × 80ms = 640ms: squash → flash → settle
-            // Flash color = RESULT orb color (already set on sr), brightened.
+            // Flash color = RESULT orb color (already set on orbVis), brightened.
             float t = 0f;
             while (t < MergeAnimDuration)
             {
-                // Guard: sr may be destroyed by a later change in the same batch
-                if (sr == null) yield break;
+                // Guard: orbVis may be destroyed by a later change in the same batch
+                if (orbVis == null) yield break;
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / MergeAnimDuration);
 
@@ -1211,7 +1156,7 @@ namespace ChromaVale.Presentation.Views
                 {
                     // Phase 1 (0–40%): squash — flatten vertically, bulge horizontally
                     float sq = Mathf.Sin((k / 0.4f) * Mathf.PI);
-                    sr.transform.localScale = new Vector3(
+                    orbVis.transform.localScale = new Vector3(
                         baseScale.x * (1f + 0.35f * sq),
                         baseScale.y * (1f - 0.35f * sq),
                         baseScale.z);
@@ -1220,23 +1165,23 @@ namespace ChromaVale.Presentation.Views
                 {
                     // Phase 2 (40–75%): flash — brighten toward white (result hue kept)
                     float fk = (k - 0.4f) / 0.35f;
-                    sr.color = Color.Lerp(flashColor, Color.white, fk * 0.75f);
+                    orbVis.SetColor(Color.Lerp(flashColor, Color.white, fk * 0.75f));
                     float pop = 1f + 0.18f * Mathf.Sin(fk * Mathf.PI);
-                    sr.transform.localScale = baseScale * pop;
+                    orbVis.transform.localScale = baseScale * pop;
                 }
                 else
                 {
                     // Phase 3 (75–100%): settle back to base scale/color
                     float sk = (k - 0.75f) / 0.25f;
                     float e = sk * sk * (3f - 2f * sk); // smoothstep
-                    sr.transform.localScale = Vector3.Lerp(baseScale * 1.18f, baseScale, e);
-                    sr.color = Color.Lerp(Color.white, flashColor, e);
+                    orbVis.transform.localScale = Vector3.Lerp(baseScale * 1.18f, baseScale, e);
+                    orbVis.SetColor(Color.Lerp(Color.white, flashColor, e));
                 }
                 yield return null;
             }
-            if (sr == null) yield break;
-            sr.transform.localScale = baseScale;
-            sr.color = flashColor;
+            if (orbVis == null) yield break;
+            orbVis.transform.localScale = baseScale;
+            orbVis.SetColor(flashColor);
         }
 
         private void HandleLevelComplete(LevelResult result)
