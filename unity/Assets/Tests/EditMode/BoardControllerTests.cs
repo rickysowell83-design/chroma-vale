@@ -388,6 +388,37 @@ namespace ChromaVale.Tests
             Assert.IsTrue(ctl.IsLevelComplete);
         }
 
+        [Test]
+        public void WinCondition_DuplicateTargets_RequireDistinctOrbs()
+        {
+            // Regression (t_47eb8003): two targets with the SAME color/tier
+            // (2x Cyan T2). One produced T2 must NOT satisfy both — the level
+            // only completes once a SECOND distinct T2 orb exists.
+            var orbs = new[]
+            {
+                new MergeOrbPlacement(0, 0, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(1, 1, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(2, 1, OrbColor.Cyan, OrbTier.T1),
+                new MergeOrbPlacement(3, 1, OrbColor.Cyan, OrbTier.T1),
+            };
+            var targets = new[]
+            {
+                new RestorationTarget(1, 0, OrbColor.Cyan, OrbTier.T2),
+                new RestorationTarget(2, 0, OrbColor.Cyan, OrbTier.T2),
+            };
+
+            var ctl = NewBoard(5, 5, 2, targets, orbs);
+
+            // First T2 produced — only one on the board → NOT complete.
+            Assert.IsTrue(ctl.TryMergeAt(P(0, 0), P(1, 1)));
+            Assert.IsFalse(ctl.IsLevelComplete, "One T2 must not satisfy two identical targets");
+
+            // Second T2 produced — two distinct T2 orbs now exist → complete.
+            Assert.IsTrue(ctl.TryMergeAt(P(2, 1), P(3, 1)));
+            Assert.IsTrue(ctl.IsLevelComplete);
+            Assert.AreEqual(2, ctl.MoveCount);
+        }
+
         // ── Star Rating ─────────────────────────────────────────────────
 
         [Test]
