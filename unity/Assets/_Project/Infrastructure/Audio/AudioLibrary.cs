@@ -9,14 +9,12 @@ namespace ChromaVale.Infrastructure.Audio
     /// or at Assets/Audio/AudioLibrary.asset in the Unity Editor.
     ///
     /// Sound names (used by IAudioService.PlaySound):
-    ///   pipe_place     — player places a pipe piece on the grid
-    ///   flow_tick      — flow advances into a trace cell
-    ///   pipe_burst     — a pipe bursts from overload
-    ///   target_reached — flow reaches a target
-    ///   win_fanfare    — level complete fanfare
-    ///   color_mix      — two colors mix at a cell
-    ///   undo           — player undoes a placement
-    ///   level_start    — level begins
+    ///   button_tap  — level select button press
+    ///   level_start — level loads / begins
+    ///   merge       — two orbs merge into one
+    ///   win_fanfare — level complete celebration
+    ///   lock_flash  — target position locks/unlocks
+    ///   spawn       — new orb spawns on the board
     /// </summary>
     [CreateAssetMenu(
         fileName = "AudioLibrary",
