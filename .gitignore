@@ -65,3 +65,6 @@ Packages/packages-lock.json
 unity_boot.log
 *.log
 Logs/
+
+# Builder screenshots (game-director captures)
+unity/Screenshots/

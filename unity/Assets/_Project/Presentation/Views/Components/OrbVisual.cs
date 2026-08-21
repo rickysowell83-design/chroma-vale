@@ -2,7 +2,7 @@
 // Chroma Vale — OrbVisual: MeshRenderer + MaterialPropertyBlock wrapper for
 // the GlassOrb shader.  Replaces per-orb SpriteRenderer + PNG sprite with a
 // single shared quad mesh and a MaterialPropertyBlock that drives _BaseColor
-// and _TierLevel without creating material instances.
+// without creating material instances.
 
 using UnityEngine;
 
@@ -19,7 +19,6 @@ namespace ChromaVale.Presentation.Views.Components
     {
         // Shader property IDs — cached once
         private static readonly int BaseColorId  = Shader.PropertyToID("_BaseColor");
-        private static readonly int TierLevelId  = Shader.PropertyToID("_TierLevel");
 
         // Shared quad mesh — one for all OrbVisual instances
         private static Mesh _quadMesh;
@@ -187,7 +186,6 @@ namespace ChromaVale.Presentation.Views.Components
             var mr = GetComponent<MeshRenderer>();
             if (mr == null) return;
             MPB.SetColor(BaseColorId, _color);
-            MPB.SetFloat(TierLevelId, _tier01);
             mr.SetPropertyBlock(MPB);
             _dirty = false;
         }
