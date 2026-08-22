@@ -159,7 +159,7 @@ namespace ChromaVale.Domain.PuzzleBoard
                 var spoils = _spoilSystem.OnMoveCompleted(this);
                 foreach (var spawn in spoils)
                 {
-                    _cells[spawn.X, spawn.Y] = new OrbData(OrbColor.Brown, 1);
+                    _cells[spawn.X, spawn.Y] = new OrbData(OrbColor.Brown, OrbTier.T1);
                     Emit(new BoardChange(ChangeType.OrbAdded, spawn, null, _cells[spawn.X, spawn.Y]));
                 }
             }
