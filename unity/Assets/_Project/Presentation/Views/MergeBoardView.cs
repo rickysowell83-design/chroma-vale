@@ -329,7 +329,6 @@ namespace ChromaVale.Presentation.Views
                     tile.transform.position = pos;
                     tile.transform.localScale = Vector3.one * _tileSize * 0.95f;
                     var sr = tile.AddComponent<SpriteRenderer>();
-                    sr.sprite = CreateWhiteSprite();
                     // Check if this cell is an obstacle
                     bool isObstacle = false;
                     if (_level.Obstacles != null)
@@ -339,7 +338,18 @@ namespace ChromaVale.Presentation.Views
                             if (obs.X == x && obs.Y == y) { isObstacle = true; break; }
                         }
                     }
-                    sr.color = isObstacle ? new Color(0.15f, 0.12f, 0.10f) : ChromaPalette.PCB_Substrate;
+                    if (isObstacle)
+                    {
+                        // Render the board-mounted obstacle fixture art instead of a
+                        // flat near-black placeholder square (which read as broken pixels).
+                        sr.sprite = LoadObstacleSprite();
+                        sr.color = Color.white; // preserve the sprite's own tint
+                    }
+                    else
+                    {
+                        sr.sprite = CreateWhiteSprite();
+                        sr.color = ChromaPalette.PCB_Substrate;
+                    }
                     sr.sortingOrder = -2; // behind everything
                     _gridTiles[x, y] = tile;
                 }
@@ -1921,6 +1931,28 @@ namespace ChromaVale.Presentation.Views
                 _whiteSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 1f);
             }
             return _whiteSprite;
+        }
+
+        // Loads the board-mounted obstacle fixture art from Resources/Board/,
+        // choosing the variant by the level's theme.  Falls back to a readable
+        // stone tile if the themed variant isn't present.  Never null.
+        private Sprite LoadObstacleSprite()
+        {
+            var theme = _level != null ? _level.DisplayName ?? "" : "";
+            var lower = theme.ToLowerInvariant();
+            string variant = "obstacle_stone_256";
+            if (lower.Contains("ice")) variant = "obstacle_ice_256";
+            else if (lower.Contains("vine") || lower.Contains("garden") || lower.Contains("forest")) variant = "obstacle_vines_256";
+
+            var spr = Resources.Load<Sprite>($"Board/{variant}");
+            if (spr != null) return spr;
+
+            // Themed sprite missing — fall back to the stone fixture so obstacles
+            // never collapse back to the near-black placeholder square.
+            spr = Resources.Load<Sprite>("Board/obstacle_stone_256");
+            if (spr != null) return spr;
+
+            return CreateWhiteSprite();
         }
 
         private Sprite CreateDefaultSprite(OrbColor color)
