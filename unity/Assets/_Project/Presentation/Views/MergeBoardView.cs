@@ -156,6 +156,12 @@ namespace ChromaVale.Presentation.Views
         {
             _levelNumber = Mathf.Clamp(_startLevel, 1, _maxLevel);
 
+            // Parent canvas for the reset button. If no HUD text is wired in the
+            // inspector, the fallback HUD canvas + SafeArea below become its parent.
+            // If a HUD IS wired, no fallback canvas exists and we build a dedicated
+            // one further down. (fix: t_7bc48bac)
+            Transform resetButtonParent = null;
+
             // If no HUD text is wired in the inspector, build a minimal screen-space
             // overlay at runtime so level/moves/par are always visible.
             if (_hudText == null)
@@ -169,6 +175,7 @@ namespace ChromaVale.Presentation.Views
                 var safeGo = new GameObject("SafeArea");
                 safeGo.transform.SetParent(canvasGo.transform, false);
                 safeGo.AddComponent<SafeAreaFitter>();
+                resetButtonParent = safeGo.transform;
 
                 var tmpGo = new GameObject("HUDText");
                 tmpGo.transform.SetParent(safeGo.transform, false);
@@ -182,33 +189,51 @@ namespace ChromaVale.Presentation.Views
                 rect.pivot = new Vector2(0.5f, 1f);
                 rect.anchoredPosition = new Vector2(0f, -20f);
                 rect.sizeDelta = new Vector2(400f, 60f);
-
-                // Reset button — top-right corner so the player can restart
-                // when stuck (e.g. tier-up'd all orbs and can't reach target tier).
-                var resetGo = new GameObject("ResetButton");
-                resetGo.transform.SetParent(safeGo.transform, false);
-                _resetButton = resetGo.AddComponent<Button>();
-                var resetImg = resetGo.AddComponent<Image>();
-                resetImg.color = new Color(0.2f, 0.3f, 0.4f, 0.8f);
-                var resetRect = resetGo.GetComponent<RectTransform>();
-                resetRect.anchorMin = new Vector2(1f, 1f);
-                resetRect.anchorMax = new Vector2(1f, 1f);
-                resetRect.pivot = new Vector2(1f, 1f);
-                resetRect.anchoredPosition = new Vector2(-10f, -10f);
-                resetRect.sizeDelta = new Vector2(80f, 40f);
-                var resetLabel = new GameObject("Label");
-                resetLabel.transform.SetParent(resetGo.transform, false);
-                var resetLabelText = resetLabel.AddComponent<TextMeshProUGUI>();
-                resetLabelText.text = "Reset";
-                resetLabelText.fontSize = 18;
-                resetLabelText.alignment = TextAlignmentOptions.Center;
-                var resetLabelRect = resetLabel.GetComponent<RectTransform>();
-                resetLabelRect.anchorMin = Vector2.zero;
-                resetLabelRect.anchorMax = Vector2.one;
-                resetLabelRect.pivot = new Vector2(0.5f, 0.5f);
-                resetLabelRect.sizeDelta = Vector2.zero;
-                _resetButton.onClick.AddListener(() => LoadLevel(_levelNumber));
             }
+
+            // If a HUD canvas was NOT built above (i.e. _hudText is wired in the
+            // inspector), the reset button still needs a parent — create a minimal
+            // screen-space canvas so the button ALWAYS exists.
+            if (resetButtonParent == null)
+            {
+                var canvasGo = new GameObject("ResetButtonCanvas");
+                var canvas = canvasGo.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = 100; // high enough to stay clickable
+                ConfigureCanvasScaler(canvas);
+
+                var safeGo = new GameObject("SafeArea");
+                safeGo.transform.SetParent(canvasGo.transform, false);
+                safeGo.AddComponent<SafeAreaFitter>();
+                resetButtonParent = safeGo.transform;
+            }
+
+            // Reset button — top-right corner so the player can restart
+            // when stuck (e.g. tier-up'd all orbs and can't reach target tier).
+            var resetGo = new GameObject("ResetButton");
+            resetGo.transform.SetParent(resetButtonParent, false);
+            _resetButton = resetGo.AddComponent<Button>();
+            var resetImg = resetGo.AddComponent<Image>();
+            resetImg.color = new Color(0.2f, 0.3f, 0.4f, 0.8f);
+            resetImg.raycastTarget = true; // receives clicks
+            var resetRect = resetGo.GetComponent<RectTransform>();
+            resetRect.anchorMin = new Vector2(1f, 1f);
+            resetRect.anchorMax = new Vector2(1f, 1f);
+            resetRect.pivot = new Vector2(1f, 1f);
+            resetRect.anchoredPosition = new Vector2(-10f, -10f);
+            resetRect.sizeDelta = new Vector2(80f, 40f);
+            var resetLabel = new GameObject("Label");
+            resetLabel.transform.SetParent(resetGo.transform, false);
+            var resetLabelText = resetLabel.AddComponent<TextMeshProUGUI>();
+            resetLabelText.text = "Reset";
+            resetLabelText.fontSize = 18;
+            resetLabelText.alignment = TextAlignmentOptions.Center;
+            var resetLabelRect = resetLabel.GetComponent<RectTransform>();
+            resetLabelRect.anchorMin = Vector2.zero;
+            resetLabelRect.anchorMax = Vector2.one;
+            resetLabelRect.pivot = new Vector2(0.5f, 0.5f);
+            resetLabelRect.sizeDelta = Vector2.zero;
+            _resetButton.onClick.AddListener(() => LoadLevel(_levelNumber));
 
             // Only auto-load in Start if no level was loaded externally
             // (LevelSelectView calls LoadLevel directly before Start fires)
