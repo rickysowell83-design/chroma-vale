@@ -19,7 +19,8 @@
     {"color": "magenta", "tier": 1, "x": 2, "y": 2},
     {"color": "yellow", "tier": 1, "x": 4, "y": 0},
     {"color": "yellow", "tier": 1, "x": 4, "y": 1},
-    {"color": "yellow", "tier": 1, "x": 4, "y": 2}
+    {"color": "yellow", "tier": 1, "x": 4, "y": 2},
+    {"color": "yellow", "tier": 1, "x": 5, "y": 2}
   ],
   "targets": [
     {"color": "green", "tier": 2, "x": 5, "y": 5},

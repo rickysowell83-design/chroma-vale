@@ -69,6 +69,7 @@ namespace ChromaVale.Presentation.Views
 
         [Header("HUD")]
         [SerializeField] private TextMeshProUGUI _hudText;
+        private Button _resetButton;
 
         // ── Design Constants (locked by @game-designer) ──
         private const float MergeAnimDuration   = 0.640f; // 8 frames × 80ms
@@ -181,6 +182,32 @@ namespace ChromaVale.Presentation.Views
                 rect.pivot = new Vector2(0.5f, 1f);
                 rect.anchoredPosition = new Vector2(0f, -20f);
                 rect.sizeDelta = new Vector2(400f, 60f);
+
+                // Reset button — top-right corner so the player can restart
+                // when stuck (e.g. tier-up'd all orbs and can't reach target tier).
+                var resetGo = new GameObject("ResetButton");
+                resetGo.transform.SetParent(safeGo.transform, false);
+                _resetButton = resetGo.AddComponent<Button>();
+                var resetImg = resetGo.AddComponent<Image>();
+                resetImg.color = new Color(0.2f, 0.3f, 0.4f, 0.8f);
+                var resetRect = resetGo.GetComponent<RectTransform>();
+                resetRect.anchorMin = new Vector2(1f, 1f);
+                resetRect.anchorMax = new Vector2(1f, 1f);
+                resetRect.pivot = new Vector2(1f, 1f);
+                resetRect.anchoredPosition = new Vector2(-10f, -10f);
+                resetRect.sizeDelta = new Vector2(80f, 40f);
+                var resetLabel = new GameObject("Label");
+                resetLabel.transform.SetParent(resetGo.transform, false);
+                var resetLabelText = resetLabel.AddComponent<TextMeshProUGUI>();
+                resetLabelText.text = "Reset";
+                resetLabelText.fontSize = 18;
+                resetLabelText.alignment = TextAlignmentOptions.Center;
+                var resetLabelRect = resetLabel.GetComponent<RectTransform>();
+                resetLabelRect.anchorMin = Vector2.zero;
+                resetLabelRect.anchorMax = Vector2.one;
+                resetLabelRect.pivot = new Vector2(0.5f, 0.5f);
+                resetLabelRect.sizeDelta = Vector2.zero;
+                _resetButton.onClick.AddListener(() => LoadLevel(_levelNumber));
             }
 
             // Only auto-load in Start if no level was loaded externally
