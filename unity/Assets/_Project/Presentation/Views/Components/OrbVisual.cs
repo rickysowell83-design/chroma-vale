@@ -22,7 +22,7 @@ namespace ChromaVale.Presentation.Views.Components
     {
         // ── Shared circle sprite (generated once) ──
         private static Sprite _circleSprite;
-        private const int CircleTexSize = 64;
+        private const int CircleTexSize = 128;
 
         // ── Per-instance state ──
         private SpriteRenderer _sr;
@@ -135,6 +135,11 @@ namespace ChromaVale.Presentation.Views.Components
             float radius = size * 0.45f;
             float aaWidth = 1.5f;
 
+            // Specular highlight parameters (upper-left quadrant).
+            float hlCx = cx - 0.3f * radius;
+            float hlCy = cy + 0.3f * radius;
+            float hlRadius = 0.25f * radius;
+
             Color32[] pixels = new Color32[size * size];
             for (int y = 0; y < size; y++)
             {
@@ -143,8 +148,25 @@ namespace ChromaVale.Presentation.Views.Components
                     float dx = x + 0.5f - cx;
                     float dy = y + 0.5f - cy;
                     float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    // Base alpha: soft anti-aliased circular mask (shape).
                     float alpha = Mathf.Clamp01((radius - dist) / aaWidth);
-                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255));
+
+                    // Radial gradient in luminance (sphere shading):
+                    // 255 at center down to ~200 (0.78x) at the rim.
+                    float edgeFactor = Mathf.Clamp01(dist / radius);
+                    float lum = Mathf.Lerp(255f, 200f, edgeFactor);
+
+                    // Specular highlight: bright Gaussian spot in the
+                    // upper-left quadrant, added to luminance (capped at 255).
+                    float hdx = x + 0.5f - hlCx;
+                    float hdy = y + 0.5f - hlCy;
+                    float hdist2 = hdx * hdx + hdy * hdy;
+                    float gauss = Mathf.Exp(-hdist2 / (2f * hlRadius * hlRadius));
+                    lum = Mathf.Min(255f, lum + gauss * 255f);
+
+                    byte rgb = (byte)Mathf.RoundToInt(lum);
+                    pixels[y * size + x] = new Color32(rgb, rgb, rgb, (byte)(alpha * 255));
                 }
             }
 
