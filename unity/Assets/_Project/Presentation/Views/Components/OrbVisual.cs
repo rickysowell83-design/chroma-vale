@@ -177,6 +177,20 @@ namespace ChromaVale.Presentation.Views.Components
             if (mr.sharedMaterial == null)
             {
                 mr.sharedMaterial = GlassOrbMaterial;
+                if (mr.sharedMaterial == null)
+                {
+                    Debug.LogError("[OrbVisual] GlassOrbMaterial is NULL — Resources.Load AND AssetDatabase fallback both failed. Attempting Shader.Find fallback.");
+                    var fallbackShader = Shader.Find("ChromaVale/GlassOrb");
+                    if (fallbackShader != null)
+                    {
+                        mr.sharedMaterial = new Material(fallbackShader);
+                        Debug.LogWarning("[OrbVisual] Using runtime Material from Shader.Find fallback. Orb rendering should now work.");
+                    }
+                    else
+                    {
+                        Debug.LogError("[OrbVisual] Shader.Find('ChromaVale/GlassOrb') also failed — shader not found at runtime!");
+                    }
+                }
             }
         }
 
