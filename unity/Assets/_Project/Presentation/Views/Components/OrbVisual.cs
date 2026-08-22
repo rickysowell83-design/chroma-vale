@@ -1,136 +1,85 @@
 // SPDX-License-Identifier: MIT
-// Chroma Vale — OrbVisual: MeshRenderer + MaterialPropertyBlock wrapper for
-// the GlassOrb shader.  Replaces per-orb SpriteRenderer + PNG sprite with a
-// single shared quad mesh and a MaterialPropertyBlock that drives _BaseColor
-// without creating material instances.
+// Chroma Vale — OrbVisual: SpriteRenderer-based orb renderer.
+// Replaces the MeshRenderer + custom GlassOrb shader approach (which was
+// invisible due to URP Transparent-queue sorting conflicts with
+// SpriteRenderer tiles at the same z).  Uses a procedurally generated
+// white circle sprite + SpriteRenderer.color for tinting.
+// Public API is identical to the previous version — MergeBoardView needs
+// no changes.
 
 using UnityEngine;
 
 namespace ChromaVale.Presentation.Views.Components
 {
     /// <summary>
-    /// Renders a glass orb using the ChromaVale/GlassOrb shader.
-    /// Attach to a GameObject that also has a MeshFilter + MeshRenderer.
+    /// Renders a glass orb using a SpriteRenderer + a procedurally
+    /// generated circle sprite.  The orb color is driven by
+    /// SpriteRenderer.color, which sorts predictably via sortingOrder.
     /// </summary>
-    [RequireComponent(typeof(MeshRenderer))]
-    [RequireComponent(typeof(MeshFilter))]
+    [RequireComponent(typeof(SpriteRenderer))]
     [ExecuteAlways]
     public class OrbVisual : MonoBehaviour
     {
-        // Shader property IDs — cached once
-        private static readonly int BaseColorId  = Shader.PropertyToID("_BaseColor");
+        // ── Shared circle sprite (generated once) ──
+        private static Sprite _circleSprite;
+        private const int CircleTexSize = 64;
 
-        // Shared quad mesh — one for all OrbVisual instances
-        private static Mesh _quadMesh;
-        private static Material _glassOrbMaterial;
-
-        // Per-instance property block
-        private MaterialPropertyBlock _mpb;
+        // ── Per-instance state ──
+        private SpriteRenderer _sr;
         private Color _color = Color.white;
         private float _tier01;
-        private bool _dirty = true;
 
         /// <summary>
-        /// The shared quad mesh (1×1 plane centered at origin).
+        /// The shared circle sprite (64×64 white circle with soft edge).
         /// </summary>
-        public static Mesh QuadMesh
+        public static Sprite CircleSprite
         {
             get
             {
-                if (_quadMesh == null) CreateQuadMesh();
-                return _quadMesh;
+                if (_circleSprite == null) CreateCircleSprite();
+                return _circleSprite;
             }
         }
 
-        /// <summary>
-        /// The shared GlassOrb material (loaded once from Resources/Materials).
-        /// </summary>
-        public static Material GlassOrbMaterial
-        {
-            get
-            {
-                if (_glassOrbMaterial == null)
-                {
-                    // Load from Resources — path: Assets/_Project/Resources/Materials/GlassOrb.mat
-                    _glassOrbMaterial = Resources.Load<Material>("Materials/GlassOrb");
-#if UNITY_EDITOR
-                    if (_glassOrbMaterial == null)
-                    {
-                        // Fallback: load directly from the project
-                        _glassOrbMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(
-                            "Assets/_Project/Materials/GlassOrb.mat");
-                    }
-#endif
-                }
-                return _glassOrbMaterial;
-            }
-        }
-
-        /// <summary>
-        /// Orb base color (mapped from OrbColor enum → ChromaVale palette).
-        /// </summary>
+        /// <summary>The orb's base color (read/write).</summary>
         public Color BaseColor
         {
             get => _color;
-            set { _color = value; _dirty = true; }
-        }
-
-        /// <summary>
-        /// Tier as a 0..1 float (T1=0 → T5=1).
-        /// </summary>
-        public float Tier01
-        {
-            get => _tier01;
-            set { _tier01 = value; _dirty = true; }
-        }
-
-        private MaterialPropertyBlock MPB
-        {
-            get
+            set
             {
-                if (_mpb == null) _mpb = new MaterialPropertyBlock();
-                return _mpb;
+                _color = value;
+                ApplyColor();
             }
         }
+
+        /// <summary>Normalized tier value 0..1 (read-only after Configure).</summary>
+        public float Tier01 => _tier01;
+
+        // ── Lifecycle ──
 
         private void Awake()
         {
             EnsureComponents();
-            ApplyIfDirty();
         }
 
         private void OnEnable()
         {
             EnsureComponents();
-            ApplyIfDirty();
         }
 
-        private void LateUpdate()
-        {
-            // The pulse animation lives in the shader (_Time.y), so we only
-            // re-apply when the MPB is dirty (color/tier changed).  But we also
-            // re-apply every frame in Editor mode so changes are visible.
-            ApplyIfDirty();
-        }
+        // ── Public API (identical to previous version) ──
 
-        private void OnValidate()
-        {
-            _dirty = true;
-        }
-
-        /// <summary>
-        /// Set both color and tier in one call — avoids double-dirty.
-        /// </summary>
+        /// <summary>Set color and normalized tier (0..1).</summary>
         public void Configure(Color baseColor, float tier01)
         {
             _color = baseColor;
             _tier01 = tier01;
-            _dirty = true;
-            ApplyIfDirty();
+            ApplyColor();
         }
 
         /// <summary>
         /// Convenience: set color and tier from OrbColor + OrbTier enums.
+        /// maxTier defaults to 5 (T1..T5 → 0..1).
         /// </summary>
         public void Configure(Color baseColor, int tier, int maxTier = 5)
         {
@@ -138,12 +87,11 @@ namespace ChromaVale.Presentation.Views.Components
             Configure(baseColor, tier01);
         }
 
-        /// <summary>Set the orb's base color (updates MaterialPropertyBlock).</summary>
+        /// <summary>Set the orb's base color.</summary>
         public void SetColor(Color c)
         {
             _color = c;
-            _dirty = true;
-            ApplyIfDirty();
+            ApplyColor();
         }
 
         /// <summary>Get the orb's current base color.</summary>
@@ -153,90 +101,58 @@ namespace ChromaVale.Presentation.Views.Components
         public void SetAlpha(float a)
         {
             _color.a = a;
-            _dirty = true;
-            ApplyIfDirty();
+            ApplyColor();
         }
+
+        // ── Internal ──
 
         private void EnsureComponents()
         {
-            var mf = GetComponent<MeshFilter>();
-            if (mf == null)
-            {
-                mf = gameObject.AddComponent<MeshFilter>();
-            }
-            if (mf.sharedMesh == null)
-            {
-                mf.sharedMesh = QuadMesh;
-            }
+            if (_sr == null) _sr = GetComponent<SpriteRenderer>();
+            if (_sr == null) _sr = gameObject.AddComponent<SpriteRenderer>();
 
-            var mr = GetComponent<MeshRenderer>();
-            if (mr == null)
+            _sr.sprite = CircleSprite;
+            _sr.sortingOrder = 1;  // tiles are at -2, so orbs render on top
+            _sr.color = _color;
+        }
+
+        private void ApplyColor()
+        {
+            if (_sr == null) _sr = GetComponent<SpriteRenderer>();
+            if (_sr != null) _sr.color = _color;
+        }
+
+        // ── Procedural circle sprite generation ──
+
+        private static void CreateCircleSprite()
+        {
+            int size = CircleTexSize;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            float cx = size * 0.5f;
+            float cy = size * 0.5f;
+            float radius = size * 0.45f;
+            float aaWidth = 1.5f;
+
+            Color32[] pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
             {
-                mr = gameObject.AddComponent<MeshRenderer>();
-            }
-            if (mr.sharedMaterial == null)
-            {
-                mr.sharedMaterial = GlassOrbMaterial;
-                if (mr.sharedMaterial == null)
+                for (int x = 0; x < size; x++)
                 {
-                    Debug.LogError("[OrbVisual] GlassOrbMaterial is NULL — Resources.Load AND AssetDatabase fallback both failed. Attempting Shader.Find fallback.");
-                    var fallbackShader = Shader.Find("ChromaVale/GlassOrb");
-                    if (fallbackShader != null)
-                    {
-                        mr.sharedMaterial = new Material(fallbackShader);
-                        Debug.LogWarning("[OrbVisual] Using runtime Material from Shader.Find fallback. Orb rendering should now work.");
-                    }
-                    else
-                    {
-                        Debug.LogError("[OrbVisual] Shader.Find('ChromaVale/GlassOrb') also failed — shader not found at runtime!");
-                    }
+                    float dx = x + 0.5f - cx;
+                    float dy = y + 0.5f - cy;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float alpha = Mathf.Clamp01((radius - dist) / aaWidth);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255));
                 }
             }
-        }
 
-        private void ApplyIfDirty()
-        {
-            if (!_dirty) return;
-            var mr = GetComponent<MeshRenderer>();
-            if (mr == null) return;
-            MPB.SetColor(BaseColorId, _color);
-            mr.SetPropertyBlock(MPB);
-            _dirty = false;
-        }
+            tex.SetPixels32(pixels);
+            tex.Apply();
 
-        // ── Shared quad mesh creation ──
-
-        private static void CreateQuadMesh()
-        {
-            // Standard Unity quad (1×1, centered at origin, UVs 0..1)
-            _quadMesh = new Mesh
-            {
-                name = "OrbVisualQuad",
-                vertices = new Vector3[]
-                {
-                    new Vector3(-0.5f, -0.5f, 0),
-                    new Vector3( 0.5f, -0.5f, 0),
-                    new Vector3( 0.5f,  0.5f, 0),
-                    new Vector3(-0.5f,  0.5f, 0),
-                },
-                uv = new Vector2[]
-                {
-                    new Vector2(0, 0),
-                    new Vector2(1, 0),
-                    new Vector2(1, 1),
-                    new Vector2(0, 1),
-                },
-                triangles = new int[] { 0, 1, 2, 0, 2, 3 },
-                normals = new Vector3[]
-                {
-                    Vector3.forward,
-                    Vector3.forward,
-                    Vector3.forward,
-                    Vector3.forward,
-                },
-            };
-            _quadMesh.RecalculateBounds();
-            _quadMesh.hideFlags = HideFlags.HideAndDontSave;
+            _circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                new Vector2(0.5f, 0.5f), pixelsPerUnit: size);
         }
     }
 }
