@@ -27,6 +27,7 @@ namespace ChromaVale.Domain.PuzzleBoard
         private int _par;
         private bool _complete;
         private bool _mixingEnabled = true;
+        private BrownSpoilSystem? _spoilSystem;
 
         /// <summary>Board width (set on Initialize).</summary>
         public int Width { get; private set; }
@@ -68,6 +69,7 @@ namespace ChromaVale.Domain.PuzzleBoard
             _targets = levelData.RestorationTargets ?? Array.Empty<RestorationTarget>();
             _par = levelData.ParMoves;
             _mixingEnabled = levelData.MixingEnabled;
+            _spoilSystem = new BrownSpoilSystem(levelData);
             MoveCount = 0;
             _complete = false;
 
@@ -150,6 +152,18 @@ namespace ChromaVale.Domain.PuzzleBoard
 
             // 4. Count the move and re-check the win condition.
             MoveCount++;
+
+            // 5. Spoiling Brown: advance decay on all browns, spawn if threshold hit.
+            if (_spoilSystem != null && _spoilSystem.Enabled)
+            {
+                var spoils = _spoilSystem.OnMoveCompleted(this);
+                foreach (var spawn in spoils)
+                {
+                    _cells[spawn.X, spawn.Y] = new OrbData(OrbColor.Brown, 1);
+                    Emit(new BoardChange(ChangeType.OrbAdded, spawn, null, _cells[spawn.X, spawn.Y]));
+                }
+            }
+
             CheckWin();
 
             return true;

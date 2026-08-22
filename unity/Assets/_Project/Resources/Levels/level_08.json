@@ -3,13 +3,15 @@
   "id": "cv_08",
   "name": "The Brown Trap",
   "mixingEnabled": true,
+  "spoilEnabled": true,
+  "spoilMaxDecay": 3,
   "grid": {
     "width": 6,
     "height": 6
   },
-  "parMoves": 9,
+  "parMoves": 8,
   "difficulty": "Medium",
-  "teaches": "Brown = clearable waste; opportunity cost visible",
+  "teaches": "Brown = clearable waste; neglected browns multiply",
   "orbs": [
     {"color": "cyan", "tier": 1, "x": 0, "y": 0},
     {"color": "cyan", "tier": 1, "x": 1, "y": 0},
@@ -22,7 +24,9 @@
     {"color": "yellow", "tier": 1, "x": 2, "y": 3},
     {"color": "yellow", "tier": 1, "x": 3, "y": 3},
     {"color": "brown", "tier": 1, "x": 2, "y": 2},
-    {"color": "brown", "tier": 1, "x": 3, "y": 2}
+    {"color": "brown", "tier": 1, "x": 3, "y": 2},
+    {"color": "brown", "tier": 1, "x": 2, "y": 4},
+    {"color": "brown", "tier": 1, "x": 4, "y": 4}
   ],
   "targets": [
     {"color": "cyan", "tier": 3, "x": 5, "y": 5},

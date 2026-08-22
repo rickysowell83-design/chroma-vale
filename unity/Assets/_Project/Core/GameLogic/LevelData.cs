@@ -83,6 +83,22 @@ namespace ChromaVale.Core.GameLogic
         /// </summary>
         public bool MixingEnabled = true;
 
+        /// <summary>
+        /// When true, the Spoiling Brown mechanic is active on this level:
+        /// neglected brown orbs accumulate decay each move and, at
+        /// <see cref="SpoilMaxDecay"/>, spawn a new Brown T1 on the nearest valid
+        /// empty cell (a "neglected browns multiply" pressure mechanic).
+        /// Default false (mechanic off).
+        /// </summary>
+        public bool SpoilEnabled;
+
+        /// <summary>
+        /// Decay threshold at which a neglected brown spawns a new Brown T1.
+        /// Only meaningful when <see cref="SpoilEnabled"/> is true.
+        /// Default 3. Must be &gt; 0; values &lt;= 0 fall back to the default.
+        /// </summary>
+        public int SpoilMaxDecay = BrownSpoilSystem.DefaultMaxDecay;
+
         // ═══════════════════════════════════════════════════════════════
         // WORLD 1: "First Light" — Learning to Route (Levels 1-5)
         // ═══════════════════════════════════════════════════════════════

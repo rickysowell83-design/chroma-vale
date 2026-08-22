@@ -76,6 +76,8 @@ namespace ChromaVale.Core.GameLogic
                     ParMoves = GetInt32(root, "parMoves"),
                     DisplayName = GetString(root, "displayName") ?? $"Level {levelNumber}",
                     MixingEnabled = GetBool(root, "mixingEnabled", true),
+                    SpoilEnabled = GetBool(root, "spoilEnabled", false),
+                    SpoilMaxDecay = GetInt32OrDefault(root, "spoilMaxDecay", BrownSpoilSystem.DefaultMaxDecay),
                     Obstacles = ParseObstacles(root),
                     MergeOrbs = ParseOrbs(root.GetProperty("orbs")),
                     RestorationTargets = ParseTargets(root.GetProperty("targets")),
@@ -114,6 +116,16 @@ namespace ChromaVale.Core.GameLogic
                 (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False))
             {
                 return value.GetBoolean();
+            }
+            return defaultValue;
+        }
+
+        private static int GetInt32OrDefault(JsonElement element, string property, int defaultValue)
+        {
+            if (element.TryGetProperty(property, out JsonElement value) &&
+                value.ValueKind == JsonValueKind.Number)
+            {
+                return value.GetInt32();
             }
             return defaultValue;
         }
