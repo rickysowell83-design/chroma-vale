@@ -1,0 +1,15 @@
+{
+    "name": "ChromaVale.Debugging",
+    "rootNamespace": "ChromaVale.Debugging",
+    "references": [
+        "UnityEngine.CoreModule",
+        "UnityEditor.CoreModule"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
