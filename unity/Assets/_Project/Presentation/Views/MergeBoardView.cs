@@ -1543,7 +1543,7 @@ namespace ChromaVale.Presentation.Views
             }
 
             // Chip root (background + text). The idle pulse tweens this whole node.
-            var rootGo = new GameObject("OnboardingCue");
+            var rootGo = new GameObject("OnboardingCue", typeof(RectTransform));
             rootGo.transform.SetParent(canvasGo.transform, false);
             _onboardingCueRoot = rootGo;
 
