@@ -227,6 +227,8 @@ namespace ChromaVale.Presentation.Views
 
         private void ResetForLevel(int levelNumber)
         {
+            if (_levelRepo == null)
+                _levelRepo = new MergeLevelRepository(new ResourcesLevelJsonProvider());
             _levelNumber = levelNumber;
             _levelData = levelNumber > 0 && levelNumber <= _levelRepo.LevelCount
                 ? _levelRepo.GetMergeLevel(levelNumber)
