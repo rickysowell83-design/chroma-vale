@@ -147,6 +147,12 @@ namespace ChromaVale.Presentation.Views
             HideChip();
             _isDragging = false;
             _dragSourceCell = null;
+            // NEW: destroy any lingering hand
+            if (_hand != null)
+            {
+                Destroy(_hand.gameObject);
+                _hand = null;
+            }
         }
 
         private void Update()
@@ -518,6 +524,12 @@ namespace ChromaVale.Presentation.Views
             {
                 _hand.FadeOut();
                 _demoActive = false;
+            }
+            // NEW: destroy the hand GO so it can't get stuck visible
+            if (_hand != null)
+            {
+                Destroy(_hand.gameObject);
+                _hand = null;
             }
         }
 

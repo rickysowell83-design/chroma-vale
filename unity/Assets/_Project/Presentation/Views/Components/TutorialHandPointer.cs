@@ -266,6 +266,8 @@ namespace ChromaVale.Presentation.Views.Components
             _transitionTween = null;
             // Kill ALL tweens on handRect to clean up any orphaned scale tweens
             _handRect?.DOKill();
+            // NEW: safety — ensure the hand is invisible even if a fade was interrupted mid-animation
+            if (_canvasGroup != null) _canvasGroup.alpha = 0f;
         }
 
         private void OnDestroy()
