@@ -404,6 +404,7 @@ namespace ChromaVale.Presentation.Views
             }
 
             // Idle pulse (procedural — breathing glow on ring + ghost)
+            if (!gameObject.activeInHierarchy) return;
             _targetPulseRoutines[(x, y)] = StartCoroutine(TargetIdlePulseRoutine(go.transform, sr, ringSr));
         }
 
@@ -1397,6 +1398,7 @@ namespace ChromaVale.Presentation.Views
             titleRect.anchoredPosition = Vector2.zero;
 
             _introBanner = bannerGo;
+            if (!gameObject.activeInHierarchy) return;
             StartCoroutine(IntroBannerAnimation(panelRect));
         }
 
