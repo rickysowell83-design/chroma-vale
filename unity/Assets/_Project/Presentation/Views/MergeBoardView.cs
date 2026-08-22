@@ -169,6 +169,7 @@ namespace ChromaVale.Presentation.Views
                 var canvasGo = new GameObject("HUDCanvas");
                 var canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvasGo.AddComponent<GraphicRaycaster>(); // needed for Reset button clicks
                 ConfigureCanvasScaler(canvas);
 
                 // Notch-safe container: HUD content stays inside Screen.safeArea.
@@ -200,6 +201,7 @@ namespace ChromaVale.Presentation.Views
                 var canvas = canvasGo.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvas.sortingOrder = 100; // high enough to stay clickable
+                canvasGo.AddComponent<GraphicRaycaster>(); // needed to receive clicks
                 ConfigureCanvasScaler(canvas);
 
                 var safeGo = new GameObject("SafeArea");
