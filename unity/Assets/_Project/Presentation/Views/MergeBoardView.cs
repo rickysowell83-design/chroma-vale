@@ -1401,6 +1401,7 @@ namespace ChromaVale.Presentation.Views
 
             while (t < duration)
             {
+                if (panelRect == null) yield break; // banner destroyed by ClearBoard
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / duration);
                 // easeOutCubic: 1 - (1-k)^3
@@ -1408,6 +1409,7 @@ namespace ChromaVale.Presentation.Views
                 panelRect.anchoredPosition = Vector2.Lerp(startPos, endPos, e);
                 yield return null;
             }
+            if (panelRect == null) yield break; // destroyed mid-animation
             panelRect.anchoredPosition = endPos;
 
             // Hold for 1.5s
@@ -1850,6 +1852,10 @@ namespace ChromaVale.Presentation.Views
 
             _isDragging = false;
             _draggedOrbVisual = null;
+
+            // Stop all running coroutines (intro banner animation, etc.)
+            // before destroying the GameObjects they animate.
+            StopAllCoroutines();
 
             // Destroy intro banner if still visible
             if (_introBanner != null)
