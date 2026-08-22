@@ -6,7 +6,8 @@
     "width": 6,
     "height": 5
   },
-  "parMoves": 4,
+  "mixingEnabled": true,
+  "parMoves": 7,
   "difficulty": "Medium",
   "teaches": "Mix THEN merge \u2014 combine both verbs",
   "orbs": [

@@ -6,7 +6,8 @@
     "width": 5,
     "height": 5
   },
-  "parMoves": 3,
+  "mixingEnabled": true,
+  "parMoves": 5,
   "difficulty": "Easy",
   "teaches": "Strategic choice \u2014 which pairs to mix",
   "orbs": [

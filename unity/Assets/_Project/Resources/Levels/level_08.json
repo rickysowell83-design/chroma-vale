@@ -1,97 +1,36 @@
 {
   "schemaVersion": 2,
   "id": "cv_08",
-  "name": "The Brown Lesson",
+  "name": "The Brown Trap",
+  "mixingEnabled": true,
   "grid": {
-    "width": 5,
-    "height": 5
+    "width": 6,
+    "height": 6
   },
-  "parMoves": 6,
-  "difficulty": "Easy",
+  "parMoves": 9,
+  "difficulty": "Medium",
   "teaches": "Brown = clearable waste; opportunity cost visible",
   "orbs": [
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 0
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 0,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 1
-    },
-    {
-      "color": "purple",
-      "tier": 1,
-      "x": 3,
-      "y": 0
-    },
-    {
-      "color": "purple",
-      "tier": 1,
-      "x": 3,
-      "y": 1
-    },
-    {
-      "color": "purple",
-      "tier": 1,
-      "x": 2,
-      "y": 2
-    },
-    {
-      "color": "green",
-      "tier": 1,
-      "x": 2,
-      "y": 1
-    },
-    {
-      "color": "brown",
-      "tier": 1,
-      "x": 2,
-      "y": 3
-    }
+    {"color": "cyan", "tier": 1, "x": 0, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 0},
+    {"color": "cyan", "tier": 1, "x": 0, "y": 1},
+    {"color": "cyan", "tier": 1, "x": 1, "y": 1},
+    {"color": "magenta", "tier": 1, "x": 3, "y": 0},
+    {"color": "magenta", "tier": 1, "x": 4, "y": 0},
+    {"color": "purple", "tier": 1, "x": 3, "y": 1},
+    {"color": "purple", "tier": 1, "x": 4, "y": 1},
+    {"color": "yellow", "tier": 1, "x": 2, "y": 3},
+    {"color": "yellow", "tier": 1, "x": 3, "y": 3},
+    {"color": "brown", "tier": 1, "x": 2, "y": 2},
+    {"color": "brown", "tier": 1, "x": 3, "y": 2}
   ],
   "targets": [
-    {
-      "color": "cyan",
-      "tier": 3,
-      "x": 4,
-      "y": 4
-    },
-    {
-      "color": "purple",
-      "tier": 2,
-      "x": 3,
-      "y": 4
-    }
+    {"color": "cyan", "tier": 3, "x": 5, "y": 5},
+    {"color": "purple", "tier": 2, "x": 4, "y": 5}
   ],
   "obstacles": [
-    {
-      "x": 0,
-      "y": 4
-    },
-    {
-      "x": 4,
-      "y": 0
-    },
-    {
-      "x": 4,
-      "y": 4
-    }
+    {"x": 0, "y": 5},
+    {"x": 5, "y": 0}
   ],
-  "displayName": "The Brown Lesson"
+  "displayName": "The Brown Trap"
 }

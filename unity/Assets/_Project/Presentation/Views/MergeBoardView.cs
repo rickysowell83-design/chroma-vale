@@ -1737,7 +1737,18 @@ namespace ChromaVale.Presentation.Views
         /// </summary>
         private float TierScale(OrbTier tier)
         {
-            return 0.6f * Mathf.Pow(1.2f, (int)tier - 1);
+            // Canon v2.1.0 §3.1 — tier v2 spec (2026-08-22).
+            // T1 0.85 / T2 1.00 / T3 1.25 / T4 1.50 / T5 1.70
+            // Supersedes the 2026-08-21 formula: 0.6f * 1.2^(tier-1)
+            return (int)tier switch
+            {
+                1 => 0.85f,
+                2 => 1.00f,
+                3 => 1.25f,
+                4 => 1.50f,
+                5 => 1.70f,
+                _ => 1.00f,
+            };
         }
 
         private void ClearBoard()
