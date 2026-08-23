@@ -86,6 +86,7 @@ namespace ChromaVale.Presentation.Views
         // ── Grid state ──
         private LevelData _level;
         private int _levelNumber;
+        private DuskfallVignette _duskfallVignette;
         private int _maxLevel;
         private float _boardOffsetX;
         private float _boardOffsetY;
@@ -263,6 +264,15 @@ namespace ChromaVale.Presentation.Views
             // TEMP-DIAG (t_e36536c3): surface domain diagnostics in the Unity console
             ((BoardController)_board).OnDiagnostic += msg => Debug.Log($"[BoardDiag] {msg}");
             _board.Initialize(_level);
+
+            // Duskfall vignette (spec l8_duskfall_blackout_spec.md): bind the
+            // level's dusk system so screen-edge darkness tracks the countdown.
+            if (_duskfallVignette == null)
+                _duskfallVignette = gameObject.AddComponent<DuskfallVignette>();
+            if (((BoardController)_board).Duskfall != null && ((BoardController)_board).Duskfall.Enabled)
+                _duskfallVignette.Bind(((BoardController)_board).Duskfall);
+            else
+                _duskfallVignette.Unbind();
 
             // Subscribe to board events
             _board.OnBoardChanged += HandleBoardChanged;
@@ -629,26 +639,27 @@ namespace ChromaVale.Presentation.Views
             _regionBackground.color = RegionBgDesaturated;
         }
 
-        /// <summary>Scales the background to cover the camera's framed view (the
-        /// camera was just configured by SetupCamera, so reuse its ortho size).</summary>
+        /// <summary>Scales the background to fit the board EXACTLY — no bleed past
+        /// the tile edges, so no second panel edge reads as "two boards" (t_ae96c91e).
+        /// The camera (SetupCamera) frames the board; the backdrop matches it.</summary>
         private void SizeRegionBackground()
         {
             if (_regionBackground == null || _regionBackground.sprite == null) return;
-            var cam = Camera.main;
-            float aspect = Screen.width > 0 ? (float)Screen.width / Screen.height : 1.7778f;
-            float orthoSize = cam != null && cam.orthographicSize > 0.01f
-                ? cam.orthographicSize
-                : (Mathf.Max(_level.Height * _tileSize, _level.Width * _tileSize) / 2f) + _tileSize;
+
+            // Board extent in world units, centered on the origin (board offsets
+            // are -W*tileSize/2 .. +W*tileSize/2).
+            float boardWorldW = _level.Width * _tileSize;
+            float boardWorldH = _level.Height * _tileSize;
 
             Vector2 spriteUnits = new Vector2(
                 _regionBackground.sprite.rect.width / Mathf.Max(_regionBackground.sprite.pixelsPerUnit, 0.01f),
                 _regionBackground.sprite.rect.height / Mathf.Max(_regionBackground.sprite.pixelsPerUnit, 0.01f));
-            float coverW = orthoSize * aspect * 2.1f;
-            float coverH = orthoSize * 2.1f;
             _regionBackground.transform.localScale = new Vector3(
-                coverW / Mathf.Max(spriteUnits.x, 0.01f),
-                coverH / Mathf.Max(spriteUnits.y, 0.01f),
+                boardWorldW / Mathf.Max(spriteUnits.x, 0.01f),
+                boardWorldH / Mathf.Max(spriteUnits.y, 0.01f),
                 1f);
+            // Keep centered on the board (CreateRegionBackground places it at origin, z=1).
+            _regionBackground.transform.position = new Vector3(0f, 0f, 1f);
         }
 
         /// <summary>Loads the current region's artist background PNG. The PNGs live

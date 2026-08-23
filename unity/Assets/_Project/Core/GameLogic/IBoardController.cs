@@ -38,6 +38,15 @@ namespace ChromaVale.Core.GameLogic
         /// <summary>Number of successful merges made this level.</summary>
         int MoveCount { get; }
 
+        /// <summary>Grid width in cells (set by Initialize).</summary>
+        int Width { get; }
+
+        /// <summary>Grid height in cells (set by Initialize).</summary>
+        int Height { get; }
+
+        /// <summary>Duskfall countdown state for the active level (null when disabled).</summary>
+        DuskfallSystem? Duskfall { get; }
+
         /// <summary>Event fired when the board state changes (orb added, removed, transformed).</summary>
         event Action<BoardChange> OnBoardChanged;
 

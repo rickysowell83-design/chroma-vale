@@ -99,6 +99,22 @@ namespace ChromaVale.Core.GameLogic
         /// </summary>
         public int SpoilMaxDecay = BrownSpoilSystem.DefaultMaxDecay;
 
+        /// <summary>
+        /// When true, the Duskfall mechanic ("The Blackout") is active on this
+        /// level: a global duskCounter starts at <see cref="DuskBeats"/> and
+        /// decrements each completed move while any Brown remains. Clearing
+        /// ALL Browns resets it; reaching 0 with a Brown present is a soft
+        /// fail (Duskfall → retry). Spec: l8_duskfall_blackout_spec.md.
+        /// Default false (mechanic off).
+        /// </summary>
+        public bool DuskEnabled;
+
+        /// <summary>
+        /// Beats in the Duskfall countdown. Only meaningful when
+        /// <see cref="DuskEnabled"/> is true. Default 6.
+        /// </summary>
+        public int DuskBeats = DuskfallSystem.DefaultDuskBeats;
+
         // ═══════════════════════════════════════════════════════════════
         // WORLD 1: "First Light" — Learning to Route (Levels 1-5)
         // ═══════════════════════════════════════════════════════════════

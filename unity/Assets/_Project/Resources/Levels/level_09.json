@@ -26,9 +26,6 @@
     {"color": "green", "tier": 2, "x": 5, "y": 5},
     {"color": "orange", "tier": 2, "x": 4, "y": 5}
   ],
-  "obstacles": [
-    {"x": 0, "y": 0},
-    {"x": 0, "y": 5}
-  ],
+  "obstacles": [],
   "displayName": "Scarcity"
 }

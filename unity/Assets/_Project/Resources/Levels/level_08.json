@@ -1,17 +1,17 @@
 {
   "schemaVersion": 2,
   "id": "cv_08",
-  "name": "The Brown Trap",
+  "name": "Duskfall",
   "mixingEnabled": true,
-  "spoilEnabled": true,
-  "spoilMaxDecay": 3,
+  "duskEnabled": true,
+  "duskBeats": 6,
   "grid": {
     "width": 6,
     "height": 6
   },
   "parMoves": 8,
   "difficulty": "Medium",
-  "teaches": "Brown = clearable waste; neglected browns multiply",
+  "teaches": "Brown = clearable waste; clear ALL Brown before the dark closes",
   "orbs": [
     {"color": "cyan", "tier": 1, "x": 0, "y": 0},
     {"color": "cyan", "tier": 1, "x": 1, "y": 0},
@@ -32,9 +32,6 @@
     {"color": "cyan", "tier": 3, "x": 5, "y": 5},
     {"color": "purple", "tier": 2, "x": 4, "y": 5}
   ],
-  "obstacles": [
-    {"x": 0, "y": 5},
-    {"x": 5, "y": 0}
-  ],
-  "displayName": "The Brown Trap"
+  "obstacles": [],
+  "displayName": "Duskfall"
 }

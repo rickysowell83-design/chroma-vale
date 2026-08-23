@@ -9,7 +9,7 @@
   },
   "parMoves": 15,
   "difficulty": "Hard",
-  "teaches": "All three chains, exact-count inventory, obstacle navigation",
+  "teaches": "All three chains, exact-count inventory",
   "orbs": [
     {"color": "cyan", "tier": 1, "x": 1, "y": 0},
     {"color": "cyan", "tier": 1, "x": 2, "y": 0},
@@ -29,11 +29,6 @@
     {"color": "green", "tier": 2, "x": 5, "y": 5},
     {"color": "orange", "tier": 2, "x": 4, "y": 5}
   ],
-  "obstacles": [
-    {"x": 0, "y": 0},
-    {"x": 6, "y": 0},
-    {"x": 0, "y": 5},
-    {"x": 6, "y": 5}
-  ],
+  "obstacles": [],
   "displayName": "Convergence"
 }

@@ -28,6 +28,7 @@ namespace ChromaVale.Domain.PuzzleBoard
         private bool _complete;
         private bool _mixingEnabled = true;
         private BrownSpoilSystem? _spoilSystem;
+        private DuskfallSystem? _duskfallSystem;
 
         /// <summary>Board width (set on Initialize).</summary>
         public int Width { get; private set; }
@@ -40,6 +41,13 @@ namespace ChromaVale.Domain.PuzzleBoard
 
         /// <inheritdoc />
         public int MoveCount { get; private set; }
+
+        /// <summary>
+        /// Duskfall countdown state for the active level (null when the level
+        /// has duskEnabled false). Presentation reads CounterRatio each frame
+        /// to drive the vignette shader and subscribes to its events.
+        /// </summary>
+        public DuskfallSystem? Duskfall => _duskfallSystem;
 
         /// <inheritdoc />
         public event Action<BoardChange>? OnBoardChanged;
@@ -70,8 +78,25 @@ namespace ChromaVale.Domain.PuzzleBoard
             _par = levelData.ParMoves;
             _mixingEnabled = levelData.MixingEnabled;
             _spoilSystem = new BrownSpoilSystem(levelData);
+            _duskfallSystem = new DuskfallSystem(levelData);
+            _duskfallSystem.Reset();
             MoveCount = 0;
             _complete = false;
+
+            // Arm the dusk countdown immediately when a Brown is pre-placed
+            // (L8 always seeds Brown — spec §2 start-at-zero determinism).
+            if (_duskfallSystem.Enabled)
+            {
+                bool prePlacedBrown = false;
+                if (levelData.MergeOrbs != null)
+                {
+                    foreach (var orb in levelData.MergeOrbs)
+                    {
+                        if (orb.Color == OrbColor.Brown) { prePlacedBrown = true; break; }
+                    }
+                }
+                if (prePlacedBrown) _duskfallSystem.Arm();
+            }
 
             if (levelData.MergeOrbs != null)
             {
@@ -153,8 +178,15 @@ namespace ChromaVale.Domain.PuzzleBoard
             // 4. Count the move and re-check the win condition.
             MoveCount++;
 
-            // 5. Spoiling Brown: advance decay on all browns, spawn if threshold hit.
-            if (_spoilSystem != null && _spoilSystem.Enabled)
+            // 5. Brown pressure mechanic — mutually exclusive per level:
+            //    Duskfall (visible countdown) takes priority over the retired
+            //    SpoilingBrown multiplication (DESIGN_CANON §3.3.1, failed
+            //    playtest — kept only for levels still flagging spoilEnabled).
+            if (_duskfallSystem != null && _duskfallSystem.Enabled)
+            {
+                _duskfallSystem.OnMoveCompleted(this);
+            }
+            else if (_spoilSystem != null && _spoilSystem.Enabled)
             {
                 var spoils = _spoilSystem.OnMoveCompleted(this);
                 foreach (var spawn in spoils)
@@ -248,6 +280,15 @@ namespace ChromaVale.Domain.PuzzleBoard
         {
             return x >= 0 && x < Width && y >= 0 && y < Height;
         }
+
+#if UNITY_EDITOR
+        /// <summary>EditMode test hook — removes the orb at a cell without firing
+        /// board events (lets dusk tests simulate "last Brown left the board").</summary>
+        public void DebugClearCell(int x, int y)
+        {
+            if (IsInBounds(x, y)) _cells[x, y] = null;
+        }
+#endif
 
         /// <summary>TEMP-DIAG (t_e36536c3): engine-free orb formatter.</summary>
         private static string FmtOrb(OrbData? orb)

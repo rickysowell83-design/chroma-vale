@@ -78,6 +78,8 @@ namespace ChromaVale.Core.GameLogic
                     MixingEnabled = GetBool(root, "mixingEnabled", true),
                     SpoilEnabled = GetBool(root, "spoilEnabled", false),
                     SpoilMaxDecay = GetInt32OrDefault(root, "spoilMaxDecay", BrownSpoilSystem.DefaultMaxDecay),
+                    DuskEnabled = GetBool(root, "duskEnabled", false),
+                    DuskBeats = GetInt32OrDefault(root, "duskBeats", DuskfallSystem.DefaultDuskBeats),
                     Obstacles = ParseObstacles(root),
                     MergeOrbs = ParseOrbs(root.GetProperty("orbs")),
                     RestorationTargets = ParseTargets(root.GetProperty("targets")),
