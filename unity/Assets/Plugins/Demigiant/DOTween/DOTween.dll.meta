@@ -25,6 +25,13 @@ PluginImporter:
       enabled: 0
       settings:
         CPU: AnyCPU
+    Android:
+      enabled: 1
+      settings:
+        CPU: ARM64
+    iPhone:
+      enabled: 1
+      settings: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 

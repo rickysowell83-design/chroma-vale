@@ -2,14 +2,14 @@
   "schemaVersion": 2,
   "id": "cv_07",
   "name": "Double Chain",
+  "mixingEnabled": true,
   "grid": {
     "width": 6,
     "height": 6
   },
-  "mixingEnabled": true,
-  "parMoves": 10,
+  "parMoves": 7,
   "difficulty": "Medium",
-  "teaches": "Two parallel chains with shared Yellow inventory",
+  "teaches": "Two parallel chains, shared Yellow",
   "orbs": [
     {
       "color": "cyan",
@@ -26,8 +26,14 @@
     {
       "color": "cyan",
       "tier": 1,
-      "x": 0,
-      "y": 1
+      "x": 2,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 0
     },
     {
       "color": "magenta",
@@ -44,32 +50,44 @@
     {
       "color": "magenta",
       "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 2,
+      "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 3,
+      "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
       "x": 4,
       "y": 1
     },
     {
       "color": "yellow",
       "tier": 1,
+      "x": 5,
+      "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
       "x": 0,
-      "y": 3
-    },
-    {
-      "color": "yellow",
-      "tier": 1,
-      "x": 1,
-      "y": 3
-    },
-    {
-      "color": "yellow",
-      "tier": 1,
-      "x": 2,
-      "y": 3
-    },
-    {
-      "color": "yellow",
-      "tier": 1,
-      "x": 3,
-      "y": 3
+      "y": 2
     }
   ],
   "targets": [

@@ -1,0 +1,23 @@
+# ninja log v5
+30	1601	8093239633815714	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	368ed65b33424438
+100	390	8093239621755926	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	6af390e661f642e3
+391	768	8093239625366414	C:/Users/rsowe/AppData/Local/hermes/profiles/game-director/workspace/chroma-vale-repo/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/Debug/5l18713i/obj/arm64-v8a/libswappywrapper.so	4e56bbf115845592
+50	1478	8093239632607378	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	39e3c8c636f3a497
+15	1512	8093239632959617	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	3674dab9f874bbe8
+68	1486	8093239632698054	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	856a025ad86863b2
+77	1476	8093239632592134	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	891f38356a021ee9
+38	1488	8093239632718422	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	99f450c931980385
+89	1534	8093239633197050	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	cb64d295fe2c8a25
+59	1585	8093239633654554	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	fb84f1bb869e562f
+1601	1787	8093239635653913	C:/Users/rsowe/AppData/Local/hermes/profiles/game-director/workspace/chroma-vale-repo/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/Debug/5l18713i/obj/arm64-v8a/libgame.so	d2eb7c99c849aed8
+21	287	8093243144651230	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	6af390e661f642e3
+288	563	8093243147293490	C:/Users/rsowe/AppData/Local/hermes/profiles/game-director/workspace/chroma-vale-repo/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/Debug/5l18713i/obj/arm64-v8a/libswappywrapper.so	4e56bbf115845592
+93	757	8093243149386846	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	891f38356a021ee9
+58	766	8093243149479615	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	99f450c931980385
+85	768	8093243149509691	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	39e3c8c636f3a497
+102	773	8093243149544766	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	856a025ad86863b2
+32	778	8093243149610243	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	3674dab9f874bbe8
+5	816	8093243149986020	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	cb64d295fe2c8a25
+77	854	8093243150350230	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	fb84f1bb869e562f
+69	866	8093243150456857	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	368ed65b33424438
+866	1041	8093243152189085	C:/Users/rsowe/AppData/Local/hermes/profiles/game-director/workspace/chroma-vale-repo/unity/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/Debug/5l18713i/obj/arm64-v8a/libgame.so	d2eb7c99c849aed8

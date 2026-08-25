@@ -1,37 +1,103 @@
 {
   "schemaVersion": 2,
   "id": "cv_08",
-  "name": "Duskfall",
+  "name": "Still Waters",
   "mixingEnabled": true,
-  "duskEnabled": true,
-  "duskBeats": 6,
   "grid": {
     "width": 6,
     "height": 6
   },
   "parMoves": 8,
-  "difficulty": "Medium",
-  "teaches": "Brown = clearable waste; clear ALL Brown before the dark closes",
+  "difficulty": "Easy",
+  "teaches": "Consolidation - relaxed T2 + T3 payoff",
   "orbs": [
-    {"color": "cyan", "tier": 1, "x": 0, "y": 0},
-    {"color": "cyan", "tier": 1, "x": 1, "y": 0},
-    {"color": "cyan", "tier": 1, "x": 0, "y": 1},
-    {"color": "cyan", "tier": 1, "x": 1, "y": 1},
-    {"color": "magenta", "tier": 1, "x": 3, "y": 0},
-    {"color": "magenta", "tier": 1, "x": 4, "y": 0},
-    {"color": "purple", "tier": 1, "x": 3, "y": 1},
-    {"color": "purple", "tier": 1, "x": 4, "y": 1},
-    {"color": "yellow", "tier": 1, "x": 2, "y": 3},
-    {"color": "yellow", "tier": 1, "x": 3, "y": 3},
-    {"color": "brown", "tier": 1, "x": 2, "y": 2},
-    {"color": "brown", "tier": 1, "x": 3, "y": 2},
-    {"color": "brown", "tier": 1, "x": 2, "y": 4},
-    {"color": "brown", "tier": 1, "x": 4, "y": 4}
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 2,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 4,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 5,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 2,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 3,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 4,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 5,
+      "y": 1
+    }
   ],
   "targets": [
-    {"color": "cyan", "tier": 3, "x": 5, "y": 5},
-    {"color": "purple", "tier": 2, "x": 4, "y": 5}
+    {
+      "color": "cyan",
+      "tier": 3,
+      "x": 5,
+      "y": 5
+    },
+    {
+      "color": "purple",
+      "tier": 2,
+      "x": 4,
+      "y": 5
+    }
   ],
   "obstacles": [],
-  "displayName": "Duskfall"
+  "displayName": "Still Waters (breather)"
 }

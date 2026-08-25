@@ -1,0 +1,1 @@
+C:\Users\rsowe\AppData\Local\hermes\profiles\game-director\workspace\chroma-vale-repo\unity\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\build\intermediates\cxx\RelWithDebInfo\6e1w3f4n\obj\arm64-v8a

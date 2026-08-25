@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
   "id": "cv_06",
-  "name": "Tier + Mix",
+  "name": "Taller Now",
+  "mixingEnabled": true,
   "grid": {
     "width": 6,
     "height": 5
   },
-  "mixingEnabled": true,
-  "parMoves": 7,
+  "parMoves": 4,
   "difficulty": "Medium",
-  "teaches": "Mix THEN merge \u2014 combine both verbs",
+  "teaches": "Mix THEN merge (both verbs combined)",
   "orbs": [
     {
       "color": "cyan",
@@ -32,38 +32,38 @@
     {
       "color": "cyan",
       "tier": 1,
-      "x": 0,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 1,
-      "y": 1
-    },
-    {
-      "color": "cyan",
-      "tier": 1,
-      "x": 2,
-      "y": 1
-    },
-    {
-      "color": "magenta",
-      "tier": 1,
       "x": 3,
       "y": 0
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 4,
       "y": 0
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 5,
       "y": 0
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 2,
+      "y": 1
     },
     {
       "color": "magenta",
@@ -81,5 +81,5 @@
     }
   ],
   "obstacles": [],
-  "displayName": "Taller Now"
+  "displayName": "Tier + Mix"
 }

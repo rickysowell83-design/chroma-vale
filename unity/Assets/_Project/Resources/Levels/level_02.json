@@ -1,28 +1,72 @@
 {
   "schemaVersion": 2,
   "id": "cv_02",
-  "name": "Double Up",
+  "name": "Two Seeds",
   "mixingEnabled": false,
   "grid": {
     "width": 4,
     "height": 4
   },
-  "parMoves": 8,
+  "parMoves": 5,
   "difficulty": "Tutorial",
-  "teaches": "Two colors, two chains, plan order — different colors don't merge (yet)",
+  "teaches": "Chain + surplus (not all orbs needed)",
   "orbs": [
-    {"color": "cyan", "tier": 1, "x": 0, "y": 0},
-    {"color": "cyan", "tier": 1, "x": 1, "y": 0},
-    {"color": "cyan", "tier": 1, "x": 0, "y": 1},
-    {"color": "cyan", "tier": 1, "x": 1, "y": 1},
-    {"color": "magenta", "tier": 1, "x": 2, "y": 0},
-    {"color": "magenta", "tier": 1, "x": 3, "y": 0},
-    {"color": "magenta", "tier": 1, "x": 2, "y": 1},
-    {"color": "magenta", "tier": 1, "x": 3, "y": 1}
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 2,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 0
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 1
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 2,
+      "y": 1
+    },
+    {
+      "color": "cyan",
+      "tier": 1,
+      "x": 3,
+      "y": 1
+    }
   ],
   "targets": [
-    {"color": "cyan", "tier": 3, "x": 0, "y": 3},
-    {"color": "magenta", "tier": 3, "x": 3, "y": 3}
+    {
+      "color": "cyan",
+      "tier": 3,
+      "x": 3,
+      "y": 3
+    }
   ],
   "obstacles": [],
   "displayName": "Double Up"
