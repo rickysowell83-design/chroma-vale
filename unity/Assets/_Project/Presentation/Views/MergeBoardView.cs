@@ -1635,6 +1635,19 @@ namespace ChromaVale.Presentation.Views
             // Don't create duplicate popups
             if (_winPopup != null) Destroy(_winPopup);
 
+            // [WinPopupDiag] Root-cause probe: is the UI event pipeline alive on device?
+            Debug.Log($"[WinPopupDiag] EventSystem.current={(UnityEngine.EventSystems.EventSystem.current != null ? UnityEngine.EventSystems.EventSystem.current.name : "NULL")}, module={(UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.currentInputModule != null ? UnityEngine.EventSystems.EventSystem.current.currentInputModule.GetType().Name : "NULL")}");
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+            {
+                var esGo = new GameObject("WinPopupEventSystem");
+                esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+#if ENABLE_INPUT_SYSTEM
+                esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
+                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+#endif
+            }
+
             var popupGo = new GameObject("WinPopup");
             var canvas = popupGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -1746,6 +1759,46 @@ namespace ChromaVale.Presentation.Views
             var button = btnGo.AddComponent<Button>();
             button.targetGraphic = btnImage;
             button.onClick.AddListener(onClick);
+            // Raw-touch fallback: fires even if the EventSystem/UIInputModule pipeline is dead on device.
+            btnGo.AddComponent<PopupTapFallback>().Init(btnRect, onClick);
+        }
+
+        /// <summary>Manual tap detector independent of the UI event pipeline (device fix v10004).</summary>
+        private class PopupTapFallback : MonoBehaviour
+        {
+            private RectTransform _rect;
+            private UnityEngine.Events.UnityAction _onClick;
+            private bool _wasDown;
+            private float _lastFire = -10f;
+
+            public void Init(RectTransform rect, UnityEngine.Events.UnityAction onClick)
+            {
+                _rect = rect;
+                _onClick = onClick;
+            }
+
+            private void Update()
+            {
+                var ts = UnityEngine.InputSystem.Touchscreen.current;
+                var mouse = UnityEngine.InputSystem.Mouse.current;
+                bool down = ts != null && ts.primaryTouch.press.wasPressedThisFrame;
+                bool up = ts != null && ts.primaryTouch.press.wasReleasedThisFrame;
+                if (!down && !up && mouse == null) return;
+
+                Vector2 pos = ts != null ? ts.primaryTouch.position.ReadValue()
+                            : mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+
+                if (down) _wasDown = true;
+                if (up && _wasDown && Time.unscaledTime - _lastFire > 0.5f
+                    && RectTransformUtility.RectangleContainsScreenPoint(_rect, pos, null))
+                {
+                    _lastFire = Time.unscaledTime;
+                    var btn = GetComponent<Button>();
+                    if (btn != null) btn.interactable = false; // dedupe vs EventSystem double-fire
+                    Debug.Log($"[PopupTapFallback] fired on {name}");
+                    _onClick?.Invoke();
+                }
+            }
         }
 
         private void ReturnToLevelSelect()
