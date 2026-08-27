@@ -114,6 +114,20 @@ namespace ChromaVale.Core.GameLogic
                 $"Merge fixture is missing required int field '{primary}' (or '{fallback}').");
         }
 
+        /// <summary>
+        /// Reads an int32 from <paramref name="primary"/>, falling back to
+        /// <paramref name="fallback"/> when the primary key is absent, then to
+        /// <paramref name="defaultValue"/> when neither key is present.
+        /// </summary>
+        private static int GetInt32Fallback(JsonElement element, string primary, string fallback, int defaultValue)
+        {
+            if (element.TryGetProperty(primary, out JsonElement v1) && v1.ValueKind == JsonValueKind.Number)
+                return v1.GetInt32();
+            if (element.TryGetProperty(fallback, out JsonElement v2) && v2.ValueKind == JsonValueKind.Number)
+                return v2.GetInt32();
+            return defaultValue;
+        }
+
         private static string GetString(JsonElement element, string property)
         {
             if (element.TryGetProperty(property, out JsonElement value) &&
@@ -191,9 +205,12 @@ namespace ChromaVale.Core.GameLogic
             List<RestorationTarget> targets = new List<RestorationTarget>();
             foreach (JsonElement target in array.EnumerateArray())
             {
+                // x/y are OPTIONAL: v2.3.0 redesign targets are position-agnostic
+                // (e.g. { "color":"cyan", "tier":2 }) — CheckWin matches anywhere.
+                // GetProperty throws KeyNotFoundException if absent, so default them.
                 targets.Add(new RestorationTarget(
-                    target.GetProperty("x").GetInt32(),
-                    target.GetProperty("y").GetInt32(),
+                    GetInt32OrDefault(target, "x", -1),
+                    GetInt32OrDefault(target, "y", -1),
                     ParseColor(target.GetProperty("color")),
                     ParseTier(target.GetProperty("tier"))));
             }
