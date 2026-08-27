@@ -4,10 +4,10 @@
   "name": "Convergence",
   "mixingEnabled": true,
   "grid": {
-    "width": 6,
-    "height": 6
+    "width": 7,
+    "height": 7
   },
-  "parMoves": 9,
+  "parMoves": 15,
   "difficulty": "Hard",
   "teaches": "All three chains, exact-count (slack 0)",
   "orbs": [
@@ -36,15 +36,21 @@
       "y": 0
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 4,
       "y": 0
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 5,
+      "y": 0
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 6,
       "y": 0
     },
     {
@@ -60,19 +66,19 @@
       "y": 1
     },
     {
-      "color": "yellow",
+      "color": "magenta",
       "tier": 1,
       "x": 2,
       "y": 1
     },
     {
-      "color": "yellow",
+      "color": "magenta",
       "tier": 1,
       "x": 3,
       "y": 1
     },
     {
-      "color": "yellow",
+      "color": "magenta",
       "tier": 1,
       "x": 4,
       "y": 1
@@ -82,26 +88,50 @@
       "tier": 1,
       "x": 5,
       "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 6,
+      "y": 1
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 0,
+      "y": 2
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 1,
+      "y": 2
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 2,
+      "y": 2
+    },
+    {
+      "color": "yellow",
+      "tier": 1,
+      "x": 3,
+      "y": 2
     }
   ],
   "targets": [
     {
       "color": "purple",
-      "tier": 2,
-      "x": 5,
-      "y": 5
+      "tier": 2
     },
     {
       "color": "green",
-      "tier": 2,
-      "x": 4,
-      "y": 5
+      "tier": 2
     },
     {
       "color": "orange",
-      "tier": 2,
-      "x": 3,
-      "y": 5
+      "tier": 2
     }
   ],
   "obstacles": [],

@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
   "id": "cv_06",
-  "name": "Taller Now",
+  "name": "Cascade",
   "mixingEnabled": true,
   "grid": {
-    "width": 6,
+    "width": 5,
     "height": 5
   },
-  "parMoves": 4,
+  "parMoves": 11,
   "difficulty": "Medium",
-  "teaches": "Mix THEN merge (both verbs combined)",
+  "teaches": "Longer chains toward T3",
   "orbs": [
     {
       "color": "cyan",
@@ -44,23 +44,17 @@
     {
       "color": "cyan",
       "tier": 1,
-      "x": 5,
-      "y": 0
-    },
-    {
-      "color": "magenta",
-      "tier": 1,
       "x": 0,
       "y": 1
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 1,
       "y": 1
     },
     {
-      "color": "magenta",
+      "color": "cyan",
       "tier": 1,
       "x": 2,
       "y": 1
@@ -70,16 +64,36 @@
       "tier": 1,
       "x": 3,
       "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 4,
+      "y": 1
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 0,
+      "y": 2
+    },
+    {
+      "color": "magenta",
+      "tier": 1,
+      "x": 1,
+      "y": 2
     }
   ],
   "targets": [
     {
+      "color": "cyan",
+      "tier": 3
+    },
+    {
       "color": "purple",
-      "tier": 2,
-      "x": 5,
-      "y": 4
+      "tier": 2
     }
   ],
   "obstacles": [],
-  "displayName": "Tier + Mix"
+  "displayName": "Cascade"
 }

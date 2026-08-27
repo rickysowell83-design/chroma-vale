@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Chroma Vale — DuskfallSystem unit tests (EditMode, NUnit)
-// Spec: l8_duskfall_blackout_spec.md — countdown, arm/reset, soft-fail event.
+//
+// DESIGN_CANON v2.3.0 (2026-08-23): Duskfall (Brown trap / countdown fail-state)
+// and the L8 "Duskfall Blackout" wiring were DEFERRED to Act IV. The DuskfallSystem
+// code remains shipped but DISABLED in Levels 1-10 — it is a correct no-op unless a
+// level explicitly sets duskEnabled=true (never the case for L1-10). These tests pin
+// that deferred (safe, inert) behavior and the opt-in arming path used when Act IV ships.
 
 #nullable enable
 
@@ -52,6 +57,8 @@ namespace ChromaVale.Tests
         [Test]
         public void Defaults_FullBeats_NotArmed()
         {
+            // System is enabled (opt-in path used when Act IV ships), but with no
+            // Browns on the board it stays disarmed and the counter is full.
             var dusk = new DuskfallSystem(MakeLevel(duskEnabled: true, beats: 6));
             Assert.IsTrue(dusk.Enabled);
             Assert.AreEqual(6, dusk.Counter);
@@ -66,7 +73,23 @@ namespace ChromaVale.Tests
             Assert.AreEqual(DuskfallSystem.DefaultDuskBeats, dusk.DuskBeats);
         }
 
-        // ── Tick semantics ───────────────────────────────────────────────
+        [Test]
+        public void Level1Through10_Deferred_DuskDisabled()
+        {
+            // DESIGN_CANON §11: every L1-10 level ships with duskEnabled=false.
+            // The DuskfallSystem must be inert for the entire shipped act.
+            for (int i = 1; i <= 10; i++)
+            {
+                MergeLevelRepository repo = new MergeLevelRepository(new ResourcesLevelJsonProvider());
+                LevelData level = repo.GetMergeLevel(i);
+                Assert.IsFalse(level.DuskEnabled, $"Level {i} must not enable Duskfall (deferred to Act IV)");
+                var dusk = new DuskfallSystem(level);
+                Assert.IsFalse(dusk.Enabled, $"Level {i} DuskfallSystem must be disabled");
+                Assert.IsFalse(dusk.Armed, $"Level {i} must not arm (no Browns in L1-10)");
+            }
+        }
+
+        // ── Tick semantics (opt-in arming path; exercised only when Act IV enables it) ──
 
         [Test]
         public void TickWithoutBrowns_IsNoOp()
@@ -129,9 +152,8 @@ namespace ChromaVale.Tests
             // Simulate the last Brown leaving the board.
             ((BoardController)board).DebugClearCell(0, 0);
             bool released = false;
-            dusk.OnBrownCleared += () => released = true;
-            dusk.OnBrownCleared += () => released = true;
             int releaseCount = 0;
+            dusk.OnBrownCleared += () => released = true;
             dusk.OnBrownCleared += () => releaseCount++;
             dusk.TickForTest();
 

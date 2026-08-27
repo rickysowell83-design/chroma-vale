@@ -1,15 +1,15 @@
 {
   "schemaVersion": 2,
   "id": "cv_04",
-  "name": "Color Born",
+  "name": "Color Wheel",
   "mixingEnabled": true,
   "grid": {
     "width": 5,
     "height": 5
   },
-  "parMoves": 4,
-  "difficulty": "Easy",
-  "teaches": "Color mixing (guided first mix, free second)",
+  "parMoves": 8,
+  "difficulty": "Medium",
+  "teaches": "Make your first secondary (Purple)",
   "orbs": [
     {
       "color": "cyan",
@@ -63,17 +63,9 @@
   "targets": [
     {
       "color": "purple",
-      "tier": 1,
-      "x": 4,
-      "y": 4
-    },
-    {
-      "color": "purple",
-      "tier": 1,
-      "x": 3,
-      "y": 4
+      "tier": 2
     }
   ],
   "obstacles": [],
-  "displayName": "Color Born"
+  "displayName": "Color Wheel (intro to mixing)"
 }

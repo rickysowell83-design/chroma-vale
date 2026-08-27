@@ -73,13 +73,13 @@ namespace ChromaVale.Core.GameLogic
                 {
                     Width = GetGridDimension(root, "width"),
                     Height = GetGridDimension(root, "height"),
-                    ParMoves = GetInt32(root, "parMoves"),
-                    DisplayName = GetString(root, "displayName") ?? $"Level {levelNumber}",
-                    MixingEnabled = GetBool(root, "mixingEnabled", true),
-                    SpoilEnabled = GetBool(root, "spoilEnabled", false),
-                    SpoilMaxDecay = GetInt32OrDefault(root, "spoilMaxDecay", BrownSpoilSystem.DefaultMaxDecay),
-                    DuskEnabled = GetBool(root, "duskEnabled", false),
-                    DuskBeats = GetInt32OrDefault(root, "duskBeats", DuskfallSystem.DefaultDuskBeats),
+                    ParMoves = GetInt32Fallback(root, "parMoves", "par_moves"),
+                    DisplayName = GetStringFallback(root, "displayName", "display_name") ?? $"Level {levelNumber}",
+                    MixingEnabled = GetBoolFallback(root, "mixingEnabled", "mixing_enabled", true),
+                    SpoilEnabled = GetBoolFallback(root, "spoilEnabled", "spoil_enabled", false),
+                    SpoilMaxDecay = GetInt32Fallback(root, "spoilMaxDecay", "spoil_max_decay", BrownSpoilSystem.DefaultMaxDecay),
+                    DuskEnabled = GetBoolFallback(root, "duskEnabled", "dusk_enabled", false),
+                    DuskBeats = GetInt32Fallback(root, "duskBeats", "dusk_beats", DuskfallSystem.DefaultDuskBeats),
                     Obstacles = ParseObstacles(root),
                     MergeOrbs = ParseOrbs(root.GetProperty("orbs")),
                     RestorationTargets = ParseTargets(root.GetProperty("targets")),
@@ -97,9 +97,21 @@ namespace ChromaVale.Core.GameLogic
             throw new JsonException($"Merge fixture is missing required field 'grid.{dimension}'.");
         }
 
-        private static int GetInt32(JsonElement element, string property)
+        /// <summary>
+        /// Reads an int32 from <paramref name="primary"/>, falling back to
+        /// <paramref name="fallback"/> when the primary key is absent. This lets
+        /// the same repository parse both the game's camelCase fixtures
+        /// (<c>parMoves</c>) and the designer's snake_case validator fixtures
+        /// (<c>par_moves</c>). Throws only if neither key is present.
+        /// </summary>
+        private static int GetInt32Fallback(JsonElement element, string primary, string fallback)
         {
-            return element.GetProperty(property).GetInt32();
+            if (element.TryGetProperty(primary, out JsonElement v1) && v1.ValueKind == JsonValueKind.Number)
+                return v1.GetInt32();
+            if (element.TryGetProperty(fallback, out JsonElement v2) && v2.ValueKind == JsonValueKind.Number)
+                return v2.GetInt32();
+            throw new JsonException(
+                $"Merge fixture is missing required int field '{primary}' (or '{fallback}').");
         }
 
         private static string GetString(JsonElement element, string property)
@@ -110,6 +122,34 @@ namespace ChromaVale.Core.GameLogic
                 return value.GetString();
             }
             return null;
+        }
+
+        /// <summary>
+        /// Reads a string from <paramref name="primary"/>, falling back to
+        /// <paramref name="fallback"/> when the primary key is absent.
+        /// </summary>
+        private static string? GetStringFallback(JsonElement element, string primary, string fallback)
+        {
+            if (element.TryGetProperty(primary, out JsonElement v1) && v1.ValueKind == JsonValueKind.String)
+                return v1.GetString();
+            if (element.TryGetProperty(fallback, out JsonElement v2) && v2.ValueKind == JsonValueKind.String)
+                return v2.GetString();
+            return null;
+        }
+
+        /// <summary>
+        /// Reads a bool from <paramref name="primary"/>, falling back to
+        /// <paramref name="fallback"/>, then to <paramref name="defaultValue"/>.
+        /// </summary>
+        private static bool GetBoolFallback(JsonElement element, string primary, string fallback, bool defaultValue)
+        {
+            if (element.TryGetProperty(primary, out JsonElement v1) &&
+                (v1.ValueKind == JsonValueKind.True || v1.ValueKind == JsonValueKind.False))
+                return v1.GetBoolean();
+            if (element.TryGetProperty(fallback, out JsonElement v2) &&
+                (v2.ValueKind == JsonValueKind.True || v2.ValueKind == JsonValueKind.False))
+                return v2.GetBoolean();
+            return defaultValue;
         }
 
         private static bool GetBool(JsonElement element, string property, bool defaultValue)

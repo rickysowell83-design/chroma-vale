@@ -30,9 +30,9 @@ namespace ChromaVale.Tests
 
             Assert.AreEqual(4, level.Width, "Level 1 grid width");
             Assert.AreEqual(4, level.Height, "Level 1 grid height");
-            Assert.AreEqual(1, level.ParMoves, "Level 1 par moves");
+            Assert.AreEqual(3, level.ParMoves, "Level 1 par moves (canon)");
 
-            Assert.AreEqual(4, level.MergeOrbs.Length, "Level 1 orb count");
+            Assert.AreEqual(6, level.MergeOrbs.Length, "Level 1 orb count");
             Assert.IsTrue(
                 level.MergeOrbs.All(o => o.Color == OrbColor.Cyan && o.Tier == OrbTier.T1),
                 "Level 1 should be four Cyan T1 orbs");
@@ -52,48 +52,51 @@ namespace ChromaVale.Tests
 
             Assert.AreEqual(5, level.Width, "Level 4 grid width");
             Assert.AreEqual(5, level.Height, "Level 4 grid height");
-            Assert.AreEqual(6, level.ParMoves, "Level 4 par moves (raised from 4 to give color-mix discovery breathing room)");
+            Assert.AreEqual(8, level.ParMoves, "Level 4 par moves (canon)");
 
             Assert.AreEqual(8, level.MergeOrbs.Length, "Level 4 orb count");
             Assert.AreEqual(4, level.MergeOrbs.Count(o => o.Color == OrbColor.Cyan), "Level 4 Cyan orbs");
             Assert.AreEqual(4, level.MergeOrbs.Count(o => o.Color == OrbColor.Magenta), "Level 4 Magenta orbs");
 
-            Assert.AreEqual(2, level.RestorationTargets.Length, "Level 4 target count");
-            Assert.IsTrue(
-                level.RestorationTargets.All(t => t.Color == OrbColor.Purple),
-                "Level 4 targets should both be Purple");
+            Assert.AreEqual(1, level.RestorationTargets.Length, "Level 4 target count");
+            Assert.AreEqual(OrbColor.Purple, level.RestorationTargets[0].Color, "Level 4 target is Purple T2");
+            Assert.AreEqual(OrbTier.T2, level.RestorationTargets[0].Tier, "Level 4 target is Purple T2");
         }
 
         [Test]
-        public void GetMergeLevel_Level8_HasBrownOrbs()
+        public void GetMergeLevel_Level8_StillWaters_NoBrown_ThreeT2Targets()
         {
+            // DESIGN_CANON §11: L8 "Still Waters" is a calm breather — NO brown, NO obstacles,
+            // NO Duskfall (Duskfall/Brown deferred to Act IV per canon v2.3.0). Targets are the
+            // three primary T2s (Cyan/Magenta/Yellow T2) so it is always solvable.
             LevelData level = _repository.GetMergeLevel(8);
 
             Assert.AreEqual(6, level.Width, "Level 8 grid width");
             Assert.AreEqual(6, level.Height, "Level 8 grid height");
-            Assert.AreEqual(9, level.ParMoves, "Level 8 par moves");
+            Assert.AreEqual(8, level.ParMoves, "Level 8 par moves (canon)");
 
+            Assert.IsFalse(
+                level.MergeOrbs.Any(o => o.Color == OrbColor.Brown),
+                "Level 8 (Still Waters) must NOT include Brown orbs");
+            Assert.IsEmpty(level.Obstacles, "Level 8 (Still Waters) must have no obstacles");
+            Assert.AreEqual(3, level.RestorationTargets.Length, "Level 8 target count");
             Assert.IsTrue(
-                level.MergeOrbs.Any(o => o.Color == OrbColor.Brown && o.Tier == OrbTier.T1),
-                "Level 8 should include Brown T1 orbs");
-            Assert.AreEqual(2, level.RestorationTargets.Length, "Level 8 target count");
+                level.RestorationTargets.All(t => t.Tier == OrbTier.T2),
+                "Level 8 targets should all be primary T2");
         }
 
         [Test]
-        public void GetMergeLevel_Level10_HasObstacles()
+        public void GetMergeLevel_Level10_NoObstacles_ThreeT2Targets()
         {
+            // Obstacles were deferred (t_40de6adf); L10 "Convergence" ships with no obstacles.
             LevelData level = _repository.GetMergeLevel(10);
 
             Assert.AreEqual(7, level.Width, "Level 10 grid width");
-            Assert.AreEqual(6, level.Height, "Level 10 grid height");
-            Assert.AreEqual(15, level.ParMoves, "Level 10 par moves");
+            Assert.AreEqual(7, level.Height, "Level 10 grid height");
+            Assert.AreEqual(15, level.ParMoves, "Level 10 par moves (canon)");
 
             Assert.AreEqual(3, level.RestorationTargets.Length, "Level 10 target count");
-            Assert.IsNotNull(level.Obstacles, "Level 10 should have an obstacles array");
-            Assert.Greater(level.Obstacles.Length, 0, "Level 10 should have obstacles present");
-            Assert.IsTrue(
-                level.Obstacles.All(o => o.X >= 0 && o.X < level.Width && o.Y >= 0 && o.Y < level.Height),
-                "Level 10 obstacles must lie inside the grid");
+            Assert.IsEmpty(level.Obstacles, "Level 10 should have NO obstacles (deferred)");
         }
 
         [Test]

@@ -246,8 +246,19 @@ def parse_level_json(filepath):
     with open(filepath) as f:
         data = json.load(f)
 
-    mixing = data.get("mixingEnabled", False)
-    par = data.get("parMoves", 0)
+    # DESIGN_CANON §3.1.1: mixing is the default on; only an explicit
+    # false/0 disables it. Accept both camelCase (game fixtures) and
+    # snake_case (validator fixtures) spellings.
+    raw_mixing = data.get("mixingEnabled", data.get("mixing_enabled", None))
+    if raw_mixing is None:
+        mixing = True  # canon default: mixing ON
+    elif isinstance(raw_mixing, bool):
+        mixing = raw_mixing
+    else:
+        mixing = str(raw_mixing).lower() not in ("false", "0", "off", "no")
+
+    raw_par = data.get("parMoves", data.get("par_moves", None))
+    par = int(raw_par) if raw_par is not None else 0
     grid_w = data.get("gridWidth", data.get("grid", {}).get("width", 5))
     grid_h = data.get("gridHeight", data.get("grid", {}).get("height", 5))
 

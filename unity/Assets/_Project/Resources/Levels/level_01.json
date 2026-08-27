@@ -2,14 +2,14 @@
   "schemaVersion": 2,
   "id": "cv_01",
   "name": "First Bloom",
-  "mixingEnabled": false,
+  "mixingEnabled": true,
   "grid": {
     "width": 4,
     "height": 4
   },
-  "parMoves": 5,
+  "parMoves": 3,
   "difficulty": "Tutorial",
-  "teaches": "Drag-to-merge + first chain (guided)",
+  "teaches": "Tap two same-color T1 -> T2 merge",
   "orbs": [
     {
       "color": "cyan",
@@ -51,11 +51,9 @@
   "targets": [
     {
       "color": "cyan",
-      "tier": 3,
-      "x": 3,
-      "y": 3
+      "tier": 2
     }
   ],
   "obstacles": [],
-  "displayName": "First Bloom"
+  "displayName": "First Bloom (tutorial)"
 }
