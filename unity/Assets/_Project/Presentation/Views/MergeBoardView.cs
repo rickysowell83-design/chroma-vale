@@ -294,6 +294,11 @@ namespace ChromaVale.Presentation.Views
             _board.OnBoardChanged += HandleBoardChanged;
             _board.OnLevelComplete += HandleLevelComplete;
 
+            // Ensure merge/win juice is attached (salvage of t_66805704 — JuiceController
+            // auto-resolves _boardView to this view, so it subscribes to the same board).
+            if (GetComponent<JuiceController>() == null)
+                gameObject.AddComponent<JuiceController>();
+
             // Build visual grid
             BuildGrid();
 

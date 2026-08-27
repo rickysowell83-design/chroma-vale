@@ -57,10 +57,51 @@ namespace ChromaVale.Presentation.Views
 
             _cam = Camera.main;
 
-            if (_mergeBurstPrefab != null)
-                _mergeBurst = Instantiate(_mergeBurstPrefab, transform);
-            if (_winConfettiPrefab != null)
-                _winConfetti = Instantiate(_winConfettiPrefab, transform);
+            // Self-provision particle systems so juice works with ZERO inspector wiring
+            // (the pared-down build leaves prefab fields empty; FX sprites live in Resources/Art/FX).
+            if (_mergeBurst == null)
+                _mergeBurst = ProvisionBurst("fx_mergeburst");
+            if (_winConfetti == null)
+                _winConfetti = ProvisionBurst("fx_confetti");
+        }
+
+        /// <summary>Builds a one-shot ParticleSystem from a sprite in Resources/Art/FX if no prefab was assigned.</summary>
+        private ParticleSystem ProvisionBurst(string spriteName)
+        {
+            var sprite = Resources.Load<Sprite>($"FX/{spriteName}");
+            if (sprite == null) return null;
+
+            var go = new GameObject($"Juice_{spriteName}");
+            go.transform.SetParent(transform);
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.duration = 0.5f;
+            main.loop = false;
+            main.startLifetime = 0.5f;
+            main.startSpeed = 3f;
+            main.startSize = 0.3f;
+            main.maxParticles = 24;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.stopAction = ParticleSystemStopAction.Destroy; // auto-cleanup
+
+            var tex = ps.textureSheetAnimation; // reserved
+            var emit = ps.emission;
+            emit.SetBursts(new[] { new ParticleSystem.Burst(0f, 16) });
+
+            // Color the particles from the FX sprite.
+            var col = ps.colorOverLifetime;
+            col.enabled = true;
+            col.color = new ParticleSystem.MinMaxGradient(Color.white, new Color(1, 1, 1, 0));
+
+            // Use the sprite as the particle texture via the Renderer module.
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            renderer.material = new Material(Shader.Find("Particles/Standard Unlit"));
+            renderer.material.mainTexture = sprite.texture;
+            renderer.material.SetColor("_Color", Color.white);
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+
+            ps.Stop();
+            return ps;
         }
 
         private void OnEnable()
