@@ -83,6 +83,10 @@ namespace ChromaVale.Presentation.Views
         private MergeLevelRepository _levelRepo;
         private IBoardController _board;
 
+        /// <summary>Public board accessor so JuiceController (t_66805704) can subscribe to
+        /// merge/win events on the SAME BoardController instance this view drives. Salvage of t_66805704.</summary>
+        public IBoardController Board => _board;
+
         // ── Grid state ──
         private LevelData _level;
         private int _levelNumber;
@@ -1196,7 +1200,14 @@ namespace ChromaVale.Presentation.Views
                             // a particle burst in the mix's resulting color + a hue-shift tween.
                             if (isColorMix)
                             {
-                                PlayMixBurst(change.Position.X, change.Position.Y, change.NewOrb.Color);
+                                Vector3 mixWorldPos = GridToWorld(change.Position.X, change.Position.Y);
+                                Color mixResult = GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier);
+                                if (_particleFx != null)
+                                    _particleFx.MixSwirl(mixWorldPos,
+                                        GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier),
+                                        change.OldOrb != null
+                                            ? GetOrbColor(change.OldOrb.Color, change.OldOrb.Tier)
+                                            : mixResult);
                             }
                         }
 
@@ -1888,7 +1899,10 @@ namespace ChromaVale.Presentation.Views
 
         // ── Helpers ──
 
-        private Vector3 GridToWorld(int x, int y)
+        /// <summary>World position of a grid cell. Public so JuiceController (t_66805704)
+        /// can place merge/win particle bursts on the correct cell without a fragile
+        /// reflection/duplicated transform. Implemented by Director salvage of the timed-out card.</summary>
+        public Vector3 GridToWorld(int x, int y)
         {
             return new Vector3(
                 x * _tileSize + _boardOffsetX + _tileSize / 2f,
@@ -1896,6 +1910,11 @@ namespace ChromaVale.Presentation.Views
                 0f
             );
         }
+
+        /// <summary>Returns the live OrbVisual at a cell (or null). Public hook for JuiceController
+        /// to drive scale-pop / color-morph on the result orb. Salvage of t_66805704.</summary>
+        public OrbVisual GetOrbVisual(int x, int y)
+            => _orbVisuals.TryGetValue((x, y), out var v) ? v : null;
 
         private (int x, int y)? WorldToGrid(Vector3 world)
         {
