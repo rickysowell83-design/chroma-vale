@@ -218,6 +218,20 @@ namespace ChromaVale.Presentation.Views.Components
             string path = $"Orbs/Art/{color}/{colorName}_t{tier}";
             var sprite = Resources.Load<Sprite>(path);
 
+            // Fallback: artist PNGs may be imported as raw textures (not Sprite assets),
+            // or arrive as animation-strip slices. Wrap a Texture2D into a Sprite so the
+            // neon-glass art still renders instead of dropping to the procedural circle.
+            if (sprite == null)
+            {
+                var tex = Resources.Load<Texture2D>(path);
+                if (tex != null)
+                {
+                    sprite = Sprite.Create(tex,
+                        new Rect(0f, 0f, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), 256f);
+                }
+            }
+
             // Cache even if null (so we don't re-probe every frame)
             _spriteCache[key] = sprite;
             return sprite;
