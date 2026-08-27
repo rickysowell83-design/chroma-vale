@@ -110,6 +110,7 @@ namespace ChromaVale.Presentation.Views
         // The region background starts desaturated (the vale has lost its color) and
         // blooms back to full saturation when the level completes.
         private ParticleFxService _particleFx;
+        private CameraShake _cameraShake;
         private SpriteRenderer _regionBackground;
         private Sprite _regionBgSprite;
         private const float RestorationDesatDuration = 0.35f;
@@ -124,6 +125,9 @@ namespace ChromaVale.Presentation.Views
         private GameObject _onboardingCueRoot;   // chip root (bg + text) — pulse target
         private Tween _onboardingPulseTween;     // killed on hide to avoid leaks
         private bool _onboardingCueShown;
+
+        // ── Colourblind mode (tier glyph overlay on orbs) ──
+        private bool _colourblindMode;
 
         // ── Colors for orbs (should match DESIGN_CANON CMY primaries) ──
         private static readonly Dictionary<OrbColor, Color> OrbColors = new()
@@ -151,6 +155,14 @@ namespace ChromaVale.Presentation.Views
             var fxGo = new GameObject("ParticleFxService");
             fxGo.transform.SetParent(transform, false);
             _particleFx = fxGo.AddComponent<ParticleFxService>();
+
+            // Camera shake for tier-up juice.
+            var camGo = Camera.main != null ? Camera.main.gameObject : new GameObject("MainCamera");
+            _cameraShake = camGo.GetComponent<CameraShake>();
+            if (_cameraShake == null) _cameraShake = camGo.AddComponent<CameraShake>();
+
+            // Colourblind mode toggle (PlayerPrefs: "ColourblindMode" = 0/1).
+            _colourblindMode = PlayerPrefs.GetInt("ColourblindMode", 0) == 1;
         }
 
         private void Start()
@@ -738,8 +750,9 @@ namespace ChromaVale.Presentation.Views
             orbGo.transform.position = worldPos;
 
             var orbVisual = orbGo.AddComponent<OrbVisual>();
-            Color orbColor = GetOrbColor(color, tier);
-            orbVisual.Configure(orbColor, (int)tier);
+            // Use artist neon-glass PNGs keyed by (OrbColor, OrbTier).
+            // OrbVisual loads internally and does NOT tint by color.
+            orbVisual.Configure(color, tier);
 
             // Designer spec: multiplicative 20% per tier (T1=1.0x → T5=2.07x)
             orbGo.transform.localScale = Vector3.one * TierScale(tier);
@@ -1136,21 +1149,27 @@ namespace ChromaVale.Presentation.Views
                         SpawnOrbVisual(change.Position.X, change.Position.Y,
                                        change.NewOrb.Color, change.NewOrb.Tier);
 
-                        // Merge animation: punch + glow + settle.
-                        // Phase 1: instant shrink to 30%
-                        // Phase 2: grow with overshoot punch (0.4s total — readable)
-                        // Phase 3: visible glow flash in the orb's own hue (NOT
-                        //          white * 1.5, which clamps back to white = invisible)
+                        // ── JUICE: merge feedback ──
+                        // Detect color mix: if OldOrb color ≠ NewOrb color, this was a pigment mix.
+                        bool isColorMix = change.OldOrb != null
+                            && change.OldOrb.Color != change.NewOrb.Color;
+
                         if (_orbVisuals.TryGetValue((change.Position.X, change.Position.Y), out var newOrb) && newOrb != null)
                         {
                             var go = newOrb.gameObject;
                             var targetScale = go.transform.localScale;
+                            int tierInt = (int)change.NewOrb.Tier;
 
+                            // ── Scale-pop animation: shrink to 30% → overshoot → settle ──
                             // Phase 1: instant shrink to 30%
                             go.transform.localScale = targetScale * 0.3f;
 
-                            // Phase 2: grow with overshoot punch (0.2s out + 0.2s settle)
-                            go.transform.DOScale(targetScale * 1.2f, 0.2f).SetEase(Ease.OutQuad)
+                            // Phase 2: grow with overshoot — intensity scales with tier.
+                            // T1/T2: standard pop. T3+: bigger overshoot. T4/T5: max pop.
+                            // Canon §3.1: emission 1→8, scale 0.85→1.70 (T5 ~5× T2).
+                            float overshoot = 1f + Mathf.Lerp(0.3f, 0.8f, (tierInt - 1) / 4f);
+                            float popDuration = 0.2f;
+                            go.transform.DOScale(targetScale * overshoot, popDuration).SetEase(Ease.OutQuad)
                                 .SetLink(go)
                                 .OnComplete(() =>
                                 {
@@ -1158,21 +1177,71 @@ namespace ChromaVale.Presentation.Views
                                         go.transform.DOScale(targetScale, 0.2f).SetEase(Ease.OutBack).SetLink(go);
                                 });
 
-                            // Phase 3: visible glow flash — boost the orb's own color
-                            var orbColor = GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier);
-                            var flashColor = new Color(
+                            // ── Additive flash: brighten the orb's own hue ──
+                            // With artist PNGs, _sr.color is white (PNG carries its own color).
+                            // Flash to a brightened tint then back, so the flash is visible.
+                            Color orbColor = GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier);
+                            Color flashColor = new Color(
                                 Mathf.Min(1f, orbColor.r * 1.8f + 0.3f),
                                 Mathf.Min(1f, orbColor.g * 1.8f + 0.3f),
                                 Mathf.Min(1f, orbColor.b * 1.8f + 0.3f),
                                 1f);
-                            var baseColor = newOrb.GetColor();
+                            Color baseColor = newOrb.GetColor();
                             newOrb.SetColor(flashColor);
                             DOTween.To(() => newOrb.GetColor(), c => newOrb.SetColor(c), baseColor, 0.4f)
                                 .SetDelay(0.15f).SetLink(go);
+
+                            // ── Colour-mix distinct juice ──
+                            // Color mixes (cyan+magenta→purple etc.) get a UNIQUE feedback:
+                            // a particle burst in the mix's resulting color + a hue-shift tween.
+                            if (isColorMix)
+                            {
+                                PlayMixBurst(change.Position.X, change.Position.Y, change.NewOrb.Color);
+                            }
                         }
 
+                        // ── Particle burst at merge point ──
+                        // Tier-up (esp. T4/T5): bigger burst + screen shake.
+                        // Canon §3.1: emission T1→T5 = 1.0→8.0, scale 0.85→1.70.
+                        Vector3 mergeWorldPos = GridToWorld(change.Position.X, change.Position.Y);
+                        int tierInt = (int)change.NewOrb.Tier;
+                        bool isTierUp = tierInt >= 3;
+                        bool isRare = tierInt >= 4;
+
+                        if (_particleFx != null)
+                        {
+                            if (isRare)
+                                _particleFx.TierUpBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                            else if (isTierUp)
+                                _particleFx.MergeBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                            else
+                                _particleFx.MergeBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                        }
+
+                        // ── Screen shake (tier-up, esp. T4/T5) ──
+                        if (isTierUp && _cameraShake != null)
+                        {
+                            float shakeMag = Mathf.Lerp(0.12f, 0.28f, (tierInt - 3) / 2f);
+                            float shakeDur = Mathf.Lerp(0.15f, 0.25f, (tierInt - 3) / 2f);
+                            _cameraShake.Shake(shakeDur, shakeMag);
+                        }
+
+                        // ── Haptic tick ──
+                        if (isTierUp)
+                        {
+                            Handheld.Vibrate();
+                        }
+
+                        // ── SFX ──
                         if (AudioServiceInstaller.Instance != null)
-                            AudioServiceInstaller.Instance.PlaySound("merge");
+                        {
+                            string sfx = isColorMix ? "color_mix"
+                                   : tierInt >= 4 ? "merge_rare"
+                                   : tierInt >= 3 ? "merge_tierup"
+                                   : "merge";
+                            AudioServiceInstaller.Instance.PlaySound(sfx);
+                        }
+
                         CheckTargetLock(change.Position.X, change.Position.Y, change.NewOrb);
                     }
                     break;
