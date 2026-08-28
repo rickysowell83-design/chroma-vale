@@ -161,7 +161,7 @@ namespace ChromaVale.Editor
             {
                 PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
                 PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
-                PlayerSettings.Android.bundleVersionCode = 10004;
+                PlayerSettings.Android.bundleVersionCode = 10005;
                 // Point Unity at writable SDK copy (Unity-bundled SDK is read-only in Program Files)
                 UnityEditor.EditorPrefs.SetString("AndroidSdkRoot", "C:/Users/rsowe/AndroidSdk_Unity");
                 // Development builds emit debug symbols automatically (IL2CPP).
