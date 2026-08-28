@@ -43,6 +43,13 @@ Desktop.ini
 # Build
 *.apk
 *.aab
+# Unity build/temp junk (not source)
+.utmp/
+.omh/
+show_task.py
+test_results.xml
+test_editmode.log
+test_orbart.*
 *.ipa
 *.app
 

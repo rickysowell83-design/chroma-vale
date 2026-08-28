@@ -2,47 +2,56 @@
   "schemaVersion": 2,
   "id": "cv_01",
   "name": "First Bloom",
+  "mixing_enabled": true,
   "grid": {
     "width": 4,
     "height": 4
   },
-  "parMoves": 1,
-  "difficulty": "Tutorial",
-  "teaches": "Tier merge",
+  "par_moves": 3,
+  "difficulty": "Normal",
   "orbs": [
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 0,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 1,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 2,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 3,
       "y": 0
+    },
+    {
+      "color": "Cyan",
+      "tier": 1,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "color": "Cyan",
+      "tier": 1,
+      "x": 1,
+      "y": 1
     }
   ],
   "targets": [
     {
-      "color": "cyan",
-      "tier": 2,
-      "x": 3,
-      "y": 3
+      "color": "Cyan",
+      "tier": 2
     }
   ],
-  "obstacles": [],
-  "displayName": "First Light"
+  "obstacles": []
 }

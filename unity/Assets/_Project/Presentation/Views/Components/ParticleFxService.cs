@@ -637,5 +637,93 @@ namespace ChromaVale.Presentation.Views.Components
             _flowHead.transform.position = position;
             _flowHead.Play();
         }
+
+        // ── Merge Juice ──────────────────────────────────────────────────────
+        // Called from MergeBoardView on every merge result. The particle colour
+        // is the result-orb colour; the particle count/size scales with the tier
+        // so a T5 merge feels ~5x the impact of a T2 (Canon §3.1: emission 1→8,
+        // scale 0.85→1.70). Uses the existing _traceShortFx burst system, tinted
+        // to the orb result colour with a flash-to-white over-lifetime gradient.
+
+        /// <summary>
+        /// Fire a merge burst at <paramref name="position"/>.
+        /// The burst is tinted to <paramref name="resultColor"/> and scaled by
+        /// <paramref name="tier"/> (1–5): higher tiers emit more particles, larger
+        /// and longer-lived.
+        /// </summary>
+        public void MergeBurst(Vector3 position, Color resultColor, int tier)
+        {
+            if (_traceShortFx == null) return;
+
+            float tierNorm = Mathf.InverseLerp(1, 5, tier);
+            // Canon §3.1: emission 1→8 → particle count 20→120
+            int particleCount = Mathf.RoundToInt(Mathf.Lerp(20, 120, tierNorm * tierNorm));
+            // Size scales with tier (0.85→1.70)
+            float size = Mathf.Lerp(0.85f, 1.70f, tierNorm) * 0.22f;
+            float lifetime = Mathf.Lerp(0.8f, 1.2f, tierNorm);
+            float speed = Mathf.Lerp(4f, 8f, tierNorm);
+
+            var main = _traceShortFx.main;
+            main.startSize = size;
+            main.startLifetime = lifetime;
+            main.startSpeed = speed;
+            main.startColor = resultColor;
+            main.maxParticles = particleCount + 20;
+
+            var emission = _traceShortFx.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, particleCount)
+            });
+
+            _traceShortFx.transform.position = position;
+            _traceShortFx.Play();
+        }
+
+        /// <summary>
+        /// Fire a TIER-UP burst (T4/T5 merges): bigger than MergeBurst, with a
+        /// white-hot flash gradient and extended ring expansion. Also triggers
+        /// the sparkle shower via _cascadingBloom.
+        /// </summary>
+        public void TierUpBurst(Vector3 position, Color resultColor, int tier)
+        {
+            if (_traceShortFx == null) return;
+
+            float tierNorm = Mathf.InverseLerp(3, 5, tier);
+            // T4 = ~2x MergeBurst, T5 = ~4x
+            int particleCount = Mathf.RoundToInt(Mathf.Lerp(80, 200, tierNorm));
+            float size = Mathf.Lerp(1.70f, 3.2f, tierNorm) * 0.22f;
+            float lifetime = Mathf.Lerp(1.2f, 1.8f, tierNorm);
+            float speed = Mathf.Lerp(6f, 12f, tierNorm);
+
+            var main = _traceShortFx.main;
+            main.startSize = size;
+            main.startLifetime = lifetime;
+            main.startSpeed = speed;
+            // White-hot flash: result colour at birth, fades through white to transparent
+            main.startColor = resultColor;
+            main.maxParticles = particleCount + 40;
+
+            var emission = _traceShortFx.emission;
+            emission.SetBursts(new ParticleSystem.Burst[]
+            {
+                new ParticleSystem.Burst(0f, particleCount),
+                new ParticleSystem.Burst(0.1f, particleCount / 2)
+            });
+
+            _traceShortFx.transform.position = position;
+            _traceShortFx.Play();
+
+            // Sparkle ring — use cascadingBloom tinted to the result colour
+            if (_cascadingBloom != null)
+            {
+                var cbMain = _cascadingBloom.main;
+                cbMain.startColor = resultColor;
+                cbMain.startSize = Mathf.Lerp(0.15f, 0.5f, tierNorm);
+                cbMain.startLifetime = Mathf.Lerp(1.0f, 2.0f, tierNorm);
+                _cascadingBloom.transform.position = position;
+                _cascadingBloom.Play();
+            }
+        }
     }
 }

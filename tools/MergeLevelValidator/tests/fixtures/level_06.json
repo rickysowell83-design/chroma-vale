@@ -1,84 +1,97 @@
 {
   "schemaVersion": 2,
   "id": "cv_06",
-  "name": "Tier + Mix",
+  "name": "Cascade",
+  "mixing_enabled": true,
   "grid": {
-    "width": 6,
+    "width": 5,
     "height": 5
   },
-  "parMoves": 7,
-  "difficulty": "Medium",
-  "teaches": "Mix THEN merge",
+  "par_moves": 11,
+  "difficulty": "Normal",
   "orbs": [
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 0,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 1,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 2,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 3,
       "y": 0
     },
     {
-      "color": "cyan",
+      "color": "Cyan",
       "tier": 1,
       "x": 4,
       "y": 0
     },
     {
-      "color": "cyan",
-      "tier": 1,
-      "x": 5,
-      "y": 0
-    },
-    {
-      "color": "magenta",
+      "color": "Cyan",
       "tier": 1,
       "x": 0,
       "y": 1
     },
     {
-      "color": "magenta",
+      "color": "Cyan",
       "tier": 1,
       "x": 1,
       "y": 1
     },
     {
-      "color": "magenta",
+      "color": "Cyan",
       "tier": 1,
       "x": 2,
       "y": 1
     },
     {
-      "color": "magenta",
+      "color": "Magenta",
       "tier": 1,
       "x": 3,
       "y": 1
+    },
+    {
+      "color": "Magenta",
+      "tier": 1,
+      "x": 4,
+      "y": 1
+    },
+    {
+      "color": "Magenta",
+      "tier": 1,
+      "x": 0,
+      "y": 2
+    },
+    {
+      "color": "Magenta",
+      "tier": 1,
+      "x": 1,
+      "y": 2
     }
   ],
   "targets": [
     {
-      "color": "purple",
-      "tier": 2,
-      "x": 5,
-      "y": 4
+      "color": "Cyan",
+      "tier": 3
+    },
+    {
+      "color": "Purple",
+      "tier": 2
     }
   ],
-  "obstacles": [],
-  "displayName": "Taller Now"
+  "obstacles": []
 }

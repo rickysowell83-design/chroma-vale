@@ -12,8 +12,8 @@
 using System;
 using NUnit.Framework;
 using ChromaVale.Core.GameLogic;
+using ChromaVale.Infrastructure.LevelData;
 using ChromaVale.Domain.PuzzleBoard;
-
 namespace ChromaVale.Tests
 {
     public class DuskfallSystemTests

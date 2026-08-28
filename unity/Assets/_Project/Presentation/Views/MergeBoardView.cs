@@ -1220,25 +1220,26 @@ namespace ChromaVale.Presentation.Views
                         // Tier-up (esp. T4/T5): bigger burst + screen shake.
                         // Canon §3.1: emission T1→T5 = 1.0→8.0, scale 0.85→1.70.
                         Vector3 mergeWorldPos = GridToWorld(change.Position.X, change.Position.Y);
-                        int tierInt = (int)change.NewOrb.Tier;
-                        bool isTierUp = tierInt >= 3;
-                        bool isRare = tierInt >= 4;
+                        int mergeTierInt = (int)change.NewOrb.Tier;
+                        bool isTierUp = mergeTierInt >= 3;
+                        bool isRare = mergeTierInt >= 4;
+                        Color mergeResultColor = GetOrbColor(change.NewOrb.Color, change.NewOrb.Tier);
 
                         if (_particleFx != null)
                         {
                             if (isRare)
-                                _particleFx.TierUpBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                                _particleFx.TierUpBurst(mergeWorldPos, mergeResultColor, mergeTierInt);
                             else if (isTierUp)
-                                _particleFx.MergeBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                                _particleFx.MergeBurst(mergeWorldPos, mergeResultColor, mergeTierInt);
                             else
-                                _particleFx.MergeBurst(mergeWorldPos, change.NewOrb.Color, tierInt);
+                                _particleFx.MergeBurst(mergeWorldPos, mergeResultColor, mergeTierInt);
                         }
 
                         // ── Screen shake (tier-up, esp. T4/T5) ──
                         if (isTierUp && _cameraShake != null)
                         {
-                            float shakeMag = Mathf.Lerp(0.12f, 0.28f, (tierInt - 3) / 2f);
-                            float shakeDur = Mathf.Lerp(0.15f, 0.25f, (tierInt - 3) / 2f);
+                            float shakeMag = Mathf.Lerp(0.12f, 0.28f, (mergeTierInt - 3) / 2f);
+                            float shakeDur = Mathf.Lerp(0.15f, 0.25f, (mergeTierInt - 3) / 2f);
                             _cameraShake.Shake(shakeDur, shakeMag);
                         }
 
@@ -1252,8 +1253,8 @@ namespace ChromaVale.Presentation.Views
                         if (AudioServiceInstaller.Instance != null)
                         {
                             string sfx = isColorMix ? "color_mix"
-                                   : tierInt >= 4 ? "merge_rare"
-                                   : tierInt >= 3 ? "merge_tierup"
+                                   : mergeTierInt >= 4 ? "merge_rare"
+                                   : mergeTierInt >= 3 ? "merge_tierup"
                                    : "merge";
                             AudioServiceInstaller.Instance.PlaySound(sfx);
                         }
